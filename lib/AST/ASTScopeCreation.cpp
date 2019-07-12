@@ -1375,6 +1375,13 @@ void IterableTypeScope::makeBodyCurrent() {
       getIterableDeclContext().get()->getExplicitMemberCount();
 }
 bool IterableTypeScope::isBodyObsolete() const {
+  if (explicitMemberCount !=
+         getIterableDeclContext().get()->getExplicitMemberCount() &&
+         explicitMemberCount) {
+     llvm::errs() << "SMOKING GUN Body: \n";
+     dump();
+     llvm_unreachable("END SMOKING GUN");
+  }
   return explicitMemberCount !=
          getIterableDeclContext().get()->getExplicitMemberCount();
 }
@@ -1382,13 +1389,26 @@ bool IterableTypeScope::isBodyObsolete() const {
 void AbstractFunctionBodyScope::beCurrent() {
   bodyWhenLastExpanded = decl->getBody();
 }
+
 bool AbstractFunctionBodyScope::isObsolete() const {
+  if (bodyWhenLastExpanded != decl->getBody()  &&
+  bodyWhenLastExpanded && !isa<ConstructorDecl>(decl)) {
+    llvm::errs() << "SMOKING GUN AFDB \n";
+    dump();
+    llvm_unreachable("END SMOKING GUN");
+  }
   return bodyWhenLastExpanded != decl->getBody();
   ;
 }
 
 void TopLevelCodeScope::beCurrent() { bodyWhenLastExpanded = decl->getBody(); }
 bool TopLevelCodeScope::isObsolete() const {
+  if (bodyWhenLastExpanded != decl->getBody()  &&
+  bodyWhenLastExpanded) {
+    llvm::errs() << "SMOKING GUN TopLevel \n";
+    dump();
+    llvm_unreachable("END SMOKING GUN");
+  }
   return bodyWhenLastExpanded != decl->getBody();
 }
 
