@@ -297,8 +297,9 @@ SourceRange
 ParameterListScope::getChildlessSourceRange(const bool omitAssertions) const {
   const auto rangeForGoodInput = getSourceRangeOfEnclosedParams(omitAssertions);
   auto r = SourceRange(rangeForGoodInput.Start,
-                     fixupEndForBadInput(rangeForGoodInput));
-  assert(getSourceManager().rangeContains(getParent().get()->getChildlessSourceRange(true), r) &&
+                       fixupEndForBadInput(rangeForGoodInput));
+  assert(getSourceManager().rangeContains(
+             getParent().get()->getChildlessSourceRange(true), r) &&
          "Parameters not within function?!");
   return r;
 }
