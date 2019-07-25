@@ -93,6 +93,8 @@ const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
     //    llvm::errs() << "in: \n";
     //    fileScope->dump();
     llvm::errs() << "\n\n";
+
+    assert(fileScope->crossCheckWithAST());
   }
 
   assert(startingScope && "ASTScopeImpl: could not find startingScope");

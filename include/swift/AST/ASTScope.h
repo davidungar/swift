@@ -320,7 +320,8 @@ public:
   /// fact, above and beyond adding Decls to the SourceFile. These are
   /// documented in: rdar://53018839, rdar://53027266, rdar://53027733,
   /// rdar://53028050
-  void reexpandIfObsolete(ScopeCreator &);
+  /// Return true if did reexpand
+  bool reexpandIfObsolete(ScopeCreator &);
 
 private:
   void reexpand(ScopeCreator &);
@@ -495,6 +496,7 @@ public:
 
   const SourceFile *getSourceFile() const override;
   NullablePtr<const void> addressForPrinting() const override { return SF; }
+  bool crossCheckWithAST();
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;

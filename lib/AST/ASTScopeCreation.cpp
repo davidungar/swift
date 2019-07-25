@@ -475,11 +475,14 @@ public:
 public:
   /// Return true if scope tree contains all the decl contexts in the AST
   /// May modify the scope tree in order to update obsolete scopes.
+  /// Likely slow.
   bool containsAllDeclContextsFromAST() {
     auto allDeclContexts = findLocalizableDeclContextsInAST();
     llvm::DenseMap<const DeclContext *, const ASTScopeImpl *> bogusDCs;
-    sourceFileScope->preOrderDo(
-        [&](ASTScopeImpl *scope) { scope->reexpandIfObsolete(*this); });
+    bool rebuilt = false;
+    sourceFileScope->preOrderDo([&](ASTScopeImpl *scope) {
+      rebuilt |= scope->reexpandIfObsolete(*this);
+    });
     sourceFileScope->postOrderDo([&](ASTScopeImpl *scope) {
       if (auto *dc = scope->getDeclContext().getPtrOrNull()) {
         auto iter = allDeclContexts.find(dc);
@@ -495,6 +498,8 @@ public:
       d->getSourceRange().dump(ctx.SourceMgr);
       llvm::errs() << " : ";
       d->dump(llvm::errs());
+      if (rebuilt)
+        llvm::errs() << " (rebuilt)";
       llvm::errs() << "\n";
     };
     bool foundOmission = false;
@@ -573,8 +578,9 @@ void ASTSourceFileScope::addNewDeclsToTree() {
   insertionPoint = scopeCreator->addNodesToTree(insertionPoint, newNodes);
   numberOfDeclsAlreadySeen = SF->Decls.size();
 
-  assert(scopeCreator->containsAllDeclContextsFromAST() &&
-         "ASTScope tree missed some DeclContexts or made some up");
+  // Too slow to perform all the time:
+  //  assert(scopeCreator->containsAllDeclContextsFromAST() &&
+  //         "ASTScope tree missed some DeclContexts or made some up");
 }
 
 ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
@@ -1475,9 +1481,11 @@ void IterableTypeScope::expandBody(ScopeCreator &scopeCreator) {
 
 #pragma mark - reexpandIfObsolete
 
-void ASTScopeImpl::reexpandIfObsolete(ScopeCreator &scopeCreator) {
-  if (!isCurrent())
-    reexpand(scopeCreator);
+bool ASTScopeImpl::reexpandIfObsolete(ScopeCreator &scopeCreator) {
+  if (isCurrent())
+    return false;
+  reexpand(scopeCreator);
+  return true;
 }
 
 void ASTScopeImpl::reexpand(ScopeCreator &scopeCreator) {
@@ -1734,4 +1742,8 @@ ScopeCreator::findLocalizableDeclContextsInAST() const {
   // Walker omits the top
   collector.record(sourceFileScope->SF);
   return collector.declContexts;
+}
+
+bool ASTSourceFileScope::crossCheckWithAST() {
+  return scopeCreator->containsAllDeclContextsFromAST();
 }
