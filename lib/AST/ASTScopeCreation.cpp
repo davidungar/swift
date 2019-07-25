@@ -36,6 +36,23 @@ using namespace swift;
 using namespace ast_scope;
 
 #pragma mark source range utilities
+static bool rangeableIsIgnored(const Decl* d) {
+  return d->isImplicit();
+}
+static bool rangeableIsIgnored(const Expr* d) {
+  return false; // implicit expr may contain closures
+}
+static bool rangeableIsIgnored(const Stmt* d) {
+  return false; // ??
+}
+static bool rangeableIsIgnored(const SpecializeAttr *a) {
+  return a->isImplicit();
+}
+static bool rangeableIsIgnored(const ASTNode n) {
+  return n.is<Decl*>() && n.get<Decl*>()->isImplicit();
+}
+
+
 template <typename Rangeable>
 static SourceRange getRangeableSourceRange(const Rangeable *const p) {
   return p->getSourceRange();
@@ -49,7 +66,7 @@ static SourceRange getRangeableSourceRange(const ASTNode n) {
 
 template <typename Rangeable>
 static bool isLocalizable(const Rangeable astElement) {
-  return getRangeableSourceRange(astElement).isValid();
+  return !rangeableIsIgnored(astElement) && getRangeableSourceRange(astElement).isValid();
 }
 
 static std::vector<ASTNode> asNodeVector(DeclRange dr) {
@@ -579,8 +596,8 @@ void ASTSourceFileScope::addNewDeclsToTree() {
   numberOfDeclsAlreadySeen = SF->Decls.size();
 
   // Too slow to perform all the time:
-  //  assert(scopeCreator->containsAllDeclContextsFromAST() &&
-  //         "ASTScope tree missed some DeclContexts or made some up");
+    assert(scopeCreator->containsAllDeclContextsFromAST() &&
+           "ASTScope tree missed some DeclContexts or made some up");
 }
 
 ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
