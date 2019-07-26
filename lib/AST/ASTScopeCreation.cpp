@@ -596,8 +596,8 @@ void ASTSourceFileScope::addNewDeclsToTree() {
   numberOfDeclsAlreadySeen = SF->Decls.size();
 
   // Too slow to perform all the time:
-    assert(scopeCreator->containsAllDeclContextsFromAST() &&
-           "ASTScope tree missed some DeclContexts or made some up");
+  //    assert(scopeCreator->containsAllDeclContextsFromAST() &&
+  //           "ASTScope tree missed some DeclContexts or made some up");
 }
 
 ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
@@ -1573,12 +1573,12 @@ bool IterableTypeBodyPortion::isCurrent(const IterableTypeScope *s) const {
 }
 
 void IterableTypeScope::makeBodyCurrent() {
-  localizableMemberCount =
-      getIterableDeclContext().get()->getLocalizableMemberCount();
+  memberCount =
+      getIterableDeclContext().get()->getMemberCount();
 }
 bool IterableTypeScope::isBodyCurrent() const {
-  return localizableMemberCount ==
-         getIterableDeclContext().get()->getLocalizableMemberCount();
+  return memberCount ==
+         getIterableDeclContext().get()->getMemberCount();
 }
 
 void AbstractFunctionBodyScope::beCurrent() {

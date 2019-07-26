@@ -697,7 +697,7 @@ class IterableDeclContext {
   /// detect when a (localizable) member has been added. A bit would suffice,
   /// but would be more fragile, The scope code could count the members each
   /// time, but I think it's a better trade to just keep a count here.
-  unsigned localizableMemberCount = 0;
+  unsigned memberCount = 0;
 
   template<class A, class B, class C>
   friend struct ::llvm::cast_convert_val;
@@ -728,8 +728,8 @@ public:
   /// is inserted immediately after the hint.
   void addMember(Decl *member, Decl *hint = nullptr);
 
-  /// See \c localizableMemberCount
-  unsigned getLocalizableMemberCount() const { return localizableMemberCount; }
+  /// See \c memberCount
+  unsigned getMemberCount() const { return memberCount; }
 
   /// Check whether there are lazily-loaded members.
   bool hasLazyMembers() const {
@@ -784,7 +784,6 @@ private:
   /// This is used internally when loading members, because loading a
   /// member is an invisible addition.
   void addMemberSilently(Decl *member, Decl *hint = nullptr) const;
-  void updateMemberCount(const Decl *member);
 };
 
 /// Define simple_display for DeclContexts but not for subclasses in order to

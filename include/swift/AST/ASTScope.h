@@ -703,7 +703,7 @@ class IterableTypeScope : public GenericTypeScope {
   /// constructed, and they can be out of order. Detect this happening by
   /// remembering the member count.
   /// TODO: unify with \c numberOfDeclsAlreadySeen
-  unsigned localizableMemberCount = 0;
+  unsigned memberCount = 0;
 
 public:
   IterableTypeScope(const Portion *p) : GenericTypeScope(p) {}
