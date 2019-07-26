@@ -915,6 +915,8 @@ ASTScopeImpl *ASTScopeImpl::expandAndBeCurrent(ScopeCreator &scopeCreator) {
   setChildrenCountWhenLastExpanded();
   assert((getChildlessSourceRange().isValid() || !getChildren().empty()) &&
          "need to be able to find source range");
+  assert(verifyThatChildrenAreContainedWithin(getSourceRange()) &&
+         "Search will fail");
   return insertionPoint;
 }
 

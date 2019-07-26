@@ -416,8 +416,6 @@ SourceRange LookupParentDiversionScope::getChildlessSourceRange(
 SourceRange ASTScopeImpl::getSourceRange(const bool omitAssertions) const {
   if (!isSourceRangeCached(omitAssertions))
     cacheSourceRangeOfMeAndDescendants(omitAssertions);
-  assert(verifyThatChildrenAreContainedWithin(*cachedSourceRange) &&
-         "Search will fail");
   return *cachedSourceRange;
 }
 
