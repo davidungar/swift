@@ -92,6 +92,10 @@ void ASTScopeImpl::print(llvm::raw_ostream &out, unsigned level, bool lastChild,
   if (auto *a = addressForPrinting().getPtrOrNull())
     out << " " << a;
   out << ", ";
+  if (auto *d = getDeclIfAny().getPtrOrNull()) {
+    if (d->isImplicit())
+      out << "implicit ";
+  }
   printRange(out);
   out << " ";
   printSpecifics(out);

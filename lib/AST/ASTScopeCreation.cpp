@@ -991,10 +991,7 @@ ASTScopeImpl *ParameterListScope::expandAScopeThatCreatesANewInsertionPoint(
 
 ASTScopeImpl *PatternEntryDeclScope::expandAScopeThatCreatesANewInsertionPoint(
     ScopeCreator &scopeCreator) {
-  forEachVarDeclWithLocalizableAccessors(scopeCreator, [&](VarDecl *var) {
-    scopeCreator.createSubtreeIfUnique<VarDeclScope>(this, var);
-  });
-
+  // Initializers come before VarDecls, e.g. PCMacro/didSet.swift 19
   auto patternEntry = getPatternEntry();
   // Create a child for the initializer, if present.
   // Cannot trust the source range given in the ASTScopeImpl for the end of the
@@ -1009,6 +1006,9 @@ ASTScopeImpl *PatternEntryDeclScope::expandAScopeThatCreatesANewInsertionPoint(
         this, decl, patternEntryIndex, vis);
   }
   // Add accessors for the variables in this pattern.
+  forEachVarDeclWithLocalizableAccessors(scopeCreator, [&](VarDecl *var) {
+    scopeCreator.createSubtreeIfUnique<VarDeclScope>(this, var);
+  });
 
   return getParent().get();
 }
