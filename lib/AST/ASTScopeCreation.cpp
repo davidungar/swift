@@ -1202,15 +1202,23 @@ void ForEachStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
   //    let v: C { for b : Int -> S((array: P { }
   // the body is implicit and it would overlap the source range of the expr
   // above.
-  if (isLocalizable(stmt->getBody()))
-    scopeCreator.createSubtree<ForEachPatternScope>(this, stmt);
+  //
+  // TODO: in
+  // compiler_crashers_fixed/01901-swift-constraints-constraintsystem-matchtypes.swift
+  // and
+  // compiler_crashers_fixed/00448-no-stacktrace.swift
+  // nodes come out out-of-rder, and body is implicit, so try ignoring in that case.
+  if (!stmt->getBody()->isImplicit()) {
+    if (isLocalizable(stmt->getBody()))
+      scopeCreator.createSubtree<ForEachPatternScope>(this, stmt);
+  }
 }
 
 void ForEachPatternScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   ASTVisitorForScopeCreation().visitExpr(stmt->getWhere(), this, scopeCreator);
-  ASTVisitorForScopeCreation().visitBraceStmt(stmt->getBody(), this,
-                                              scopeCreator);
+    ASTVisitorForScopeCreation().visitBraceStmt(stmt->getBody(), this,
+                                                scopeCreator);
 }
 
 void CatchStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
