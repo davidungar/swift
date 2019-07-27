@@ -207,7 +207,7 @@ SourceRange PatternEntryDeclScope::getChildlessSourceRange(
 
 SourceRange PatternEntryInitializerScope::getChildlessSourceRange(
     const bool omitAssertions) const {
-    // TODO: decl/var/NSManaged_properties.swift vanishing initializer
+  // TODO: decl/var/NSManaged_properties.swift vanishing initializer
   return correct(initAsWrittenWhenCreated->getSourceRange(),
                  getSourceManager());
 }

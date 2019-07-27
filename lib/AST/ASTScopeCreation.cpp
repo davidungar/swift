@@ -411,10 +411,9 @@ private:
         if (auto *cond = clause.Cond)
           expansion.push_back(cond);
         if (!clause.isActive) {
-//          expandInactiveClausesInto(expansion, clause.Elements,
-//                                    /*isInAnActiveNode=*/false);
-        }
-        else {
+          //          expandInactiveClausesInto(expansion, clause.Elements,
+          //                                    /*isInAnActiveNode=*/false);
+        } else {
           assert(isInAnActiveNode && "Assume that clause is not marked "
                                      "active unless it's context is "
                                      "active");
@@ -437,7 +436,7 @@ private:
     std::vector<ASTNode> culled;
     llvm::copy_if(input, std::back_inserter(culled), [&](ASTNode n) {
       return isLocalizable(n) && !n.isDecl(DeclKind::Var) &&
-             !n.isDecl(DeclKind::Accessor) &&  !n.isDecl(DeclKind::EnumCase);
+             !n.isDecl(DeclKind::Accessor) && !n.isDecl(DeclKind::EnumCase);
     });
     return culled;
   }
@@ -760,13 +759,12 @@ public:
                      : DeclVisibilityKind::LocalVariable;
     auto *insertionPoint = parentScope;
     for (unsigned i = 0; i < patternBinding->getPatternList().size(); ++i) {
-    // UGH!
+      // UGH!
       auto &patternEntry = patternBinding->getPatternList()[i];
       if (!patternEntry.getInitAsWritten()) {
         bool found = false;
-        patternEntry.getPattern()->forEachVariable([&](VarDecl*vd) {
-          found |= vd->hasAnyAccessors();
-        });
+        patternEntry.getPattern()->forEachVariable(
+            [&](VarDecl *vd) { found |= vd->hasAnyAccessors(); });
         if (!found)
           continue;
       }
@@ -1013,10 +1011,13 @@ ASTScopeImpl *PatternEntryDeclScope::expandAScopeThatCreatesANewInsertionPoint(
   // we cannot make a scope for it, since no source range.
   if (patternEntry.getInitAsWritten() &&
       isLocalizable(patternEntry.getInitAsWritten())) {
-    // TODO: In print_property_wrappers.swift, initializer expression starts too soon
-    if (!getSourceManager().isBeforeInBuffer(patternEntry.getInitAsWritten()->getStartLoc(), decl->getStartLoc()))
+    // TODO: In print_property_wrappers.swift, initializer expression starts too
+    // soon
+    if (!getSourceManager().isBeforeInBuffer(
+            patternEntry.getInitAsWritten()->getStartLoc(),
+            decl->getStartLoc()))
       scopeCreator.createSubtree<PatternEntryInitializerScope>(
-                                                               this, decl, patternEntryIndex, vis);
+          this, decl, patternEntryIndex, vis);
   }
   // Add accessors for the variables in this pattern.
   forEachVarDeclWithLocalizableAccessors(scopeCreator, [&](VarDecl *var) {
@@ -1207,7 +1208,8 @@ void ForEachStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
   // compiler_crashers_fixed/01901-swift-constraints-constraintsystem-matchtypes.swift
   // and
   // compiler_crashers_fixed/00448-no-stacktrace.swift
-  // nodes come out out-of-rder, and body is implicit, so try ignoring in that case.
+  // nodes come out out-of-rder, and body is implicit, so try ignoring in that
+  // case.
   if (!stmt->getBody()->isImplicit()) {
     if (isLocalizable(stmt->getBody()))
       scopeCreator.createSubtree<ForEachPatternScope>(this, stmt);
@@ -1217,8 +1219,8 @@ void ForEachStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
 void ForEachPatternScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   ASTVisitorForScopeCreation().visitExpr(stmt->getWhere(), this, scopeCreator);
-    ASTVisitorForScopeCreation().visitBraceStmt(stmt->getBody(), this,
-                                                scopeCreator);
+  ASTVisitorForScopeCreation().visitBraceStmt(stmt->getBody(), this,
+                                              scopeCreator);
 }
 
 void CatchStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
