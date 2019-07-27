@@ -435,9 +435,12 @@ private:
   /// members.
   std::vector<ASTNode> cull(ArrayRef<ASTNode> input) const {
     std::vector<ASTNode> culled;
+    // TODO: don't cull Accessor because validation-test/compiler-crashers-fixed/25454-swift-abstractclosureexpr-setparams.swift
+    // leaves an accessor at the same level as the VarDec but does not also put it into the VarDecl (on line 12)
+    // This issue is a corrolary of me commenting out my record fix in the parser.
     llvm::copy_if(input, std::back_inserter(culled), [&](ASTNode n) {
       return isLocalizable(n) && !n.isDecl(DeclKind::Var) &&
-             !n.isDecl(DeclKind::Accessor) && !n.isDecl(DeclKind::EnumCase);
+             /*!n.isDecl(DeclKind::Accessor) &&*/  !n.isDecl(DeclKind::EnumCase);
     });
     return culled;
   }
@@ -760,6 +763,16 @@ public:
                      : DeclVisibilityKind::LocalVariable;
     auto *insertionPoint = parentScope;
     for (unsigned i = 0; i < patternBinding->getPatternList().size(); ++i) {
+    // UGH!
+      auto &patternEntry = patternBinding->getPatternList()[i];
+      if (!patternEntry.getInitAsWritten()) {
+        bool found = false;
+        patternEntry.getPattern()->forEachVariable([&](VarDecl*vd) {
+          found |= vd->hasAnyAccessors();
+        });
+        if (!found)
+          continue;
+      }
       insertionPoint = scopeCreator
                            .createSubtreeIfUnique<PatternEntryDeclScope>(
                                insertionPoint, patternBinding, i, vis)

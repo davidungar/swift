@@ -4806,13 +4806,18 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
   // If we have an invalid case, bail out now.
   if (!PrimaryVar) {
     fillInAccessorTypeErrors(*this, accessors);
-    Decls.append(accessors.Accessors.begin(), accessors.Accessors.end());
+//    Decls.append(accessors.Accessors.begin(), accessors.Accessors.end());
     // Following preserves invariaent that accessor can be found from its
     // VarDecl
+    //
     // But it causes -frontend -target x86_64-apple-macosx10.9 -module-cache-path /Users/ungar/s/exp-dep/build/Ninja-DebugAssert/swift-macosx-x86_64/swift-test-results/x86_64-apple-macosx10.9/clang-module-cache -sdk /Applications/Xcode11s.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -swift-version 4 -enable-astscope-lookup -typo-correction-limit 10 /Users/ungar/s/exp-dep/swift/validation-test/compiler_crashers_fixed/27571-swift-inflightdiagnostic.swift -typecheck
 //    to fail
-//    accessors.record(*this, storage, Invalid, Flags, StaticLoc, Attributes,
-//                     TyLoc, /*indices*/ nullptr, Decls);
+// But,  validation-test/compiler_crashers_fixed/25454-swift-abstractclosureexpr-setparams.swift
+    // leaves an accessor at the same level as the VarDec but does not also put it into the VarDecl (on line 12)
+    // This issue is a corrolary of me commenting out my record fix in the parser.
+    // So, let's fix the first issue.
+    accessors.record(*this, storage, Invalid, Flags, StaticLoc, Attributes,
+                     TyLoc, /*indices*/ nullptr, Decls);
     return nullptr;
   }
 
