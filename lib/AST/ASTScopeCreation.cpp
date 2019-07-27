@@ -410,9 +410,10 @@ private:
       for (auto &clause : icd->getClauses()) {
         if (auto *cond = clause.Cond)
           expansion.push_back(cond);
-        if (!clause.isActive)
-          expandInactiveClausesInto(expansion, clause.Elements,
-                                    /*isInAnActiveNode=*/false);
+        if (!clause.isActive) {
+//          expandInactiveClausesInto(expansion, clause.Elements,
+//                                    /*isInAnActiveNode=*/false);
+        }
         else {
           assert(isInAnActiveNode && "Assume that clause is not marked "
                                      "active unless it's context is "
@@ -1002,8 +1003,10 @@ ASTScopeImpl *PatternEntryDeclScope::expandAScopeThatCreatesANewInsertionPoint(
   // we cannot make a scope for it, since no source range.
   if (patternEntry.getInitAsWritten() &&
       isLocalizable(patternEntry.getInitAsWritten())) {
-    scopeCreator.createSubtree<PatternEntryInitializerScope>(
-        this, decl, patternEntryIndex, vis);
+    // TODO: In print_property_wrappers.swift, initializer expression starts too soon
+    if (!getSourceManager().isBeforeInBuffer(patternEntry.getInitAsWritten()->getStartLoc(), decl->getStartLoc()))
+      scopeCreator.createSubtree<PatternEntryInitializerScope>(
+                                                               this, decl, patternEntryIndex, vis);
   }
   // Add accessors for the variables in this pattern.
   forEachVarDeclWithLocalizableAccessors(scopeCreator, [&](VarDecl *var) {
