@@ -201,7 +201,15 @@ SourceRange DefaultArgumentInitializerScope::getChildlessSourceRange(
 }
 
 SourceRange PatternEntryDeclScope::getChildlessSourceRange(
-    const bool omitAssertions) const {
+                                                           const bool omitAssertions) const {
+  if (!getChildren().empty()) { // why needed???
+    bool hasOne = false;
+    getPattern()->forEachVariable([&](VarDecl*){hasOne = true;});
+    if (!hasOne)
+      return SourceRange(); // just the init
+    if (!getPatternEntry().getInit())
+      return SourceRange(); // just the var decls
+  }
   return correct(getPatternEntry().getSourceRange(), getSourceManager());
 }
 

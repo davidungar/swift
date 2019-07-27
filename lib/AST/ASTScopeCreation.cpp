@@ -374,7 +374,7 @@ public:
 
   std::vector<ASTNode> expandInactiveClausesSortAndCullElementsOrMembers(
       ArrayRef<ASTNode> input) const {
-    return sortBySourceRange(cull(expandInactiveClauses(input)));
+    return cullSecondPatternAtSameLoc(sortBySourceRange(cull(expandInactiveClauses(input))));
   }
 
 private:
@@ -437,6 +437,67 @@ private:
     llvm::copy_if(input, std::back_inserter(culled), [&](ASTNode n) {
       return isLocalizable(n) && !n.isDecl(DeclKind::Var) &&
              !n.isDecl(DeclKind::Accessor) && !n.isDecl(DeclKind::EnumCase);
+    });
+    return culled;
+  }
+  
+  /// TODO: The parser yields two decls at the same source loc with the same kind
+  /// Tests::
+  /// compiler_crashers_fixed/27185-swift-astcontext-getbridgedtoobjc.swift
+  /// expr/unary/keypath/keypath.swift
+  /// compiler_crashers_fixed/27548-swift-constraints-constraintsystem-assignfixedtype.swift
+  ///
+  /// In all cases the first pattern seems to carry the initializer, and the second, the accessor
+  std::vector<ASTNode> cullSecondPatternAtSameLoc(ArrayRef<ASTNode> input) const {
+    auto dumpPBD = [&](PatternBindingDecl *pbd, const char* which) {
+//      llvm::errs() << "*** " << which << " pbd isImplicit: " << pbd->isImplicit()
+//      << ", #entries: " << pbd->getNumPatternEntries() << " :";
+//      pbd->getSourceRange().print(llvm::errs(), pbd->getASTContext().SourceMgr, false);
+//      llvm::errs() << "\n";
+//      llvm::errs() << "init: "  << pbd->getInit(0) << "\n";
+//      if (pbd->getInit(0)) {
+//        llvm::errs() << "SR (init): ";
+//        pbd->getInit(0)->getSourceRange().print(llvm::errs(), pbd->getASTContext().SourceMgr, false);
+//        llvm::errs() << "\n";
+//        pbd->getInit(0)->dump();
+//      }
+//      llvm::errs() << "vars:\n";
+//      pbd->getPattern(0)->forEachVariable(
+//                                          [&](VarDecl *vd) {
+//        llvm::errs() << "  " << vd->getName() << " implicit: " << vd->isImplicit() << " #accs: " << vd->getAllAccessors().size() << "\nSR (var):";
+//        vd->getSourceRange().print(llvm::errs(), pbd->getASTContext().SourceMgr, false);
+//        llvm::errs() << "\nSR (braces)";
+//        vd->getBracesRange().print(llvm::errs(), pbd->getASTContext().SourceMgr, false);
+//        llvm::errs() << "\n";
+//        for (auto *a: vd->getAllAccessors()) {
+//          llvm::errs() << "SR (acc): ";
+//          a->getSourceRange().print(llvm::errs(), pbd->getASTContext().SourceMgr, false);
+//          llvm::errs() << "\n";
+//          a->dump();
+//        }
+//      });
+    };
+  
+    std::vector<ASTNode> culled;
+    Decl* lastD = nullptr;
+    llvm::copy_if(input, std::back_inserter(culled),
+                  [&](ASTNode n) {
+      auto *d = n.dyn_cast<Decl*>();
+      if (!d || !lastD || lastD->getStartLoc() != d->getStartLoc() || lastD->getKind() != d->getKind()) {
+        lastD = d;
+        return true;
+      }
+      if (auto *pbd = dyn_cast<PatternBindingDecl>(lastD))
+        dumpPBD(pbd, "prev");
+      if (auto *pbd = dyn_cast<PatternBindingDecl>(d)) {
+        dumpPBD(pbd, "curr");
+        return true;
+      }
+      llvm::errs() << "Two same kind decls at same loc: \n";
+      lastD->dump(llvm::errs());
+      llvm::errs() << "and\n";
+      d->dump(llvm::errs());
+      assert(false && "Two same kind decls; unexpected kinds");
     });
     return culled;
   }
@@ -764,7 +825,13 @@ public:
       if (!patternEntry.getInitAsWritten()) {
         bool found = false;
         patternEntry.getPattern()->forEachVariable(
-            [&](VarDecl *vd) { found |= vd->hasAnyAccessors(); });
+            [&](VarDecl *vd) {
+            if (!vd->isImplicit())
+              found = true;
+            else
+              found |= llvm::any_of(vd->getAllAccessors(),
+                     [&](AccessorDecl *a) { return isLocalizable(a); });
+        });
         if (!found)
           continue;
       }
