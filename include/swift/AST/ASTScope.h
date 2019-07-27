@@ -207,7 +207,7 @@ public:
   void cacheSourceRangeOfMeAndDescendants(bool omitAssertions = false) const;
   bool isSourceRangeCached(bool omitAssertions = false) const;
 
-  bool checkSourceRange() const;
+  bool checkChildlessSourceRange() const;
 
 private:
   SourceRange getUncachedSourceRange(bool omitAssertions = false) const;
