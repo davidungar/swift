@@ -233,10 +233,6 @@ public:
     /// (pattern_binding_decl range=[test.swift:13:8 - line:12:29]
     const auto &SM = d->getASTContext().SourceMgr;
 
-    // TODO: Once rdar://53080185 is fixed, remove this.
-    if (isa<PatternBindingDecl>(d))
-      return true;
-
     // Once we allow invalid PatternBindingDecls (see shouldCreateScope),
     // then IDE/complete_property_delegate_attribute.swift fails because
     // we try to expand a member whose source range is backwards.
@@ -463,7 +459,7 @@ private:
         pbd->getInit(0)->getSourceRange().print(
             llvm::errs(), pbd->getASTContext().SourceMgr, false);
         llvm::errs() << "\n";
-        pbd->getInit(0)->dump();
+        pbd->getInit(0)->dump(llvm::errs(), 0);
       }
       llvm::errs() << "vars:\n";
       pbd->getPattern(0)->forEachVariable([&](VarDecl *vd) {
@@ -482,7 +478,7 @@ private:
           a->getSourceRange().print(llvm::errs(),
                                     pbd->getASTContext().SourceMgr, false);
           llvm::errs() << "\n";
-          a->dump();
+          a->dump(llvm::errs(), 0);
         }
       });
     };
@@ -611,7 +607,7 @@ public:
       dcAndScope.getFirst()->printContext(llvm::errs());
       if (auto *d = dcAndScope.getFirst()->getAsDecl())
         printDecl(d);
-      dcAndScope.getSecond()->dump();
+      dcAndScope.getSecond()->print(llvm::errs(), 0, false);
     }
     return !foundOmission && bogusDCs.empty();
   }
@@ -832,7 +828,7 @@ public:
       // for PatternEntryDeclScope is simplified to use the PatternEntry's
       // source range.
       auto &patternEntry = patternBinding->getPatternList()[i];
-      if (!patternEntry.getInitAsWritten()) {
+      if (!patternEntry.getOrigInit()) {
         bool found = false;
         patternEntry.getPattern()->forEachVariable(
             [&](VarDecl *vd) {
@@ -1083,16 +1079,12 @@ ASTScopeImpl *PatternEntryDeclScope::expandAScopeThatCreatesANewInsertionPoint(
   // Cannot trust the source range given in the ASTScopeImpl for the end of the
   // initializer (because of InterpolatedLiteralStrings and EditorPlaceHolders),
   // so compute it ourselves.
-  assert(patternEntry.getInit() == patternEntry.getInitAsWritten());
   // Even if this predicate fails, there may be an initContext but
   // we cannot make a scope for it, since no source range.
-  if (patternEntry.getInitAsWritten() &&
-      isLocalizable(patternEntry.getInitAsWritten())) {
-    // TODO: In print_property_wrappers.swift, initializer expression starts too
-    // soon
-    if (!getSourceManager().isBeforeInBuffer(
-            patternEntry.getInitAsWritten()->getStartLoc(),
-            decl->getStartLoc()))
+  if (patternEntry.getOrigInit() && isLocalizable(patternEntry.getOrigInit())) {
+    assert(!getSourceManager().isBeforeInBuffer(
+              patternEntry.getOrigInit()->getStartLoc(), decl->getStartLoc()) &&
+              "Original inits are always after the '='");
       scopeCreator.createSubtree<PatternEntryInitializerScope>(
           this, decl, patternEntryIndex, vis);
   }
@@ -1108,8 +1100,8 @@ ASTScopeImpl *
 PatternEntryInitializerScope::expandAScopeThatCreatesANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   // Create a child for the initializer expression.
-  ASTVisitorForScopeCreation().visitExpr(getPatternEntry().getInitAsWritten(),
-                                         this, scopeCreator);
+  ASTVisitorForScopeCreation().visitExpr(getPatternEntry().getOrigInit(), this,
+                                         scopeCreator);
   return this;
 }
 
@@ -1697,14 +1689,14 @@ bool TopLevelCodeScope::isCurrent() const {
 }
 
 void PatternEntryDeclScope::beCurrent() {
-  initWhenLastExpanded = getPatternEntry().getInitAsWritten();
+  initWhenLastExpanded = getPatternEntry().getOrigInit();
   unsigned varCount = 0;
   getPatternEntry().getPattern()->forEachVariable(
       [&](VarDecl *) { ++varCount; });
   varCountWhenLastExpanded = 0;
 }
 bool PatternEntryDeclScope::isCurrent() const {
-  if (initWhenLastExpanded != getPatternEntry().getInitAsWritten())
+  if (initWhenLastExpanded != getPatternEntry().getOrigInit())
     return false;
   unsigned varCount = 0;
   getPatternEntry().getPattern()->forEachVariable(

@@ -1138,7 +1138,7 @@ public:
                                DeclVisibilityKind vis)
       : AbstractPatternEntryScope(pbDecl, entryIndex, vis),
         initAsWrittenWhenCreated(
-            pbDecl->getPatternList()[entryIndex].getInitAsWritten()) {}
+            pbDecl->getPatternList()[entryIndex].getOrigInit()) {}
   virtual ~PatternEntryInitializerScope() {}
 
 protected:

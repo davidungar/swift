@@ -3255,23 +3255,7 @@ void Parser::parseDeclDelayed() {
         NTD->addMember(D);
       } else if (auto *ED = dyn_cast<ExtensionDecl>(parent)) {
         ED->addMember(D);
-      } else if (auto *ace = dyn_cast<ClosureExpr>(parent)) {
-        auto *body = ace->getBody();
-
-        // TODO: factor with similar code in
-        // TypeChecker::typeCheckConstructorBodyUntil
-        SmallVector<ASTNode, 8> Elts(body->getElements().begin(),
-                                     body->getElements().end());
-
-        Elts.push_back(ASTNode(D));
-
-        auto *newBody =
-            BraceStmt::create(Context, body->getLBraceLoc(), Elts,
-                              body->getRBraceLoc(), body->isImplicit());
-        ace->setBody(newBody, false);
       } else if (auto *SF = dyn_cast<SourceFile>(parent)) {
-        // FIXME: unify notification to ASTSourceFileScope with addMember
-        // mechanism used above
         SF->Decls.push_back(D);
       }
     }
@@ -4884,27 +4868,8 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
   // If we have an invalid case, bail out now.
   if (!PrimaryVar) {
     fillInAccessorTypeErrors(*this, accessors);
-    //    Decls.append(accessors.Accessors.begin(), accessors.Accessors.end());
-    // Following preserves invariaent that accessor can be found from its
-    // VarDecl
-    //
-    // But it causes -frontend -target x86_64-apple-macosx10.9
-    // -module-cache-path
-    // /Users/ungar/s/exp-dep/build/Ninja-DebugAssert/swift-macosx-x86_64/swift-test-results/x86_64-apple-macosx10.9/clang-module-cache
-    // -sdk
-    // /Applications/Xcode11s.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
-    // -swift-version 4 -enable-astscope-lookup -typo-correction-limit 10
-    // /Users/ungar/s/exp-dep/swift/validation-test/compiler_crashers_fixed/27571-swift-inflightdiagnostic.swift
-    // -typecheck
-    //    to fail
-    // But,
-    // validation-test/compiler_crashers_fixed/25454-swift-abstractclosureexpr-setparams.swift
-    // leaves an accessor at the same level as the VarDec but does not also put
-    // it into the VarDecl (on line 12) This issue is a corrolary of me
-    // commenting out my record fix in the parser. So, let's fix the first
-    // issue.
-    accessors.record(*this, storage, Invalid, Flags, StaticLoc, Attributes,
-                     TyLoc, /*indices*/ nullptr, Decls);
+    // Preserve the invariant that an accessor can be found from its VarDecl
+    accessors.record(*this, storage, Invalid, Decls);
     return nullptr;
   }
 
@@ -5259,12 +5224,10 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       PBDEntries.back().setEqualLoc(EqualLoc);
 
       ParserResult<Expr> init = parseExpr(diag::expected_init_value);
+      PBDEntries.back().setOrigInit(init.getPtrOrNull());
 
       // If this Pattern binding was not supposed to have an initializer, but it
-      // did, diagnose this.
-      // FIXME; Someday, do not remove it, because ASTScope system needs to find
-      // the initializer in the PatternBindingDecl in order to find scopes for
-      // closures in the initializer.
+      // did, diagnose this and remove it.
       if (Flags & PD_DisallowInit && init.isNonNull()) {
         diagnose(EqualLoc, diag::disallowed_init);
         init = nullptr;

@@ -35,13 +35,6 @@ using namespace ast_scope;
 
 static SourceLoc getStartOfFirstParam(ClosureExpr *closure);
 
-/// Todo: Remove once rdar://53080185 is fixed
-static SourceRange ensureHorseBeforeCart(const SourceRange r,
-                                         SourceManager &SM) {
-  assert(!SM.isBeforeInBuffer(r.End, r.Start) && "Start cannot be after end.");
-  return r;
-}
-
 SourceRange ASTScopeImpl::widenSourceRangeForIgnoredASTNodes(
     const SourceRange range) const {
   if (range.isInvalid())
@@ -214,8 +207,7 @@ SourceRange PatternEntryDeclScope::getChildlessSourceRange(
     if (!getPatternEntry().getInit())
       return SourceRange(); // just the var decls
   }
-  return ensureHorseBeforeCart(getPatternEntry().getSourceRange(),
-                               getSourceManager());
+  return getPatternEntry().getSourceRange();
 }
 
 SourceRange PatternEntryInitializerScope::getChildlessSourceRange(
@@ -223,8 +215,7 @@ SourceRange PatternEntryInitializerScope::getChildlessSourceRange(
   // TODO: a radar -- decl/var/NSManaged_properties.swift vanishing initializer
   // Note: grep for "When the initializer is removed we don't actually clear the
   // pointer" because we do!
-  return ensureHorseBeforeCart(initAsWrittenWhenCreated->getSourceRange(),
-                               getSourceManager());
+  return initAsWrittenWhenCreated->getSourceRange();
 }
 
 SourceRange
