@@ -202,6 +202,8 @@ SourceRange DefaultArgumentInitializerScope::getChildlessSourceRange(
 
 SourceRange PatternEntryDeclScope::getChildlessSourceRange(
                                                            const bool omitAssertions) const {
+  // TODO: Once rdar://53627317 is accomplished, the following may be able to be
+  // simplified.
   if (!getChildren().empty()) { // why needed???
     bool hasOne = false;
     getPattern()->forEachVariable([&](VarDecl*){hasOne = true;});

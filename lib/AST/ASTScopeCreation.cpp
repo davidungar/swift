@@ -374,7 +374,10 @@ public:
 
   std::vector<ASTNode> expandInactiveClausesSortAndCullElementsOrMembers(
       ArrayRef<ASTNode> input) const {
-    return cullSecondPatternAtSameLoc(sortBySourceRange(cull(expandInactiveClauses(input))));
+    auto cleanedupNodes = sortBySourceRange(cull(expandInactiveClauses(input)));
+    // TODO: uncomment when working on rdar://53627317
+    //    findCollidingPatterns(cleanedupNodes);
+    return cleanedupNodes;
   }
 
 private:
@@ -440,66 +443,70 @@ private:
     });
     return culled;
   }
-  
-  /// TODO: The parser yields two decls at the same source loc with the same kind
-  /// Tests::
-  /// compiler_crashers_fixed/27185-swift-astcontext-getbridgedtoobjc.swift
-  /// expr/unary/keypath/keypath.swift
-  /// compiler_crashers_fixed/27548-swift-constraints-constraintsystem-assignfixedtype.swift
+
+  /// TODO: The parser yields two decls at the same source loc with the same
+  /// kind Call me when tackling rdar://53627317, then move this to ASTVerifier.
   ///
-  /// In all cases the first pattern seems to carry the initializer, and the second, the accessor
-  std::vector<ASTNode> cullSecondPatternAtSameLoc(ArrayRef<ASTNode> input) const {
-    auto dumpPBD = [&](PatternBindingDecl *pbd, const char* which) {
-//      llvm::errs() << "*** " << which << " pbd isImplicit: " << pbd->isImplicit()
-//      << ", #entries: " << pbd->getNumPatternEntries() << " :";
-//      pbd->getSourceRange().print(llvm::errs(), pbd->getASTContext().SourceMgr, false);
-//      llvm::errs() << "\n";
-//      llvm::errs() << "init: "  << pbd->getInit(0) << "\n";
-//      if (pbd->getInit(0)) {
-//        llvm::errs() << "SR (init): ";
-//        pbd->getInit(0)->getSourceRange().print(llvm::errs(), pbd->getASTContext().SourceMgr, false);
-//        llvm::errs() << "\n";
-//        pbd->getInit(0)->dump();
-//      }
-//      llvm::errs() << "vars:\n";
-//      pbd->getPattern(0)->forEachVariable(
-//                                          [&](VarDecl *vd) {
-//        llvm::errs() << "  " << vd->getName() << " implicit: " << vd->isImplicit() << " #accs: " << vd->getAllAccessors().size() << "\nSR (var):";
-//        vd->getSourceRange().print(llvm::errs(), pbd->getASTContext().SourceMgr, false);
-//        llvm::errs() << "\nSR (braces)";
-//        vd->getBracesRange().print(llvm::errs(), pbd->getASTContext().SourceMgr, false);
-//        llvm::errs() << "\n";
-//        for (auto *a: vd->getAllAccessors()) {
-//          llvm::errs() << "SR (acc): ";
-//          a->getSourceRange().print(llvm::errs(), pbd->getASTContext().SourceMgr, false);
-//          llvm::errs() << "\n";
-//          a->dump();
-//        }
-//      });
+  /// In all cases the first pattern seems to carry the initializer, and the
+  /// second, the accessor
+  void findCollidingPatterns(ArrayRef<ASTNode> input) const {
+    auto dumpPBD = [&](PatternBindingDecl *pbd, const char *which) {
+      llvm::errs() << "*** " << which
+                   << " pbd isImplicit: " << pbd->isImplicit()
+                   << ", #entries: " << pbd->getNumPatternEntries() << " :";
+      pbd->getSourceRange().print(llvm::errs(), pbd->getASTContext().SourceMgr,
+                                  false);
+      llvm::errs() << "\n";
+      llvm::errs() << "init: " << pbd->getInit(0) << "\n";
+      if (pbd->getInit(0)) {
+        llvm::errs() << "SR (init): ";
+        pbd->getInit(0)->getSourceRange().print(
+            llvm::errs(), pbd->getASTContext().SourceMgr, false);
+        llvm::errs() << "\n";
+        pbd->getInit(0)->dump();
+      }
+      llvm::errs() << "vars:\n";
+      pbd->getPattern(0)->forEachVariable([&](VarDecl *vd) {
+        llvm::errs() << "  " << vd->getName()
+                     << " implicit: " << vd->isImplicit()
+                     << " #accs: " << vd->getAllAccessors().size()
+                     << "\nSR (var):";
+        vd->getSourceRange().print(llvm::errs(), pbd->getASTContext().SourceMgr,
+                                   false);
+        llvm::errs() << "\nSR (braces)";
+        vd->getBracesRange().print(llvm::errs(), pbd->getASTContext().SourceMgr,
+                                   false);
+        llvm::errs() << "\n";
+        for (auto *a : vd->getAllAccessors()) {
+          llvm::errs() << "SR (acc): ";
+          a->getSourceRange().print(llvm::errs(),
+                                    pbd->getASTContext().SourceMgr, false);
+          llvm::errs() << "\n";
+          a->dump();
+        }
+      });
     };
-  
-    std::vector<ASTNode> culled;
+
     Decl* lastD = nullptr;
-    llvm::copy_if(input, std::back_inserter(culled),
-                  [&](ASTNode n) {
+    for (auto n : input) {
       auto *d = n.dyn_cast<Decl*>();
-      if (!d || !lastD || lastD->getStartLoc() != d->getStartLoc() || lastD->getKind() != d->getKind()) {
+      if (!d || !lastD ||
+          lastD->getStartLoc() != d->getStartLoc() ||
+          lastD->getKind()     != d->getKind()) {
         lastD = d;
-        return true;
       }
       if (auto *pbd = dyn_cast<PatternBindingDecl>(lastD))
         dumpPBD(pbd, "prev");
       if (auto *pbd = dyn_cast<PatternBindingDecl>(d)) {
         dumpPBD(pbd, "curr");
-        return true;
+        assert(false && "found colliding pattern binding decls");
       }
       llvm::errs() << "Two same kind decls at same loc: \n";
       lastD->dump(llvm::errs());
       llvm::errs() << "and\n";
       d->dump(llvm::errs());
       assert(false && "Two same kind decls; unexpected kinds");
-    });
-    return culled;
+    }
   }
 
   template <typename Rangeable>
@@ -820,7 +827,10 @@ public:
                      : DeclVisibilityKind::LocalVariable;
     auto *insertionPoint = parentScope;
     for (unsigned i = 0; i < patternBinding->getPatternList().size(); ++i) {
-      // UGH!
+      // TODO: Won't need to do so much work to avoid creating one without
+      // a SourceRange once rdar://53627317 is done and getChildlessSourceRange
+      // for PatternEntryDeclScope is simplified to use the PatternEntry's
+      // source range.
       auto &patternEntry = patternBinding->getPatternList()[i];
       if (!patternEntry.getInitAsWritten()) {
         bool found = false;
