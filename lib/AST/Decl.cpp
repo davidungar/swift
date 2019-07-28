@@ -1394,6 +1394,17 @@ SourceRange PatternBindingEntry::getOrigInitRange() const {
   return Init ? Init->getSourceRange() : SourceRange();
 }
 
+SourceRange PatternBindingEntry::getOrigPostfixInitRange() const {
+  auto Init = getInitAsWritten();
+  if (!Init)
+    return SourceLoc();
+  // Cannot find SourceManager to use isBeforeInBuffer
+  if (Init->getStartLoc().getOpaquePointerValue() <
+      getPattern()->getStartLoc().getOpaquePointerValue())
+    return SourceLoc();
+  return Init->getSourceRange();
+}
+
 bool PatternBindingEntry::isInitialized() const {
   // Directly initialized.
   if (getInit())
@@ -1429,7 +1440,7 @@ VarDecl *PatternBindingEntry::getAnchoringVarDecl() const {
 
 SourceRange PatternBindingEntry::getSourceRange(bool omitAccessors) const {
   // Patterns end at the initializer, if present.
-  SourceLoc endLoc = getOrigInitRange().End;
+  SourceLoc endLoc = getOrigPostfixInitRange().End;
 
   // If we're not banned from handling accessors, they follow the initializer.
   if (!omitAccessors) {

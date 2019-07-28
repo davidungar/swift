@@ -1961,6 +1961,10 @@ public:
     return isInitializerSubsumed() ? nullptr : getInit();
   }
   SourceRange getOrigInitRange() const;
+  
+  /// If the orig init is a prefix (e.g. a property wrapper), don't get it.
+  SourceRange getOrigPostfixInitRange() const;
+
   void setInit(Expr *E);
 
   /// Gets the text of the initializer expression, stripping out inactive

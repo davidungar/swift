@@ -37,6 +37,8 @@ static SourceLoc getStartOfFirstParam(ClosureExpr *closure);
 
 /// Todo: Remove once rdar://53080185 is fixed
 static SourceRange correct(const SourceRange r, SourceManager &SM) {
+  if (SM.isBeforeInBuffer(r.End, r.Start))
+    assert(false && "had to correct");
   return SM.isBeforeInBuffer(r.End, r.Start) ? SourceRange(r.End, r.Start) : r;
 }
 
@@ -217,7 +219,9 @@ SourceRange PatternEntryDeclScope::getChildlessSourceRange(
 
 SourceRange PatternEntryInitializerScope::getChildlessSourceRange(
     const bool omitAssertions) const {
-  // TODO: decl/var/NSManaged_properties.swift vanishing initializer
+  // TODO: a radar -- decl/var/NSManaged_properties.swift vanishing initializer
+  // Note: grep for "When the initializer is removed we don't actually clear the
+  // pointer" because we do!
   return correct(initAsWrittenWhenCreated->getSourceRange(),
                  getSourceManager());
 }
