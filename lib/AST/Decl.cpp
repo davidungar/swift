@@ -1390,8 +1390,35 @@ unsigned PatternBindingDecl::getPatternEntryIndexForVarDecl(const VarDecl *VD) c
   return ~0U;
 }
 
+Expr *PatternBindingEntry::getOrigInitAsWritten() const {
+  // Before the addition of property wrappers, the following would work:
+  // return InitContextAndIsText.getInt() ? nullptr : InitExpr.Node;
+  // Consider: @Blah(17) var foo: Foo = 18
+  // The code above will return:
+  // Clamped(wrappedValue: 17, min: 0, max: 255)
+  // but what we want is the "18".
+
+  Expr *const init = InitContextAndIsText.getInt() ? nullptr : InitExpr.Node;
+  if (!init)
+    return nullptr;
+  // Assume wrappers only apply to single-variable patterns.
+  VarDecl *const var = getPattern()->getSingleVar();
+  if (!var)
+    return init;
+  auto *e = findOriginalPropertyWrapperInitialValue(var, init);
+  if (e)
+    return e;
+  // Consider: @Wrapper(stored: 17) static var x: Int
+  // It has an "init" but not really a wrapper initial value. Return nullptr in
+  // that case.
+  if (var->getASTContext().SourceMgr.isBeforeInBuffer(init->getStartLoc(),
+                                                      var->getStartLoc()))
+    return nullptr;
+  return init;
+}
+
 SourceRange PatternBindingEntry::getOrigInitRange() const {
-  auto Init = getInitAsWritten();
+  auto Init = getOrigInitAsWritten();
   return Init ? Init->getSourceRange() : SourceRange();
 }
 
@@ -5824,20 +5851,19 @@ void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
   DefaultValueAndFlags.getPointer()->InitContext = initContext;
 }
 
+/// Return nullptr if there is no property wrapper
 Expr *swift::findOriginalPropertyWrapperInitialValue(VarDecl *var,
                                                      Expr *init) {
   auto *PBD = var->getParentPatternBinding();
   if (!PBD)
     return nullptr;
 
-  // If there is no '=' on the pattern, there was no initial value.
-  if (PBD->getPatternList()[0].getEqualLoc().isInvalid()
-      && !PBD->isDefaultInitializable())
-    return nullptr;
-
   ASTContext &ctx = var->getASTContext();
   auto dc = var->getInnermostDeclContext();
-  auto innermostAttr = var->getAttachedPropertyWrappers().back();
+  const auto wrapperAttrs = var->getAttachedPropertyWrappers();
+  if (wrapperAttrs.empty())
+    return nullptr;
+  auto innermostAttr = wrapperAttrs.back();
   auto innermostNominal = evaluateOrDefault(
       ctx.evaluator, CustomAttrNominalRequest{innermostAttr, dc}, nullptr);
   if (!innermostNominal)
