@@ -79,15 +79,29 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
   }
 
   // Configure the toolchain.
-  // By default, use the system clang++ to link.
-  const char *Clang = "clang++";
+  //
+  // By default use the system `clang` to perform the link.  We use `clang` for
+  // the driver here because we do not wish to select a particular C++ runtime.
+  // Furthermore, until C++ interop is enabled, we cannot have a dependency on
+  // C++ code from pure Swift code.  If linked libraries are C++ based, they
+  // should properly link C++.  In the case of static linking, the user can
+  // explicitly specify the C++ runtime to link against.  This is particularly
+  // important for platforms like android where as it is a Linux platform, the
+  // default C++ runtime is `libstdc++` which is unsupported on the target but
+  // as the builds are usually cross-compiled from Linux, libstdc++ is going to
+  // be present.  This results in linking the wrong version of libstdc++
+  // generating invalid binaries.  It is also possible to use different C++
+  // runtimes than the default C++ runtime for the platform (e.g. libc++ on
+  // Windows rather than msvcprt).  When C++ interop is enabled, we will need to
+  // surface this via a driver flag.  For now, opt for the simpler approach of
+  // just using `clang` and avoid a dependency on the C++ runtime.
+  const char *Clang = "clang";
   if (const Arg *A = context.Args.getLastArg(options::OPT_tools_directory)) {
     StringRef toolchainPath(A->getValue());
 
     // If there is a clang in the toolchain folder, use that instead.
-    if (auto toolchainClang =
-            llvm::sys::findProgramByName("clang++", {toolchainPath}))
-      Clang = context.Args.MakeArgString(toolchainClang.get());
+    if (auto tool = llvm::sys::findProgramByName("clang", {toolchainPath}))
+      Clang = context.Args.MakeArgString(tool.get());
   }
 
   std::string Target = getTriple().str();
@@ -102,28 +116,26 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
   // driver rather than the `clang-cl` driver.
   Arguments.push_back("-nostartfiles");
 
-  SmallString<128> SharedRuntimeLibPath;
-  getRuntimeLibraryPath(SharedRuntimeLibPath, context.Args,
-                        /*Shared=*/true);
+  bool wantsStaticStdlib =
+      context.Args.hasFlag(options::OPT_static_stdlib,
+                           options::OPT_no_static_stdlib, false);
 
-  // Link the standard library.
-  Arguments.push_back("-L");
-  if (context.Args.hasFlag(options::OPT_static_stdlib,
-                           options::OPT_no_static_stdlib, false)) {
-    SmallString<128> StaticRuntimeLibPath;
-    getRuntimeLibraryPath(StaticRuntimeLibPath, context.Args,
-                          /*Shared=*/false);
+  SmallVector<std::string, 4> RuntimeLibPaths;
+  getRuntimeLibraryPaths(RuntimeLibPaths, context.Args, context.OI.SDKPath,
+                         /*Shared=*/!wantsStaticStdlib);
 
+  for (auto path : RuntimeLibPaths) {
+    Arguments.push_back("-L");
     // Since Windows has separate libraries per architecture, link against the
     // architecture specific version of the static library.
-    Arguments.push_back(context.Args.MakeArgString(StaticRuntimeLibPath + "/" +
-                                                   getTriple().getArchName()));
-  } else {
-    Arguments.push_back(context.Args.MakeArgString(SharedRuntimeLibPath + "/" +
+    Arguments.push_back(context.Args.MakeArgString(path + "/" +
                                                    getTriple().getArchName()));
   }
 
-  SmallString<128> swiftrtPath = SharedRuntimeLibPath;
+  SmallString<128> SharedResourceDirPath;
+  getResourceDirPath(SharedResourceDirPath, context.Args, /*Shared=*/true);
+
+  SmallString<128> swiftrtPath = SharedResourceDirPath;
   llvm::sys::path::append(swiftrtPath,
                           swift::getMajorArchitectureName(getTriple()));
   llvm::sys::path::append(swiftrtPath, "swiftrt.obj");
@@ -158,7 +170,7 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
   }
 
   if (context.Args.hasArg(options::OPT_profile_generate)) {
-    SmallString<128> LibProfile(SharedRuntimeLibPath);
+    SmallString<128> LibProfile(SharedResourceDirPath);
     llvm::sys::path::remove_filename(LibProfile); // remove platform name
     llvm::sys::path::append(LibProfile, "clang", "lib");
 

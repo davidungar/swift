@@ -306,7 +306,7 @@ SourceRange AbstractFunctionDeclScope::getChildlessSourceRange(
     assert(r.End.isValid());
     return r;
   }
-  return decl->getBody()->getSourceRange();
+  return decl->getBodySourceRange();
 }
 
 SourceRange

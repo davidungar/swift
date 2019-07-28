@@ -180,6 +180,12 @@ bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
 Expr *ConstraintLocatorBuilder::trySimplifyToExpr() const {
   SmallVector<LocatorPathElt, 4> pathBuffer;
   Expr *anchor = getLocatorParts(pathBuffer);
+  // Locators are not guaranteed to have an anchor
+  // if constraint system is used to verify generic
+  // requirements.
+  if (!anchor)
+    return nullptr;
+
   ArrayRef<LocatorPathElt> path = pathBuffer;
 
   SourceRange range;
@@ -2603,6 +2609,9 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
         for (unsigned i : indices(wrappedVar->getAttachedPropertyWrappers())) {
           auto wrapperInfo = wrappedVar->getAttachedPropertyWrapperTypeInfo(i);
+          if (!wrapperInfo)
+            break;
+
           Type memberType =
               cs->createTypeVariable(emptyLocator, TVO_CanBindToLValue);
           cs->addValueMemberConstraint(
@@ -2713,7 +2722,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       auto &ctx = singleVar->getASTContext();
       auto outermostWrapperAttr = wrapperAttrs.front();
       if (initializer) {
-        // Form init(initialValue:) call(s).
+        // Form init(wrappedValue:) call(s).
         Expr *wrappedInitializer =
             buildPropertyWrapperInitialValueCall(
                 singleVar, Type(), initializer, /*ignoreAttributeArgs=*/false);
@@ -3103,7 +3112,7 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
 
   // Create a 'let' binding to stand in for the RHS value.
   auto *matchVar = new (Context) VarDecl(/*IsStatic*/false,
-                                         VarDecl::Specifier::Let,
+                                         VarDecl::Introducer::Let,
                                          /*IsCaptureList*/false,
                                          EP->getLoc(),
                                          Context.getIdentifier("$match"),

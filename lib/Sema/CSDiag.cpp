@@ -469,13 +469,6 @@ private:
                                     CalleeCandidateInfo &calleeInfo,
                                     SourceLoc applyLoc);
 
-  /// Produce diagnostic for failures related to attributes associated with
-  /// candidate functions/methods e.g. mutability.
-  bool diagnoseMethodAttributeFailures(ApplyExpr *expr,
-                                       ArrayRef<Identifier> argLabels,
-                                       bool hasTrailingClosure,
-                                       CalleeCandidateInfo &candidates);
-
   /// Produce diagnostic for failures related to unfulfilled requirements
   /// of the generic parameters used as arguments.
   bool diagnoseArgumentGenericRequirements(TypeChecker &TC, Expr *callExpr,
@@ -748,7 +741,6 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
       return;
 
     switch (firstProblem) {
-    case MemberLookupResult::UR_LabelMismatch:
     case MemberLookupResult::UR_WritableKeyPathOnReadOnlyMember:
     case MemberLookupResult::UR_ReferenceWritableKeyPathOnMutatingMember:
     case MemberLookupResult::UR_KeyPathWithAnyObjectRootType:
@@ -777,14 +769,8 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
     }
     case MemberLookupResult::UR_MutatingMemberOnRValue:
     case MemberLookupResult::UR_MutatingGetterOnRValue: {
-      auto diagIDsubelt = diag::cannot_pass_rvalue_mutating_subelement;
-      auto diagIDmember = diag::cannot_pass_rvalue_mutating;
-      if (firstProblem == MemberLookupResult::UR_MutatingGetterOnRValue) {
-        diagIDsubelt = diag::cannot_pass_rvalue_mutating_getter_subelement;
-        diagIDmember = diag::cannot_pass_rvalue_mutating_getter;
-      }
-      assert(baseExpr && "Cannot have a mutation failure without a base");
-      AssignmentFailure failure(baseExpr, CS, loc, diagIDsubelt, diagIDmember);
+      MutatingMemberRefOnImmutableBase failure(E, CS, choice->getDecl(),
+                                               CS.getConstraintLocator(E));
       (void)failure.diagnose();
       return;
     }
@@ -3057,116 +3043,6 @@ bool FailureDiagnosis::diagnoseImplicitSelfErrors(
   return false;
 }
 
-static bool diagnoseTupleParameterMismatch(CalleeCandidateInfo &CCI,
-                                           ArrayRef<AnyFunctionType::Param> params,
-                                           ArrayRef<AnyFunctionType::Param> args,
-                                           Expr *fnExpr, Expr *argExpr,
-                                           bool isTopLevel = true) {
-  // Try to diagnose function call tuple parameter splat only if
-  // there is no trailing or argument closure, because
-  // FailureDiagnosis::visitClosureExpr will produce better
-  // diagnostic and fix-it for trailing closure case.
-  if (isTopLevel) {
-    if (CCI.hasTrailingClosure)
-      return false;
-
-    if (auto *parenExpr = dyn_cast<ParenExpr>(argExpr)) {
-      if (isa<ClosureExpr>(parenExpr->getSubExpr()))
-        return false;
-    }
-  }
-
-  if (params.size() == 1 && args.size() == 1) {
-    auto paramType = params.front().getOldType();
-    auto argType = args.front().getOldType();
-
-    if (auto *paramFnType = paramType->getAs<AnyFunctionType>()) {
-      // Only if both of the parameter and argument types are functions
-      // let's recur into diagnosing their arguments.
-      if (auto *argFnType = argType->getAs<AnyFunctionType>())
-        return diagnoseTupleParameterMismatch(CCI, paramFnType->getParams(),
-                                              argFnType->getParams(), fnExpr,
-                                              argExpr, /* isTopLevel */ false);
-      return false;
-    }
-  }
-
-  if (params.size() != 1 || args.empty())
-    return false;
-
-  auto paramType = params.front().getOldType();
-
-  if (args.size() == 1) {
-    auto argType = args.front().getOldType();
-    if (auto *paramFnType = paramType->getAs<AnyFunctionType>()) {
-      // Only if both of the parameter and argument types are functions
-      // let's recur into diagnosing their arguments.
-      if (auto *argFnType = argType->getAs<AnyFunctionType>())
-        return diagnoseTupleParameterMismatch(CCI, paramFnType->getParams(),
-                                              argFnType->getParams(), fnExpr,
-                                              argExpr, /* isTopLevel */ false);
-    }
-
-    return false;
-  }
-
-  // Let's see if inferred argument is actually a tuple inside of Paren.
-  auto *paramTupleTy = paramType->getAs<TupleType>();
-  if (!paramTupleTy)
-    return false;
-
-  if (paramTupleTy->getNumElements() != args.size())
-    return false;
-
-  // Looks like the number of tuple elements matches number
-  // of function arguments, which means we can we can emit an
-  // error about an attempt to make use of tuple splat or tuple
-  // destructuring, unfortunately we can't provide a fix-it for
-  // this case.
-  auto &TC = CCI.CS.TC;
-  if (isTopLevel) {
-    if (auto *decl = CCI[0].getDecl()) {
-      Identifier name;
-      auto kind = decl->getDescriptiveKind();
-      // Constructors/descructors and subscripts don't really have names.
-      if (!(isa<ConstructorDecl>(decl) || isa<DestructorDecl>(decl) ||
-            isa<SubscriptDecl>(decl))) {
-        name = decl->getBaseName().getIdentifier();
-      }
-
-      TC.diagnose(argExpr->getLoc(), diag::single_tuple_parameter_mismatch,
-                  kind, name, paramTupleTy, !name.empty())
-          .highlight(argExpr->getSourceRange())
-          .fixItInsertAfter(argExpr->getStartLoc(), "(")
-          .fixItInsert(argExpr->getEndLoc(), ")");
-    } else {
-      TC.diagnose(argExpr->getLoc(),
-                  diag::unknown_single_tuple_parameter_mismatch, paramTupleTy)
-          .highlight(argExpr->getSourceRange())
-          .fixItInsertAfter(argExpr->getStartLoc(), "(")
-          .fixItInsert(argExpr->getEndLoc(), ")");
-    }
-  } else {
-    TC.diagnose(argExpr->getLoc(),
-                diag::nested_tuple_parameter_destructuring, paramTupleTy,
-                CCI.CS.getType(fnExpr));
-  }
-
-  return true;
-}
-
-static bool diagnoseTupleParameterMismatch(CalleeCandidateInfo &CCI,
-                                           ArrayRef<FunctionType::Param> params,
-                                           Type argType, Expr *fnExpr,
-                                           Expr *argExpr,
-                                           bool isTopLevel = true) {
-  llvm::SmallVector<AnyFunctionType::Param, 4> args;
-  FunctionType::decomposeInput(argType, args);
-
-  return diagnoseTupleParameterMismatch(CCI, params, args, fnExpr, argExpr,
-                                        isTopLevel);
-}
-
 class ArgumentMatcher : public MatchCallArgumentListener {
   TypeChecker &TC;
   Expr *FnExpr;
@@ -3342,13 +3218,20 @@ public:
 
     assert(insertLoc.isValid() && "missing argument after trailing closure?");
 
-    if (name.empty())
+    if (name.empty()) {
       TC.diagnose(insertLoc, diag::missing_argument_positional,
                   missingParamIdx + 1)
           .fixItInsert(insertLoc, insertText.str());
-    else
-      TC.diagnose(insertLoc, diag::missing_argument_named, name)
-          .fixItInsert(insertLoc, insertText.str());
+    } else {
+      if (isPropertyWrapperImplicitInit()) {
+        auto TE = cast<TypeExpr>(FnExpr);
+        TC.diagnose(TE->getLoc(), diag::property_wrapper_missing_arg_init, name,
+                    TE->getInstanceType()->getString());
+      } else {
+        TC.diagnose(insertLoc, diag::missing_argument_named, name)
+            .fixItInsert(insertLoc, insertText.str());
+      }
+    }
 
     auto candidate = CandidateInfo[0];
     if (candidate.getDecl())
@@ -3356,6 +3239,27 @@ public:
                   candidate.getDecl()->getFullName());
 
     Diagnosed = true;
+  }
+
+  bool isPropertyWrapperImplicitInit() {
+    auto TE = dyn_cast<TypeExpr>(FnExpr);
+    if (!TE)
+      return false;
+
+    auto instanceTy = TE->getInstanceType();
+    if (!instanceTy)
+      return false;
+
+    auto nominalDecl = instanceTy->getAnyNominal();
+    if (!(nominalDecl &&
+          nominalDecl->getAttrs().hasAttribute<PropertyWrapperAttr>()))
+      return false;
+
+    if (auto *parentExpr = CandidateInfo.CS.getParentExpr(FnExpr)) {
+      return parentExpr->isImplicit() && isa<CallExpr>(parentExpr);
+    }
+
+    return false;
   }
 
   bool missingLabel(unsigned paramIdx) override {
@@ -3481,10 +3385,6 @@ diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI, Expr *fnExpr,
       return true;
     }
   }
-
-  if (diagnoseTupleParameterMismatch(CCI, candidate.getParameters(),
-                                     CCI.CS.getType(argExpr), fnExpr, argExpr))
-    return true;
 
   // We only handle structural errors here.
   if (CCI.closeness != CC_ArgumentLabelMismatch &&
@@ -3979,86 +3879,6 @@ bool FailureDiagnosis::diagnoseNilLiteralComparison(
   return true;
 }
 
-bool FailureDiagnosis::diagnoseMethodAttributeFailures(
-    swift::ApplyExpr *callExpr, ArrayRef<Identifier> argLabels,
-    bool hasTrailingClosure, CalleeCandidateInfo &candidates) {
-  auto UDE = dyn_cast<UnresolvedDotExpr>(callExpr->getFn());
-  if (!UDE)
-    return false;
-
-  auto argExpr = callExpr->getArg();
-  auto argType = CS.getType(argExpr);
-
-  // If type of the argument hasn't been established yet, we can't diagnose.
-  if (!argType || isUnresolvedOrTypeVarType(argType))
-    return false;
-
-  // Let's filter our candidate list based on that type.
-  candidates.filterListArgs(decomposeArgType(argType, argLabels));
-
-  if (candidates.closeness == CC_ExactMatch)
-    return false;
-
-  // And if filtering didn't give an exact match, such means that problem
-  // might be related to function attributes which is best diagnosed by
-  // unviable member candidates, if any.
-  auto base = UDE->getBase();
-  auto baseType = CS.getType(base);
-
-  // This handles following situation:
-  // struct S {
-  //   mutating func f(_ i: Int) {}
-  //   func f(_ f: Float) {}
-  // }
-  //
-  // Given struct has an overloaded method "f" with a single argument of
-  // multiple different types, one of the overloads is marked as
-  // "mutating", which means it can only be applied on LValue base type.
-  // So when struct is used like this:
-  //
-  // let answer: Int = 42
-  // S().f(answer)
-  //
-  // Constraint system generator is going to pick `f(_ f: Float)` as
-  // only possible overload candidate because "base" of the call is immutable
-  // and contextual information about argument type is not available yet.
-  // Such leads to incorrect contextual conversion failure diagnostic because
-  // type of the argument is going to resolved as (Int) no matter what.
-  // To workaround that fact and improve diagnostic of such cases we are going
-  // to try and collect all unviable candidates for a given call and check if
-  // at least one of them matches established argument type before even trying
-  // to re-check argument expression.
-  auto results = CS.performMemberLookup(
-      ConstraintKind::ValueMember, UDE->getName(), baseType,
-      UDE->getFunctionRefKind(), CS.getConstraintLocator(UDE),
-      /*includeInaccessibleMembers=*/false);
-
-  if (results.UnviableCandidates.empty())
-    return false;
-
-  SmallVector<OverloadChoice, 2> choices;
-  for (auto &unviable : results.UnviableCandidates)
-    choices.push_back(OverloadChoice(baseType, unviable.getDecl(),
-                                     UDE->getFunctionRefKind()));
-
-  CalleeCandidateInfo unviableCandidates(baseType, choices, hasTrailingClosure,
-                                         CS);
-
-  // Filter list of the unviable candidates based on the
-  // already established type of the argument expression.
-  unviableCandidates.filterListArgs(decomposeArgType(argType, argLabels));
-
-  // If one of the unviable candidates matches arguments exactly,
-  // that means that actual problem is related to function attributes.
-  if (unviableCandidates.closeness == CC_ExactMatch) {
-    diagnoseUnviableLookupResults(results, UDE, baseType, base, UDE->getName(),
-                                  UDE->getNameLoc(), UDE->getLoc());
-    return true;
-  }
-
-  return false;
-}
-
 bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
     TypeChecker &TC, Expr *callExpr, Expr *fnExpr, Expr *argExpr,
     CalleeCandidateInfo &candidates, ArrayRef<Identifier> argLabels) {
@@ -4371,7 +4191,7 @@ bool FailureDiagnosis::diagnoseTrailingClosureErrors(ApplyExpr *callExpr) {
   };
 
   SmallPtrSet<TypeBase *, 4> possibleTypes;
-  auto currentType = CS.getType(fnExpr);
+  auto currentType = CS.simplifyType(CS.getType(fnExpr));
 
   // If current type has type variables or unresolved types
   // let's try to re-typecheck it to see if we can get some
@@ -4809,14 +4629,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     callExpr->getArgumentLabels(argLabelsScratch);
   if (diagnoseParameterErrors(calleeInfo, callExpr->getFn(),
                               callExpr->getArg(), argLabels))
-    return true;
-
-  // There might be a candidate with correct argument types but it's not
-  // used by constraint solver because it doesn't have correct attributes,
-  // let's try to diagnose such situation there right before type checking
-  // argument expression, because that would overwrite original argument types.
-  if (diagnoseMethodAttributeFailures(callExpr, argLabels, hasTrailingClosure,
-                                      calleeInfo))
     return true;
 
   Type argType;  // argument list, if known.
@@ -7116,9 +6928,8 @@ bool FailureDiagnosis::diagnoseAmbiguousGenericParameters() {
     // because type B would have no constraints associated with it.
     unsigned numConstraints = 0;
     {
-      llvm::SetVector<Constraint *> constraints;
-      CS.getConstraintGraph().gatherConstraints(
-          tv, constraints, ConstraintGraph::GatheringKind::EquivalenceClass,
+      auto constraints = CS.getConstraintGraph().gatherConstraints(
+          tv, ConstraintGraph::GatheringKind::EquivalenceClass,
           [&](Constraint *constraint) -> bool {
             // We are not interested in ConformsTo constraints because
             // we can't derive any concrete type information from them.

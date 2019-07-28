@@ -40,6 +40,7 @@ namespace constraints {
 class OverloadChoice;
 class ConstraintSystem;
 class ConstraintLocator;
+class ConstraintLocatorBuilder;
 class Solution;
 
 /// Describes the kind of fix to apply to the given constraint before
@@ -179,6 +180,17 @@ enum class FixKind : uint8_t {
   /// matches up with a
   /// parameter that has a function builder.
   SkipUnhandledConstructInFunctionBuilder,
+
+  /// Allow invalid reference to a member declared as `mutating`
+  /// when base is an r-value type.
+  AllowMutatingMemberOnRValueBase,
+
+  /// Fix the type of the default argument
+  DefaultArgumentTypeMismatch,
+  
+  /// Allow a single tuple parameter to be matched with N arguments
+  /// by forming all of the given arguments into a single tuple.
+  AllowTupleSplatForSingleParameter,
 };
 
 class ConstraintFix {
@@ -728,20 +740,37 @@ public:
                                         ConstraintLocator *locator);
 };
 
-class AllowMemberRefOnExistential final : public ConstraintFix {
+class AllowInvalidMemberRef : public ConstraintFix {
   Type BaseType;
+  ValueDecl *Member;
   DeclName Name;
 
+protected:
+  AllowInvalidMemberRef(ConstraintSystem &cs, FixKind kind, Type baseType,
+                        ValueDecl *member, DeclName name,
+                        ConstraintLocator *locator)
+      : ConstraintFix(cs, kind, locator), BaseType(baseType), Member(member),
+        Name(name) {}
+
+public:
+  Type getBaseType() const { return BaseType; }
+
+  ValueDecl *getMember() const { return Member; }
+
+  DeclName getMemberName() const { return Name; }
+};
+
+class AllowMemberRefOnExistential final : public AllowInvalidMemberRef {
   AllowMemberRefOnExistential(ConstraintSystem &cs, Type baseType,
                               DeclName memberName, ValueDecl *member,
                               ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::AllowMemberRefOnExistential, locator),
-        BaseType(baseType), Name(memberName) {}
+      : AllowInvalidMemberRef(cs, FixKind::AllowMemberRefOnExistential,
+                              baseType, member, memberName, locator) {}
 
 public:
   std::string getName() const override {
     llvm::SmallVector<char, 16> scratch;
-    auto memberName = Name.getString(scratch);
+    auto memberName = getMemberName().getString(scratch);
     return "allow access to invalid member '" + memberName.str() +
            "' on value of protocol type";
   }
@@ -754,20 +783,16 @@ public:
                                              ConstraintLocator *locator);
 };
 
-class AllowTypeOrInstanceMember final : public ConstraintFix {
-  Type BaseType;
-  ValueDecl *Member;
-  DeclName UsedName;
-
-public:
+class AllowTypeOrInstanceMember final : public AllowInvalidMemberRef {
   AllowTypeOrInstanceMember(ConstraintSystem &cs, Type baseType,
                             ValueDecl *member, DeclName name,
                             ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::AllowTypeOrInstanceMember, locator),
-        BaseType(baseType), Member(member), UsedName(name) {
+      : AllowInvalidMemberRef(cs, FixKind::AllowTypeOrInstanceMember, baseType,
+                              member, name, locator) {
     assert(member);
   }
 
+public:
   std::string getName() const override {
     return "allow access to instance member on type or a type member on instance";
   }
@@ -845,6 +870,25 @@ private:
                                      ConstraintLocator *locator);
 };
 
+class AllowMutatingMemberOnRValueBase final : public AllowInvalidMemberRef {
+  AllowMutatingMemberOnRValueBase(ConstraintSystem &cs, Type baseType,
+                                  ValueDecl *member, DeclName name,
+                                  ConstraintLocator *locator)
+      : AllowInvalidMemberRef(cs, FixKind::AllowMutatingMemberOnRValueBase,
+                              baseType, member, name, locator) {}
+
+public:
+  std::string getName() const override {
+    return "allow `mutating` method on r-value base";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowMutatingMemberOnRValueBase *
+  create(ConstraintSystem &cs, Type baseType, ValueDecl *member, DeclName name,
+         ConstraintLocator *locator);
+};
+
 class AllowClosureParamDestructuring final : public ConstraintFix {
   FunctionType *ContextualType;
 
@@ -905,6 +949,27 @@ private:
   }
 };
 
+class IgnoreDefaultArgumentTypeMismatch final : public ConstraintFix {
+  Type FromType;
+  Type ToType;
+
+  IgnoreDefaultArgumentTypeMismatch(ConstraintSystem &cs, Type fromType,
+                                    Type toType, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::DefaultArgumentTypeMismatch, locator),
+        FromType(fromType), ToType(toType) {}
+
+public:
+  std::string getName() const override {
+    return "ignore default argument type mismatch";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static IgnoreDefaultArgumentTypeMismatch *create(ConstraintSystem &cs,
+                                                   Type fromType, Type toType,
+                                                   ConstraintLocator *locator);
+};
+
 class MoveOutOfOrderArgument final : public ConstraintFix {
   using ParamBinding = SmallVector<unsigned, 1>;
 
@@ -934,13 +999,12 @@ public:
                                         ConstraintLocator *locator);
 };
 
-class AllowInaccessibleMember final : public ConstraintFix {
-  ValueDecl *Member;
-
-  AllowInaccessibleMember(ConstraintSystem &cs, ValueDecl *member,
+class AllowInaccessibleMember final : public AllowInvalidMemberRef {
+  AllowInaccessibleMember(ConstraintSystem &cs, Type baseType,
+                          ValueDecl *member, DeclName name,
                           ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::AllowInaccessibleMember, locator),
-        Member(member) {}
+      : AllowInvalidMemberRef(cs, FixKind::AllowInaccessibleMember, baseType,
+                              member, name, locator) {}
 
 public:
   std::string getName() const override {
@@ -949,8 +1013,8 @@ public:
 
   bool diagnose(Expr *root, bool asNote = false) const override;
 
-  static AllowInaccessibleMember *create(ConstraintSystem &cs,
-                                         ValueDecl *member,
+  static AllowInaccessibleMember *create(ConstraintSystem &cs, Type baseType,
+                                         ValueDecl *member, DeclName name,
                                          ConstraintLocator *locator);
 };
 
@@ -1144,6 +1208,32 @@ public:
   static SkipUnhandledConstructInFunctionBuilder *
   create(ConstraintSystem &cs, UnhandledNode unhandledNode,
          NominalTypeDecl *builder, ConstraintLocator *locator);
+};
+
+class AllowTupleSplatForSingleParameter final : public ConstraintFix {
+  using Param = AnyFunctionType::Param;
+
+  Type ParamType;
+
+  AllowTupleSplatForSingleParameter(ConstraintSystem &cs, Type paramTy,
+                                    ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowTupleSplatForSingleParameter, locator),
+        ParamType(paramTy) {}
+
+public:
+  std::string getName() const override {
+    return "allow single parameter tuple splat";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  /// Apply this fix to given arguments/parameters and return `true`
+  /// this fix is not applicable and solver can't continue, `false`
+  /// otherwise.
+  static bool attempt(ConstraintSystem &cs, SmallVectorImpl<Param> &args,
+                      ArrayRef<Param> params,
+                      SmallVectorImpl<SmallVector<unsigned, 1>> &bindings,
+                      ConstraintLocatorBuilder locator);
 };
 
 } // end namespace constraints

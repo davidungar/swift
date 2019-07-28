@@ -694,7 +694,7 @@ class IterableDeclContext {
 
   /// Because \c parseDelayedDecl and lazy member adding can add members *after*
   /// an \c ASTScope tree is created, there must be some way for the tree to
-  /// detect when a (localizable) member has been added. A bit would suffice,
+  /// detect when a member has been added. A bit would suffice,
   /// but would be more fragile, The scope code could count the members each
   /// time, but I think it's a better trade to just keep a count here.
   unsigned memberCount = 0;
@@ -796,6 +796,9 @@ void simple_display(llvm::raw_ostream &out, const ParamT *dc) {
   else
     out << "(null)";
 }
+
+/// Extract the source location from the given declaration context.
+SourceLoc extractNearestSourceLoc(const DeclContext *dc);
 
 } // end namespace swift
 

@@ -342,14 +342,16 @@ AllowMemberRefOnExistential::create(ConstraintSystem &cs, Type baseType,
 }
 
 bool AllowMemberRefOnExistential::diagnose(Expr *root, bool asNote) const {
-  auto failure = InvalidMemberRefOnExistential(root, getConstraintSystem(),
-                                               BaseType, Name, getLocator());
+  auto failure =
+      InvalidMemberRefOnExistential(root, getConstraintSystem(), getBaseType(),
+                                    getMemberName(), getLocator());
   return failure.diagnose(asNote);
 }
 
 bool AllowTypeOrInstanceMember::diagnose(Expr *root, bool asNote) const {
   auto failure = AllowTypeOrInstanceMemberFailure(
-      root, getConstraintSystem(), BaseType, Member, UsedName, getLocator());
+      root, getConstraintSystem(), getBaseType(), getMember(), getMemberName(),
+      getLocator());
   return failure.diagnose(asNote);
 }
 
@@ -449,6 +451,21 @@ bool AddMissingArguments::diagnose(Expr *root, bool asNote) const {
   return failure.diagnose(asNote);
 }
 
+IgnoreDefaultArgumentTypeMismatch *
+IgnoreDefaultArgumentTypeMismatch::create(ConstraintSystem &cs, Type fromType,
+                                          Type toType,
+                                          ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      IgnoreDefaultArgumentTypeMismatch(cs, fromType, toType, locator);
+}
+
+bool IgnoreDefaultArgumentTypeMismatch::diagnose(Expr *root,
+                                                 bool asNote) const {
+  DefaultArgumentTypeMismatch failure(root, getConstraintSystem(), FromType,
+                                      ToType, getLocator());
+  return failure.diagnose(asNote);
+}
+
 AddMissingArguments *
 AddMissingArguments::create(ConstraintSystem &cs, FunctionType *funcType,
                             llvm::ArrayRef<Param> synthesizedArgs,
@@ -472,15 +489,17 @@ MoveOutOfOrderArgument *MoveOutOfOrderArgument::create(
 }
 
 bool AllowInaccessibleMember::diagnose(Expr *root, bool asNote) const {
-  InaccessibleMemberFailure failure(root, getConstraintSystem(), Member,
+  InaccessibleMemberFailure failure(root, getConstraintSystem(), getMember(),
                                     getLocator());
   return failure.diagnose(asNote);
 }
 
 AllowInaccessibleMember *
-AllowInaccessibleMember::create(ConstraintSystem &cs, ValueDecl *member,
+AllowInaccessibleMember::create(ConstraintSystem &cs, Type baseType,
+                                ValueDecl *member, DeclName name,
                                 ConstraintLocator *locator) {
-  return new (cs.getAllocator()) AllowInaccessibleMember(cs, member, locator);
+  return new (cs.getAllocator())
+      AllowInaccessibleMember(cs, baseType, member, name, locator);
 }
 
 bool AllowAnyObjectKeyPathRoot::diagnose(Expr *root, bool asNote) const {
@@ -638,4 +657,58 @@ bool SkipUnhandledConstructInFunctionBuilder::diagnose(Expr *root,
   SkipUnhandledConstructInFunctionBuilderFailure failure(
       root, getConstraintSystem(), unhandled, builder, getLocator());
   return failure.diagnose(asNote);
+}
+
+bool AllowMutatingMemberOnRValueBase::diagnose(Expr *root, bool asNote) const {
+  auto &cs = getConstraintSystem();
+  MutatingMemberRefOnImmutableBase failure(root, cs, getMember(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowMutatingMemberOnRValueBase *
+AllowMutatingMemberOnRValueBase::create(ConstraintSystem &cs, Type baseType,
+                                        ValueDecl *member, DeclName name,
+                                        ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowMutatingMemberOnRValueBase(cs, baseType, member, name, locator);
+}
+
+bool AllowTupleSplatForSingleParameter::diagnose(Expr *root, bool asNote) const {
+  auto &cs = getConstraintSystem();
+  InvalidTupleSplatWithSingleParameterFailure failure(root, cs, ParamType,
+                                                      getLocator());
+  return failure.diagnose(asNote);
+}
+
+bool AllowTupleSplatForSingleParameter::attempt(
+    ConstraintSystem &cs, SmallVectorImpl<Param> &args, ArrayRef<Param> params,
+    SmallVectorImpl<SmallVector<unsigned, 1>> &bindings,
+    ConstraintLocatorBuilder locator) {
+  if (params.size() != 1 || args.size() <= 1)
+    return true;
+
+  const auto &param = params.front();
+
+  auto *paramTy = param.getOldType()->getAs<TupleType>();
+  if (!paramTy || paramTy->getNumElements() != args.size())
+    return true;
+
+  SmallVector<TupleTypeElt, 4> argElts;
+  for (const auto &arg : args) {
+    argElts.push_back(
+        {arg.getPlainType(), arg.getLabel(), arg.getParameterFlags()});
+  }
+
+  bindings[0].clear();
+  bindings[0].push_back(0);
+
+  auto newArgType = TupleType::get(argElts, cs.getASTContext());
+
+  args.clear();
+  args.push_back(AnyFunctionType::Param(newArgType, param.getLabel()));
+
+  auto *fix = new (cs.getAllocator()) AllowTupleSplatForSingleParameter(
+      cs, paramTy, cs.getConstraintLocator(locator));
+
+  return cs.recordFix(fix);
 }

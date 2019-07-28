@@ -498,8 +498,11 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
         "-Werror=non-modular-include-in-framework-module");
 
   if (LangOpts.EnableObjCInterop) {
-    invocationArgStrs.insert(invocationArgStrs.end(),
-                             {"-x", "objective-c", "-std=gnu11", "-fobjc-arc"});
+    bool EnableCXXInterop = LangOpts.EnableCXXInterop;
+    invocationArgStrs.insert(
+        invocationArgStrs.end(),
+        {"-x", EnableCXXInterop ? "objective-c++" : "objective-c",
+         EnableCXXInterop ? "-std=gnu++17" : "-std=gnu11", "-fobjc-arc"});
     // TODO: Investigate whether 7.0 is a suitable default version.
     if (!triple.isOSDarwin())
       invocationArgStrs.insert(invocationArgStrs.end(),
@@ -518,7 +521,10 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
       });
 
   } else {
-    invocationArgStrs.insert(invocationArgStrs.end(), {"-x", "c", "-std=gnu11"});
+    bool EnableCXXInterop = LangOpts.EnableCXXInterop;
+    invocationArgStrs.insert(invocationArgStrs.end(),
+                             {"-x", EnableCXXInterop ? "c++" : "c",
+                              EnableCXXInterop ? "-std=gnu++17" : "-std=gnu11"});
   }
 
   // Set C language options.
@@ -636,7 +642,7 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     invocationArgStrs.back().append(moduleCachePath);
   }
 
-  if (importerOpts.DisableModulesValidateSystemHeaders) {
+  if (ctx.SearchPathOpts.DisableModulesValidateSystemDependencies) {
     invocationArgStrs.push_back("-fno-modules-validate-system-headers");
   } else {
     invocationArgStrs.push_back("-fmodules-validate-system-headers");
@@ -1012,10 +1018,11 @@ ClangImporter::create(ASTContext &ctx,
 
   // Set up the file manager.
   {
-    if (!ctx.SearchPathOpts.VFSOverlayFiles.empty()) {
+    if (!ctx.SearchPathOpts.VFSOverlayFiles.empty() ||
+        importerOpts.ForceUseSwiftVirtualFileSystem) {
       // If the clang instance has overlays it means the user has provided
-      // -ivfsoverlay options and swift -vfsoverlay options.  We're going to
-      // clobber their file system with our own, so warn about it.
+      // -ivfsoverlay options.  We're going to clobber their file system with
+      // the Swift file system, so warn about it.
       if (!instance.getHeaderSearchOpts().VFSOverlayFiles.empty()) {
         ctx.Diags.diagnose(SourceLoc(), diag::clang_vfs_overlay_is_ignored);
       }

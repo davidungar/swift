@@ -12,6 +12,7 @@
 
 #include "ToolChains.h"
 
+#include "swift/AST/DiagnosticsDriver.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
@@ -72,12 +73,13 @@ toolchains::Darwin::constructInvocation(const InterpretJobAction &job,
                                         const JobContext &context) const {
   InvocationInfo II = ToolChain::constructInvocation(job, context);
 
-  SmallString<128> runtimeLibraryPath;
-  getRuntimeLibraryPath(runtimeLibraryPath, context.Args, /*Shared=*/true);
+  SmallVector<std::string, 4> runtimeLibraryPaths;
+  getRuntimeLibraryPaths(runtimeLibraryPaths, context.Args, context.OI.SDKPath,
+                         /*Shared=*/true);
 
   addPathEnvironmentVariableIfNeeded(II.ExtraEnvironment, "DYLD_LIBRARY_PATH",
                                      ":", options::OPT_L, context.Args,
-                                     runtimeLibraryPath);
+                                     runtimeLibraryPaths);
   addPathEnvironmentVariableIfNeeded(II.ExtraEnvironment, "DYLD_FRAMEWORK_PATH",
                                      ":", options::OPT_F, context.Args);
   // FIXME: Add options::OPT_Fsystem paths to DYLD_FRAMEWORK_PATH as well.
@@ -390,13 +392,10 @@ toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
   Arguments.push_back("-arch");
   Arguments.push_back(context.Args.MakeArgString(getTriple().getArchName()));
 
-  // Add the runtime library link path, which is platform-specific and found
-  // relative to the compiler.
-  SmallString<128> RuntimeLibPath;
-  getRuntimeLibraryPath(RuntimeLibPath, context.Args, /*Shared=*/true);
-
   // Link compatibility libraries, if we're deploying back to OSes that
   // have an older Swift runtime.
+  SmallString<128> SharedResourceDirPath;
+  getResourceDirPath(SharedResourceDirPath, context.Args, /*Shared=*/true);
   Optional<llvm::VersionTuple> runtimeCompatibilityVersion;
   
   if (context.Args.hasArg(options::OPT_runtime_compatibility_version)) {
@@ -418,7 +417,7 @@ toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
     if (*runtimeCompatibilityVersion <= llvm::VersionTuple(5, 0)) {
       // Swift 5.0 compatibility library
       SmallString<128> BackDeployLib;
-      BackDeployLib.append(RuntimeLibPath);
+      BackDeployLib.append(SharedResourceDirPath);
       llvm::sys::path::append(BackDeployLib, "libswiftCompatibility50.a");
       
       if (llvm::sys::fs::exists(BackDeployLib)) {
@@ -433,7 +432,7 @@ toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
       if (*runtimeCompatibilityVersion <= llvm::VersionTuple(5, 0)) {
         // Swift 5.0 dynamic replacement compatibility library.
         SmallString<128> BackDeployLib;
-        BackDeployLib.append(RuntimeLibPath);
+        BackDeployLib.append(SharedResourceDirPath);
         llvm::sys::path::append(BackDeployLib,
                                 "libswiftCompatibilityDynamicReplacements.a");
 
@@ -444,23 +443,22 @@ toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
       }
   }
 
-  // Link the standard library.
-  Arguments.push_back("-L");
-  if (context.Args.hasFlag(options::OPT_static_stdlib,
-                           options::OPT_no_static_stdlib, false)) {
-    SmallString<128> StaticRuntimeLibPath;
-    getRuntimeLibraryPath(StaticRuntimeLibPath, context.Args, /*Shared=*/false);
-    Arguments.push_back(context.Args.MakeArgString(StaticRuntimeLibPath));
-    Arguments.push_back("-lc++");
-    Arguments.push_back("-framework");
-    Arguments.push_back("Foundation");
-    Arguments.push_back("-force_load_swift_libs");
-  } else {
-    Arguments.push_back(context.Args.MakeArgString(RuntimeLibPath));
-    // FIXME: We probably shouldn't be adding an rpath here unless we know ahead
-    // of time the standard library won't be copied. SR-1967
+  SmallVector<std::string, 4> RuntimeLibPaths;
+  getRuntimeLibraryPaths(RuntimeLibPaths, context.Args,
+                         context.OI.SDKPath, /*Shared=*/true);
+
+  // Add the runtime library link path, which is platform-specific and found
+  // relative to the compiler.
+  for (auto path : RuntimeLibPaths) {
+    Arguments.push_back("-L");
+    Arguments.push_back(context.Args.MakeArgString(path));
+  }
+
+  // FIXME: We probably shouldn't be adding an rpath here unless we know ahead
+  // of time the standard library won't be copied. SR-1967
+  for (auto path : RuntimeLibPaths) {
     Arguments.push_back("-rpath");
-    Arguments.push_back(context.Args.MakeArgString(RuntimeLibPath));
+    Arguments.push_back(context.Args.MakeArgString(path));
   }
 
   if (context.Args.hasArg(options::OPT_profile_generate)) {
@@ -585,4 +583,49 @@ bool toolchains::Darwin::shouldStoreInvocationInDebugInfo() const {
   if (const char *S = ::getenv("RC_DEBUG_OPTIONS"))
     return S[0] != '\0';
   return false;
+}
+
+static void validateDeploymentTarget(const toolchains::Darwin &TC,
+                                     DiagnosticEngine &diags,
+                                     const llvm::opt::ArgList &args) {
+  // Check minimum supported OS versions.
+  auto triple = TC.getTriple();
+  if (triple.isMacOSX()) {
+    if (triple.isMacOSXVersionLT(10, 9))
+      diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
+                     "OS X 10.9");
+  } else if (triple.isiOS()) {
+    if (triple.isTvOS()) {
+      if (triple.isOSVersionLT(9, 0)) {
+        diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
+                       "tvOS 9.0");
+        return;
+      }
+    }
+    if (triple.isOSVersionLT(7))
+      diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
+                     "iOS 7");
+    if (triple.isArch32Bit() && !triple.isOSVersionLT(11)) {
+      diags.diagnose(SourceLoc(), diag::error_ios_maximum_deployment_32,
+                     triple.getOSMajorVersion());
+    }
+  } else if (triple.isWatchOS()) {
+    if (triple.isOSVersionLT(2, 0)) {
+      diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
+                     "watchOS 2.0");
+      return;
+    }
+  }
+}
+
+void 
+toolchains::Darwin::validateArguments(DiagnosticEngine &diags,
+                                      const llvm::opt::ArgList &args) const {
+  // Validating apple platforms deployment targets.
+  validateDeploymentTarget(*this, diags, args);
+    
+  // Validating darwin unsupported -static-stdlib argument.
+  if (args.hasArg(options::OPT_static_stdlib)) {
+    diags.diagnose(SourceLoc(), diag::error_darwin_static_stdlib_not_supported);
+  }
 }
