@@ -1408,12 +1408,6 @@ Expr *PatternBindingEntry::getOrigInitAsWritten() const {
   auto *e = findOriginalPropertyWrapperInitialValue(var, init);
   if (e)
     return e;
-  // Consider: @Wrapper(stored: 17) static var x: Int
-  // It has an "init" but not really a wrapper initial value. Return nullptr in
-  // that case.
-  if (var->getASTContext().SourceMgr.isBeforeInBuffer(init->getStartLoc(),
-                                                      var->getStartLoc()))
-    return nullptr;
   return init;
 }
 
@@ -5891,6 +5885,10 @@ Expr *swift::findOriginalPropertyWrapperInitialValue(VarDecl *var,
                                                      Expr *init) {
   auto *PBD = var->getParentPatternBinding();
   if (!PBD)
+    return nullptr;
+
+  // If there is no '=' on the pattern, there was no initial value.
+  if (PBD->getPatternList()[0].getEqualLoc().isInvalid())
     return nullptr;
 
   ASTContext &ctx = var->getASTContext();
