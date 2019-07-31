@@ -1283,8 +1283,9 @@ PatternBindingDecl *PatternBindingDecl::createImplicit(
     ASTContext &Ctx, StaticSpellingKind StaticSpelling, Pattern *Pat, Expr *E,
     DeclContext *Parent, SourceLoc VarLoc) {
   auto *Result = create(Ctx, /*StaticLoc*/ SourceLoc(), StaticSpelling, VarLoc,
-                        Pat, /*EqualLoc*/ SourceLoc(), E, Parent);
+                        Pat, /*EqualLoc*/ SourceLoc(), nullptr, Parent);
   Result->setImplicit();
+  Result->setInit(0, E);
   return Result;
 }
 
@@ -1390,30 +1391,19 @@ unsigned PatternBindingDecl::getPatternEntryIndexForVarDecl(const VarDecl *VD) c
   return ~0U;
 }
 
-Expr *PatternBindingEntry::getOrigInitAsWritten() const {
-  // Before the addition of property wrappers, the following would work:
-  // return InitContextAndIsText.getInt() ? nullptr : InitExpr.Node;
-  // Consider: @Blah(17) var foo: Foo = 18
-  // The code above will return:
-  // Clamped(wrappedValue: 17, min: 0, max: 255)
-  // but what we want is the "18".
-
-  Expr *const init = InitContextAndIsText.getInt() ? nullptr : InitExpr.Node;
-  if (!init)
-    return nullptr;
-  // Assume wrappers only apply to single-variable patterns.
-  VarDecl *const var = getPattern()->getSingleVar();
-  if (!var)
-    return init;
-  auto *e = findOriginalPropertyWrapperInitialValue(var, init);
-  if (e)
-    return e;
-  return init;
+Expr *PatternBindingEntry::getOrigInit() const {
+  return InitContextAndIsText.getInt() ? nullptr : InitExpr.origInit;
 }
 
 SourceRange PatternBindingEntry::getOrigInitRange() const {
-  auto Init = getOrigInitAsWritten();
-  return Init ? Init->getSourceRange() : SourceRange();
+  if (auto *i = getOrigInit())
+    return i->getSourceRange();
+  return SourceRange();
+}
+
+void PatternBindingEntry::setOrigInit(Expr* E) {
+  InitExpr.origInit = E;
+  InitContextAndIsText.setInt(false);
 }
 
 bool PatternBindingEntry::isInitialized() const {
@@ -1438,7 +1428,7 @@ void PatternBindingEntry::setInit(Expr *E) {
   } else {
     PatternAndFlags.setInt(F | Flags::Removed);
   }
-  InitExpr.Node = E;
+  InitExpr.initAfterSynthesis = E;
   InitContextAndIsText.setInt(false);
 }
 
@@ -1459,26 +1449,6 @@ SourceLoc PatternBindingEntry::getLastAccessorEndLoc() const {
   return lastAccessorEnd;
 }
 
-SourceLoc PatternBindingEntry::getPostfixInitEndLoc() const {
-  if (getEqualLoc().isInvalid()) // An optimization
-    return SourceLoc();
-
-  const SourceLoc endOrigInit = getOrigInitRange().End;
-  if (endOrigInit.isInvalid())
-    return SourceLoc();
-  // The initializer could precede the pattern if it comes from a
-  // property wrapper.
-  if (const auto *const potentiallyWrappedVar = getPattern()->getSingleVar()) {
-    const auto &SM = potentiallyWrappedVar->getASTContext().SourceMgr;
-    if (SM.isBeforeInBuffer(endOrigInit, getStartLoc())) {
-      assert(getEqualLoc().isInvalid() &&
-             "Needed to get the real postfix init");
-      return SourceLoc();
-    }
-  }
-  return endOrigInit;
-}
-
 SourceLoc PatternBindingEntry::getStartLoc() const {
   return getPattern()->getStartLoc();
 }
@@ -1490,9 +1460,9 @@ SourceLoc PatternBindingEntry::getEndLoc(bool omitAccessors) const {
     if (lastAccessorEnd.isValid())
       return lastAccessorEnd;
   }
-  const auto postfixInitEnd = getPostfixInitEndLoc();
-  if (postfixInitEnd.isValid())
-    return postfixInitEnd;
+  const auto initEnd = getOrigInitRange().End;
+  if (initEnd.isValid())
+    return initEnd;
 
   return getPattern()->getEndLoc();
 }
@@ -5881,78 +5851,12 @@ void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
 }
 
 /// Return nullptr if there is no property wrapper
-Expr *swift::findOriginalPropertyWrapperInitialValue(VarDecl *var,
-                                                     Expr *init) {
+Expr *swift::findOriginalPropertyWrapperInitialValue(VarDecl *var) {
   auto *PBD = var->getParentPatternBinding();
   if (!PBD)
     return nullptr;
-
-  // If there is no '=' on the pattern, there was no initial value.
-  if (PBD->getPatternList()[0].getEqualLoc().isInvalid())
-    return nullptr;
-
-  ASTContext &ctx = var->getASTContext();
-  auto dc = var->getInnermostDeclContext();
-  const auto wrapperAttrs = var->getAttachedPropertyWrappers();
-  if (wrapperAttrs.empty())
-    return nullptr;
-  auto innermostAttr = wrapperAttrs.back();
-  auto innermostNominal = evaluateOrDefault(
-      ctx.evaluator, CustomAttrNominalRequest{innermostAttr, dc}, nullptr);
-  if (!innermostNominal)
-    return nullptr;
-
-      // Walker
-  class Walker : public ASTWalker {
-  public:
-    NominalTypeDecl *innermostNominal;
-    Expr *initArg = nullptr;
-
-    Walker(NominalTypeDecl *innermostNominal)
-      : innermostNominal(innermostNominal) { }
-
-    virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      if (initArg)
-        return { false, E };
-
-      if (auto call = dyn_cast<CallExpr>(E)) {
-        // We're looking for an implicit call.
-        if (!call->isImplicit())
-          return { true, E };
-
-        // ... producing a value of the same nominal type as the innermost
-        // property wrapper.
-        if (!call->getType() ||
-            call->getType()->getAnyNominal() != innermostNominal)
-          return { true, E };
-
-        // Find the implicit initialValue argument.
-        if (auto tuple = dyn_cast<TupleExpr>(call->getArg())) {
-          ASTContext &ctx = innermostNominal->getASTContext();
-          for (unsigned i : range(tuple->getNumElements())) {
-            if (tuple->getElementName(i) == ctx.Id_wrappedValue ||
-                tuple->getElementName(i) == ctx.Id_initialValue) {
-              initArg = tuple->getElement(i);
-              return { false, E };
-            }
-          }
-        }
-      }
-
-      return { true, E };
-    }
-  } walker(innermostNominal);
-  init->walk(walker);
-
-  Expr *initArg = walker.initArg;
-  if (initArg) {
-    initArg = initArg->getSemanticsProvidingExpr();
-    if (auto autoclosure = dyn_cast<AutoClosureExpr>(initArg)) {
-      initArg =
-          autoclosure->getSingleExpressionBody()->getSemanticsProvidingExpr();
-    }
-  }
-  return initArg;
+    
+  return PBD->getPatternEntryForVarDecl(var).getOrigInit();
 }
 
 StringRef
@@ -6016,7 +5920,7 @@ ParamDecl::getDefaultValueStringRepresentation(
         }
 
         auto init =
-            findOriginalPropertyWrapperInitialValue(original, parentInit);
+            findOriginalPropertyWrapperInitialValue(original);
         return extractInlinableText(getASTContext().SourceMgr, init, scratch);
       }
     }

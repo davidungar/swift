@@ -183,7 +183,7 @@ void simple_display(
 
 /// Given the initializer for the given property with an attached property
 /// wrapper, dig out the original initialization expression.
-Expr *findOriginalPropertyWrapperInitialValue(VarDecl *var, Expr *init);
+Expr *findOriginalPropertyWrapperInitialValue(VarDecl *var);
 
 } // end namespace swift
 

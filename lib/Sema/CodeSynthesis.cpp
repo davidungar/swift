@@ -2004,7 +2004,7 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   if (Expr *init = parentPBD->getInit(patternNumber)) {
     pbd->setInit(0, init);
     pbd->setInitializerChecked(0);
-    originalInitialValue = findOriginalPropertyWrapperInitialValue(var, init);
+    originalInitialValue = findOriginalPropertyWrapperInitialValue(var);
   } else if (!parentPBD->isInitialized(patternNumber) &&
              wrapperInfo.defaultInit) {
     // FIXME: Record this expression somewhere so that DI can perform the
