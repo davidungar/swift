@@ -1455,26 +1455,61 @@ VarDecl *PatternBindingEntry::getAnchoringVarDecl() const {
   return variables[0];
 }
 
-SourceRange PatternBindingEntry::getSourceRange(bool omitAccessors) const {
-  // Patterns end at the initializer, if present.
-  SourceLoc endLoc = getOrigInitRange().End;
+SourceLoc PatternBindingEntry::getLastAccessorEndLoc() const {
+  SourceLoc lastAccessorEnd;
+  getPattern()->forEachVariable([&](VarDecl *var) {
+    auto accessorsEndLoc = var->getBracesRange().End;
+    if (accessorsEndLoc.isValid())
+      lastAccessorEnd = accessorsEndLoc;
+  });
+  return lastAccessorEnd;
+}
 
-  // If we're not banned from handling accessors, they follow the initializer.
-  if (!omitAccessors) {
-    getPattern()->forEachVariable([&](VarDecl *var) {
-      auto accessorsEndLoc = var->getBracesRange().End;
-      if (accessorsEndLoc.isValid())
-        endLoc = accessorsEndLoc;
-    });
+SourceLoc PatternBindingEntry::getPostfixInitEndLoc() const {
+  if (getEqualLoc().isInvalid()) // An optimization
+    return SourceLoc();
+
+  const SourceLoc endOrigInit = getOrigInitRange().End;
+  if (endOrigInit.isInvalid())
+    return SourceLoc();
+  // The initializer could precede the pattern if it comes from a
+  // property wrapper.
+  if (const auto *const potentiallyWrappedVar = getPattern()->getSingleVar()) {
+    const auto &SM = potentiallyWrappedVar->getASTContext().SourceMgr;
+    if (SM.isBeforeInBuffer(endOrigInit, getStartLoc())) {
+      assert(getEqualLoc().isInvalid() &&
+             "Needed to get the real postfix init");
+      return SourceLoc();
+    }
   }
+  return endOrigInit;
+}
 
-  // If we didn't find an end yet, check the pattern.
+SourceLoc PatternBindingEntry::getStartLoc() const {
+  return getPattern()->getStartLoc();
+}
+
+SourceLoc PatternBindingEntry::getEndLoc(bool omitAccessors) const {
+  // Accessors are last
+  if (!omitAccessors) {
+    const auto lastAccessorEnd = getLastAccessorEndLoc();
+    if (lastAccessorEnd.isValid())
+      return lastAccessorEnd;
+  }
+  const auto postfixInitEnd = getPostfixInitEndLoc();
+  if (postfixInitEnd.isValid())
+    return postfixInitEnd;
+
+  return getPattern()->getEndLoc();
+}
+
+SourceRange PatternBindingEntry::getSourceRange(bool omitAccessors) const {
+  const SourceLoc startLoc = getStartLoc();
+  if (startLoc.isInvalid())
+    return SourceRange();
+  const SourceLoc endLoc = getEndLoc(omitAccessors);
   if (endLoc.isInvalid())
-    endLoc = getPattern()->getEndLoc();
-
-  SourceLoc startLoc = getPattern()->getStartLoc();
-  if (startLoc.isValid() != endLoc.isValid()) return SourceRange();
-
+    return SourceRange();
   return SourceRange(startLoc, endLoc);
 }
 
