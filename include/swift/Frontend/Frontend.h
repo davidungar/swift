@@ -291,6 +291,7 @@ public:
 
   void setCodeCompletionFactory(CodeCompletionCallbacksFactory *Factory) {
     CodeCompletionFactory = Factory;
+    LangOpts.EnableASTScopeLookup = false;
   }
 
   CodeCompletionCallbacksFactory *getCodeCompletionFactory() const {

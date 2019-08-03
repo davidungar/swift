@@ -1905,18 +1905,22 @@ class PatternBindingEntry {
   };
   llvm::PointerIntPair<Pattern *, 3, OptionSet<Flags>> PatternAndFlags;
 
-  struct ExprAndEqualLoc {
-    // When the initializer is removed we don't actually clear the pointer
+  struct InitializerAndEqualLoc {
+    // When the initializer is removed we don't actually clear the pointers
     // because we might need to get initializer's source range. Since the
     // initializer is ASTContext-allocated it is safe.
-    Expr *Node;
+
+    /// Exactly the expr the programmer wrote
+    Expr *origInit;
+    /// Might be transformed, e.g. for a property wrapper
+    Expr *initAfterSynthesis;
     /// The location of the equal '=' token.
     SourceLoc EqualLoc;
   };
 
   union {
     /// The initializer expression and its '=' token loc.
-    ExprAndEqualLoc InitExpr;
+    InitializerAndEqualLoc InitExpr;
 
     /// The text of the initializer expression if deserialized from a module.
     StringRef InitStringRepresentation;
@@ -1933,9 +1937,8 @@ class PatternBindingEntry {
 public:
   PatternBindingEntry(Pattern *P, SourceLoc EqualLoc, Expr *E,
                       DeclContext *InitContext)
-    : PatternAndFlags(P, {}), InitExpr({E, EqualLoc}),
-      InitContextAndIsText({InitContext, false}) {
-  }
+      : PatternAndFlags(P, {}), InitExpr({E, E, EqualLoc}),
+        InitContextAndIsText({InitContext, false}) {}
 
   Pattern *getPattern() const { return PatternAndFlags.getPointer(); }
   void setPattern(Pattern *P) { PatternAndFlags.setPointer(P); }
@@ -1947,7 +1950,7 @@ public:
     if (PatternAndFlags.getInt().contains(Flags::Removed) ||
         InitContextAndIsText.getInt())
       return nullptr;
-    return InitExpr.Node;
+    return InitExpr.initAfterSynthesis;
   }
   /// Retrieve the initializer if it should be executed to initialize this
   /// particular pattern binding.
@@ -1984,10 +1987,12 @@ public:
     InitExpr.EqualLoc = equalLoc;
   }
 
-  /// Retrieve the initializer as it was written in the source.
-  Expr *getInitAsWritten() const {
-    return InitContextAndIsText.getInt() ? nullptr : InitExpr.Node;
-  }
+  /// Retrieve the initializer after the =, if any, as it was written in the
+  /// source.
+  Expr *getOrigInit() const;
+
+  /// Set the initializer after the = as it was written in the source.
+  void setOrigInit(Expr *);
 
   bool isInitializerChecked() const {
     return PatternAndFlags.getInt().contains(Flags::Checked);
@@ -2016,7 +2021,15 @@ public:
     InitContextAndIsText.setPointer(dc);
   }
 
-  /// Retrieve the source range covered by this pattern binding.
+  SourceLoc getStartLoc() const;
+
+  /// Retrieve the end location covered by this pattern binding entry.
+  ///
+  /// \param omitAccessors Whether the computation should omit the accessors
+  /// from the source range.
+  SourceLoc getEndLoc(bool omitAccessors = false) const;
+
+  /// Retrieve the source range covered by this pattern binding entry.
   ///
   /// \param omitAccessors Whether the computation should omit the accessors
   /// from the source range.
@@ -2024,6 +2037,9 @@ public:
 
   const CaptureInfo &getCaptureInfo() const { return Captures; }
   void setCaptureInfo(const CaptureInfo &captures) { Captures = captures; }
+
+private:
+  SourceLoc getLastAccessorEndLoc() const;
 };
 
 /// This decl contains a pattern and optional initializer for a set
