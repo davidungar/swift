@@ -4823,11 +4823,8 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
     Invalid = true;
 
   // If we have an invalid case, bail out now.
-  if (!PrimaryVar) {
-    // Maintain the invariant that an accessor can be found from its VarDecl
-    accessors.record(*this, storage, Invalid);
+  if (!PrimaryVar)
     return nullptr;
-  }
 
   if (!TyLoc.hasLocation()) {
     if (accessors.Get || accessors.Set || accessors.Address ||
