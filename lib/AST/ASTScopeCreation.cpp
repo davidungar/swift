@@ -168,7 +168,7 @@ public:
 
     auto *ip = insertionPoint;
     for (auto nd :
-         expandInactiveClausesSortAndCullElementsOrMembers(nodesOrDeclsToAdd)) {
+         expandClausesSortAndCullElementsOrMembers(nodesOrDeclsToAdd)) {
       if (shouldThisNodeBeScopedWhenEncountered(nd))
         ip = createScopeFor(nd, ip).getPtrOr(ip);
       else
@@ -366,17 +366,18 @@ public:
       fn(specializeAttr);
   }
 
-  std::vector<ASTNode> expandInactiveClausesSortAndCullElementsOrMembers(
-      ArrayRef<ASTNode> input) const {
-    auto cleanedupNodes = sortBySourceRange(cull(expandInactiveClauses(input)));
+  std::vector<ASTNode>
+  expandClausesSortAndCullElementsOrMembers(ArrayRef<ASTNode> input) const {
+    auto cleanedupNodes = sortBySourceRange(cull(expandClauses(input)));
     // TODO: uncomment when working on rdar://53627317
     //    findCollidingPatterns(cleanedupNodes);
     return cleanedupNodes;
   }
 
-private:
-  /// IfConfigs pose a challenge because we need to field lookups into the
-  /// inactive clauses, but the AST contains redundancy: the active clause's
+public:
+  /// When ASTScopes are enabled for code completion, rdar://53321156
+  /// IfConfigs will pose a challenge because we may need to field lookups into
+  /// the inactive clauses, but the AST contains redundancy: the active clause's
   /// elements are present in the members or elements of an IterableTypeDecl or
   /// BraceStmt alongside of the IfConfigDecl. In addition there are two more
   /// complications:
@@ -386,39 +387,44 @@ private:
   ///
   /// 2. The active clause may be before or after the inactive ones
   ///
-  /// So, when encountering an IfConfigDecl, expand only the inactive elements.
-  /// Also, always sort members or elements so that the child scopes are in
-  /// source order (Just one of several reasons we need to sort.)
-  static std::vector<ASTNode> expandInactiveClauses(ArrayRef<ASTNode> input) {
+  /// So, when encountering an IfConfigDecl, we will expand  the inactive
+  /// elements. Also, always sort members or elements so that the child scopes
+  /// are in source order (Just one of several reasons we need to sort.)
+  ///
+  static const bool includeInactiveClausesOfIfConfigDecls = false;
+
+private:
+  static std::vector<ASTNode> expandClauses(ArrayRef<ASTNode> input) {
     std::vector<ASTNode> expansion;
-    expandInactiveClausesInto(expansion, input, /*isInAnActiveNode=*/true);
+    expandClausesInto(expansion, input, /*isInAnActiveNode=*/true);
     return expansion;
   }
 
-  static void expandInactiveClausesInto(std::vector<ASTNode> &expansion,
-                                        ArrayRef<ASTNode> input,
-                                        bool isInAnActiveNode) {
+  static void expandClausesInto(std::vector<ASTNode> &expansion,
+                                ArrayRef<ASTNode> input,
+                                const bool isInAnActiveNode) {
     for (auto n : input) {
       if (!n.isDecl(DeclKind::IfConfig)) {
         expansion.push_back(n);
         continue;
       }
-      auto *icd = cast<IfConfigDecl>(n.get<Decl *>());
+      auto *const icd = cast<IfConfigDecl>(n.get<Decl *>());
       for (auto &clause : icd->getClauses()) {
-        if (auto *cond = clause.Cond)
+        if (auto *const cond = clause.Cond)
           expansion.push_back(cond);
-        if (!clause.isActive) {
-          //          expandInactiveClausesInto(expansion, clause.Elements,
-          //                                    /*isInAnActiveNode=*/false);
-        } else {
-          assert(isInAnActiveNode && "Assume that clause is not marked "
+        if (clause.isActive) {
+          // rdar://53922172
+          assert(isInAnActiveNode && "Clause should not be marked "
                                      "active unless it's context is "
                                      "active");
           // get inactive nodes that nest in active clauses
           for (auto n : clause.Elements)
-            if (auto *d = n.dyn_cast<Decl *>())
-              if (auto *icd = dyn_cast<IfConfigDecl>(d))
-                expandInactiveClausesInto(expansion, {d}, true);
+            if (auto *const d = n.dyn_cast<Decl *>())
+              if (auto *const icd = dyn_cast<IfConfigDecl>(d))
+                expandClausesInto(expansion, {d}, true);
+        } else if (includeInactiveClausesOfIfConfigDecls) {
+          expandClausesInto(expansion, clause.Elements,
+                            /*isInAnActiveNode=*/false);
         }
       }
     }
@@ -440,7 +446,8 @@ private:
   }
 
   /// TODO: The parser yields two decls at the same source loc with the same
-  /// kind. Call me when tackling rdar://53627317, then move this to ASTVerifier.
+  /// kind. Call me when tackling rdar://53627317, then move this to
+  /// ASTVerifier.
   ///
   /// In all cases the first pattern seems to carry the initializer, and the
   /// second, the accessor
@@ -860,7 +867,7 @@ public:
                                               ASTScopeImpl *p,
                                               ScopeCreator &scopeCreator) {
     llvm_unreachable("Should be handled inside of "
-                     "expandInactiveClausesSortAndCullElementsOrMembers");
+                     "expandClausesSortAndCullElementsOrMembers");
   }
 
   NullablePtr<ASTScopeImpl> visitReturnStmt(ReturnStmt *rs, ASTScopeImpl *p,
@@ -1578,9 +1585,12 @@ void AbstractFunctionBodyScope::expandBody(ScopeCreator &scopeCreator) {
 void GenericTypeOrExtensionScope::expandBody(ScopeCreator &) {}
 
 void IterableTypeScope::expandBody(ScopeCreator &scopeCreator) {
+  auto nodes = asNodeVector(getIterableDeclContext().get()->getMembers());
+  // Revisit the "false" below, rdar://53321156
+  auto nodesIncludingIfConfigClauses =
+      scopeCreator.expandClausesSortAndCullElementsOrMembers(nodes);
   // TODO: can we call addNodesToTree here instead of expand...?
-  for (auto n : scopeCreator.expandInactiveClausesSortAndCullElementsOrMembers(
-           asNodeVector(getIterableDeclContext().get()->getMembers())))
+  for (auto n : nodesIncludingIfConfigClauses)
     scopeCreator.createScopeFor(n, this);
 }
 
@@ -1788,7 +1798,7 @@ public:
       record(dc);
     if (auto *icd =
             dyn_cast<IfConfigDecl>(D)) { // TODO: fix ASTWalker with option
-      walkToInactiveClauses(icd);
+      walkToClauses(icd);
       return false;
     }
     if (auto *pd = dyn_cast<ParamDecl>(D))
@@ -1808,13 +1818,16 @@ public:
   }
 
 private:
-  void walkToInactiveClauses(IfConfigDecl *icd) {
+  void walkToClauses(IfConfigDecl *icd) {
     for (auto &clause : icd->getClauses()) {
       // Generate scopes for any closures in the condition
-      if (clause.Cond)
-        clause.Cond->walk(*this);
-      for (auto n : clause.Elements)
-        n.walk(*this);
+      if (ScopeCreator::includeInactiveClausesOfIfConfigDecls &&
+          clause.isActive) {
+        if (clause.Cond)
+          clause.Cond->walk(*this);
+        for (auto n : clause.Elements)
+          n.walk(*this);
+      }
     }
   }
 
