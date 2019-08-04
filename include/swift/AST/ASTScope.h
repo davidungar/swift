@@ -1131,6 +1131,7 @@ protected:
 };
 
 class PatternEntryInitializerScope final : public AbstractPatternEntryScope {
+  // Should be able to remove this when rdar://53921703 is accomplished.
   Expr *initAsWrittenWhenCreated;
 
 public:

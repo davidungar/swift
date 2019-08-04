@@ -361,7 +361,7 @@ public:
       if (auto *specializeAttr = dyn_cast<SpecializeAttr>(attr))
         sortedSpecializeAttrs.push_back(specializeAttr);
     }
-    // TODO: rm extra copy
+    // Part of rdar://53921774 rm extra copy
     for (auto *specializeAttr : sortBySourceRange(sortedSpecializeAttrs))
       fn(specializeAttr);
   }
@@ -430,6 +430,7 @@ private:
   /// because the overlap EnumElements and AST includes the elements in the
   /// members.
   std::vector<ASTNode> cull(ArrayRef<ASTNode> input) const {
+    // TODO don't need to cull accessors anymore? - use new walker below, too?
     std::vector<ASTNode> culled;
     llvm::copy_if(input, std::back_inserter(culled), [&](ASTNode n) {
       return isLocalizable(n) && !n.isDecl(DeclKind::Var) &&
@@ -439,7 +440,7 @@ private:
   }
 
   /// TODO: The parser yields two decls at the same source loc with the same
-  /// kind Call me when tackling rdar://53627317, then move this to ASTVerifier.
+  /// kind. Call me when tackling rdar://53627317, then move this to ASTVerifier.
   ///
   /// In all cases the first pattern seems to carry the initializer, and the
   /// second, the accessor
@@ -502,6 +503,7 @@ private:
     }
   }
 
+  /// See rdar://53921962
   template <typename Rangeable>
   std::vector<Rangeable>
   sortBySourceRange(std::vector<Rangeable> toBeSorted) const {
@@ -931,7 +933,7 @@ void ScopeCreator::addChildrenForAllLocalizableAccessorsInSourceOrder(
                 });
 
   // Sort in order to include synthesized ones, which are out of order.
-  // TODO: rm extra copy
+  // Part of rdar://53921774 rm extra copy
   for (auto *accessor : sortBySourceRange(accessorsToScope)) {
     ASTVisitorForScopeCreation().visitAbstractFunctionDecl(accessor, parent,
                                                            *this);
@@ -1270,12 +1272,7 @@ void ForEachStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
   // the body is implicit and it would overlap the source range of the expr
   // above.
   //
-  // TODO: in
-  // compiler_crashers_fixed/01901-swift-constraints-constraintsystem-matchtypes.swift
-  // and
-  // compiler_crashers_fixed/00448-no-stacktrace.swift
-  // nodes come out out-of-rder, and body is implicit, so try ignoring in that
-  // case.
+  // TODO: refer to rdar://53921962
   if (!stmt->getBody()->isImplicit()) {
     if (isLocalizable(stmt->getBody()))
       scopeCreator.createSubtree<ForEachPatternScope>(this, stmt);

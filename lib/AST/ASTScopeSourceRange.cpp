@@ -212,7 +212,7 @@ SourceRange PatternEntryDeclScope::getChildlessSourceRange(
 
 SourceRange PatternEntryInitializerScope::getChildlessSourceRange(
     const bool omitAssertions) const {
-  // TODO: a radar -- decl/var/NSManaged_properties.swift vanishing initializer
+  // See rdar://53921703
   // Note: grep for "When the initializer is removed we don't actually clear the
   // pointer" because we do!
   return initAsWrittenWhenCreated->getSourceRange();
