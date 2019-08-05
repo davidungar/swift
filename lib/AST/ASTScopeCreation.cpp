@@ -67,6 +67,29 @@ static bool isLocalizable(const Rangeable astElement) {
          getRangeableSourceRange(astElement).isValid();
 }
 
+template <typename Rangeable>
+static void dumpRangeable(const Rangeable r, llvm::raw_ostream &f) {
+  r.dump(f);
+}
+template <typename Rangeable>
+static void dumpRangeable(const Rangeable *r, llvm::raw_ostream &f) {
+  r->dump(f);
+}
+template <typename Rangeable>
+static void dumpRangeable(Rangeable *r, llvm::raw_ostream &f) {
+  r->dump(f);
+}
+
+static void dumpRangeable(const SpecializeAttr r, llvm::raw_ostream &f) {
+  llvm::errs() << "SpecializeAttr\n";
+}
+static void dumpRangeable(const SpecializeAttr *r, llvm::raw_ostream &f) {
+  llvm::errs() << "SpecializeAttr\n";
+}
+static void dumpRangeable(SpecializeAttr *r, llvm::raw_ostream &f) {
+  llvm::errs() << "SpecializeAttr\n";
+}
+
 static std::vector<ASTNode> asNodeVector(DeclRange dr) {
   std::vector<ASTNode> nodes;
   llvm::transform(dr, std::back_inserter(nodes),
@@ -437,10 +460,45 @@ private:
   /// members.
   std::vector<ASTNode> cull(ArrayRef<ASTNode> input) const {
     // TODO don't need to cull accessors anymore? - use new walker below, too?
+    // Cull ImportDecls because when running from lldb, we can see an ImportDecl
+    // within a large FuncDecl (manuafactured by lldb) and that would trip the
+    // "contradicts" assertion in the sort.
+    // TODO: move following into radar, maybe
+    /// For instance:  \code
+    /// SOURCE_DIR/lldb/test/dotest.py -q --arch= -s
+    /// SOURCE_DIR/build/Ninja-DebugAssert/lldb-macosx-x86_64/lldb-test-traces
+    /// --build-dir
+    /// SOURCE_DIR/build/Ninja-DebugAssert/lldb-macosx-x86_64/lldb-test-build.noindex
+    /// -S nm -u CXXFLAGS -u CFLAGS --executable
+    /// SOURCE_DIR/build/Ninja-DebugAssert/lldb-macosx-x86_64/./bin/lldb
+    /// --dsymutil
+    /// SOURCE_DIR/build/Ninja-DebugAssert/llvm-macosx-x86_64/./bin/dsymutil
+    /// --filecheck
+    /// SOURCE_DIR/build/Ninja-DebugAssert/llvm-macosx-x86_64/./bin/FileCheck -C
+    /// SOURCE_DIR/build/Ninja-DebugAssert/llvm-macosx-x86_64/bin/clang
+    /// --swift-compiler
+    /// SOURCE_DIR/build/Ninja-DebugAssert/swift-macosx-x86_64/bin/swiftc
+    /// --swift-library
+    /// SOURCE_DIR/build/Ninja-DebugAssert/swift-macosx-x86_64/lib/swift --env
+    /// DYLD_LIBRARY_PATH="SOURCE_DIR/build/Ninja-DebugAssert/swift-macosx-x86_64/lib/swift"
+    /// LD_LIBRARY_PATH="SOURCE_DIR/build/Ninja-DebugAssert/swift-macosx-x86_64/lib/swift"
+    /// SIMCTL_CHILD_DYLD_LIBRARY_PATH="SOURCE_DIR/build/Ninja-DebugAssert/swift-macosx-x86_64/lib/swift"
+    /// --codesign-identity lldb_codesign --framework
+    /// SOURCE_DIR/build/Ninja-DebugAssert/lldb-macosx-x86_64/bin/LLDB.framework
+    /// --server
+    /// SOURCE_DIR/build/Ninja-DebugAssert/lldb-macosx-x86_64/./bin/debugserver
+    /// --out-of-tree-debugserver --build-dir
+    /// SOURCE_DIR/build/Ninja-DebugAssert/lldb-macosx-x86_64/lldb-test-build.noindex
+    /// --test-subdir lang/swift --skip-category=watchpoint --skip-category=dwo
+    /// -t -E
+    /// SOURCE_DIR/lldb/packages/Python/lldbsuite/test/lang/swift/parseable_interfaces/shared
+    /// -p TestSwiftInterfaceNoDebugInfo.py
+    /// \endcode
     std::vector<ASTNode> culled;
     llvm::copy_if(input, std::back_inserter(culled), [&](ASTNode n) {
       return isLocalizable(n) && !n.isDecl(DeclKind::Var) &&
-             !n.isDecl(DeclKind::Accessor) && !n.isDecl(DeclKind::EnumCase);
+             !n.isDecl(DeclKind::Accessor) && !n.isDecl(DeclKind::EnumCase) &&
+             !n.isDecl(DeclKind::Import);
     });
     return culled;
   }
