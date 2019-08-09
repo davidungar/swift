@@ -82,8 +82,6 @@ static void dumpRangeable(const SpecializeAttr *r,
 static void dumpRangeable(const SpecializeAttr *r, llvm::raw_ostream &f) {
   llvm::errs() << "SpecializeAttr\n";
 }
-static void dumpRangeable(SpecializeAttr *r,
-                          llvm::raw_ostream &f) LLVM_ATTRIBUTE_USED;
 static void dumpRangeable(SpecializeAttr *r, llvm::raw_ostream &f) {
   llvm::errs() << "SpecializeAttr\n";
 }
