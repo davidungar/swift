@@ -306,6 +306,12 @@ protected:
   virtual void beCurrent();
   virtual bool isCurrent() const;
 
+private:
+  /// Compare the pre-expasion range with the post-expansion range and return
+  /// false if lazyiness couild miss lookups.
+  bool checkLazySourceRange(SourceRange expanded) const;
+
+protected:
   /// Some scopes can be expanded lazily.
   /// Such scopes must: not change their source ranges after expansion, and
   /// their expansion must return an insertion point outside themselves.

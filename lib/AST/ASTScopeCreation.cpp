@@ -789,7 +789,8 @@ public:
   VISIT_AND_CREATE_WHOLE_PORTION(OpaqueTypeDecl, OpaqueTypeScope)
 #undef VISIT_AND_CREATE_WHOLE_PORTION
 
-  // This declaration is handled from addChildrenForAllExplicitAccessors
+  // This declaration is handled from
+  // addChildrenForAllLocalizableAccessorsInSourceOrder
   NullablePtr<ASTScopeImpl> visitAccessorDecl(AccessorDecl *, ASTScopeImpl *p,
                                               ScopeCreator &scopeCreator) {
     llvm_unreachable("Should not see an accessor decl");
@@ -1892,7 +1893,7 @@ private:
     auto lin = SM.getLineNumber(loc);
     if (f.endswith(file) && lin == line)
       if (auto *v = dyn_cast<PatternBindingDecl>(D))
-        llvm::errs() << "HERE catchForDebugging: " << lin << "\n";
+        llvm::errs() << "*** catchForDebugging: " << lin << " ***\n";
   }
 };
 } // end namespace
