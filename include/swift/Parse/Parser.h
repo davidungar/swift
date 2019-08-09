@@ -571,7 +571,7 @@ public:
 
   /// Retrieve the location just past the end of the previous
   /// source location.
-  SourceLoc getEndOfPreviousLoc();
+  SourceLoc getEndOfPreviousLoc() const;
 
   /// If the current token is the specified kind, consume it and
   /// return true.  Otherwise, return false without consuming it.
@@ -806,11 +806,17 @@ public:
                   Diag<DiagArgTypes...> ID, ArgTypes... Args) {
     return parseToken(K, L, Diagnostic(ID, Args...));
   }
-  
-  /// Parse the specified expected token and return its location on success.  On failure, emit the specified
-  /// error diagnostic,  a note at the specified note location, and return the location of the previous token.
+
+  /// Parse the specified expected token and return its location on success.  On
+  /// failure, emit the specified error diagnostic, a note at the specified
+  /// note location, and return the location before the current token.
   bool parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
                           SourceLoc OtherLoc);
+
+  /// Returns the proper location for a missing right brace, parenthesis, etc.
+  SourceLoc getConfabulatedMatchingTokenLoc() const;
+  
+  SourceLoc getErrorOrMissingLocForLazyASTScopes() const;
 
   /// Parse a comma separated list of some elements.
   ParserStatus parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
@@ -1067,6 +1073,9 @@ public:
   parseDeclPrecedenceGroup(ParseDeclOptions flags, DeclAttributes &attributes);
 
   ParserResult<TypeRepr> parseDeclResultType(Diag<> MessageID);
+
+  /// Get the location for a type error.
+  SourceLoc getTypeErrorLoc() const;
 
   //===--------------------------------------------------------------------===//
   // Type Parsing

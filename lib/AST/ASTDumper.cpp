@@ -1933,7 +1933,7 @@ public:
   }
   void visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
     printCommon(E, "interpolated_string_literal_expr");
-    
+
     // Print the trailing quote location
     if (auto Ty = GetTypeOfExpr(E)) {
       auto &Ctx = Ty->getASTContext();
