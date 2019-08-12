@@ -3702,6 +3702,9 @@ bool Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
   }
   if (parseMatchingToken(tok::r_brace, RBLoc, ErrorDiag, LBLoc)) {
     // Synthesize an r_brace syntax node if the token is absent
+    // Set its location to the next token to be parsed, in order to ensure
+    // that everything parsed as part of the body is included in the enclosing
+    // Decl's SourceRange.
     SyntaxContext->synthesize(tok::r_brace, RBLoc);
   }
 

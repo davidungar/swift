@@ -534,7 +534,13 @@ ParserResult<TypeRepr> Parser::parseDeclResultType(Diag<> MessageID) {
         diag.fixItInsertAfter(secondType.get()->getEndLoc(), getTokenText(tok::r_square));
       }
     }
-    return makeParserErrorResult(new (Context) ErrorTypeRepr(Tok.getLoc()));
+    // When doing lazy ASTScopes, the end of the function needs to be the last
+    // token, so that it is enclosed by the source range of an IterableTypeDecl.
+    // Pass this information as the start of the error range.
+    const auto errorStart =
+        Context.LangOpts.LazyASTScopes ? PreviousLoc : Tok.getLoc();
+    return makeParserErrorResult(new (Context)
+                                     ErrorTypeRepr({errorStart, Tok.getLoc()}));
   }
   return result;
 }
