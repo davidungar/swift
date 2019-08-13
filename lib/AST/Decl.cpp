@@ -7088,9 +7088,14 @@ SourceRange FuncDecl::getSourceRange() const {
   if (TrailingWhereClauseSourceRange.isValid())
     return { StartLoc, TrailingWhereClauseSourceRange.End };
 
+  // The error type is beyond the end which is too far
+  // because the enclosing decl must enclose it.
   if (getBodyResultTypeLoc().hasLocation() &&
-      getBodyResultTypeLoc().getSourceRange().End.isValid())
-    return { StartLoc, getBodyResultTypeLoc().getSourceRange().End };
+      getBodyResultTypeLoc().getSourceRange().End.isValid()) {
+    if (getBodyResultTypeLoc().getTypeRepr()->getKind() == TypeReprKind::Error)
+      return {StartLoc, getBodyResultTypeLoc().getSourceRange().Start};
+    return {StartLoc, getBodyResultTypeLoc().getSourceRange().End};
+  }
 
   if (hasThrows())
     return { StartLoc, getThrowsLoc() };

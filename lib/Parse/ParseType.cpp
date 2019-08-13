@@ -534,7 +534,10 @@ ParserResult<TypeRepr> Parser::parseDeclResultType(Diag<> MessageID) {
         diag.fixItInsertAfter(secondType.get()->getEndLoc(), getTokenText(tok::r_square));
       }
     }
-    return makeParserErrorResult(new (Context) ErrorTypeRepr(Tok.getLoc()));
+    // Capture the last token location for the start of the range
+    // so it can be used as the last location of a function.
+    return makeParserErrorResult(
+        new (Context) ErrorTypeRepr({PreviousLoc, Tok.getLoc()}));
   }
   return result;
 }
