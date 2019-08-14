@@ -462,11 +462,16 @@ ASTScopeImpl::getUncachedSourceRange(const bool omitAssertions) const {
   const auto childlessRange = getChildlessSourceRange(omitAssertions);
   const auto rangeIncludingIgnoredNodes =
       widenSourceRangeForIgnoredASTNodes(childlessRange);
-  assert(rangeForLazyCheck.isInvalid() ||
+  assert(omitAssertions || rangeForLazyCheck.isInvalid() ||
          rangeForLazyCheck == rangeIncludingIgnoredNodes);
   auto uncachedSourceRange =
       widenSourceRangeForChildren(rangeIncludingIgnoredNodes, omitAssertions);
-  assert(rangeForLazyCheck.isInvalid() ||
+  if (omitAssertions || rangeForLazyCheck.isInvalid() ||
+  rangeForLazyCheck == uncachedSourceRange); else {
+    auto a = getChildlessSourceRange();
+    auto b = getChildren().back()->getUncachedSourceRange();
+  }
+  assert(omitAssertions || rangeForLazyCheck.isInvalid() ||
          rangeForLazyCheck == uncachedSourceRange);
   return uncachedSourceRange;
 }
@@ -524,12 +529,30 @@ SourceRange ASTScopeImpl::getEffectiveSourceRange(const ASTNode n) const {
                                       : e->getEndLoc());
 }
 
-void ASTScopeImpl::widenSourceRangeForIgnoredASTNode(const ASTNode n) {
-  // The pattern scopes will include the source ranges for VarDecls.
-  // Doing the default here would cause a pattern initializer scope's range
-  // to overlap the pattern use scope's range.
+/// Some nodes (e.g. the error expression) cannot possibly contain anything to
+/// be looked up and if included in a parent scope's source range would expand
+/// it beyond an ancestor's source range. But if the ancestor is expanded
+/// lazily, we check that its source range does not change when expanding it,
+/// and this check would fail.
+static bool sourceRangeWouldInterfereWithLaziness(const ASTNode n) {
+  return n.isExpr(ExprKind::Error);
+}
 
-  if (n.isDecl(DeclKind::Var))
+static bool
+shouldIgnoredASTNodeSourceRangeWidenEnclosingScope(const ASTNode n) {
+  if (n.isDecl(DeclKind::Var)) {
+    // The pattern scopes will include the source ranges for VarDecls.
+    // Using its range here would cause a pattern initializer scope's range
+    // to overlap the pattern use scope's range.
+    return false;
+  }
+  if (sourceRangeWouldInterfereWithLaziness(n))
+    return false;
+  return true;
+}
+
+void ASTScopeImpl::widenSourceRangeForIgnoredASTNode(const ASTNode n) {
+  if (!shouldIgnoredASTNodeSourceRangeWidenEnclosingScope(n))
     return;
 
   SourceRange r = getEffectiveSourceRange(n);

@@ -7078,13 +7078,16 @@ SourceRange FuncDecl::getSourceRange() const {
   if (TrailingWhereClauseSourceRange.isValid())
     return { StartLoc, TrailingWhereClauseSourceRange.End };
 
-  // For lazy ASTScopes, the end of the error type is beyond the last token of
+  // For LazyASTScopes, the end of the error type is beyond the last token of
   // the function. This location is too far because the enclosing decl must
   // enclose it. When trying lazy ASTScopes, the last token position is passed
   // via the start of the error's source range, so use that.
   if (getBodyResultTypeLoc().hasLocation() &&
       getBodyResultTypeLoc().getSourceRange().End.isValid()) {
-    if (getBodyResultTypeLoc().getTypeRepr()->getKind() == TypeReprKind::Error)
+    if (getBodyResultTypeLoc().getTypeRepr()->getKind() ==
+            TypeReprKind::Error &&
+        getASTContext().LangOpts.EnableASTScopeLookup &&
+        getASTContext().LangOpts.LazyASTScopes)
       return {StartLoc, getBodyResultTypeLoc().getSourceRange().Start};
     return {StartLoc, getBodyResultTypeLoc().getSourceRange().End};
   }
