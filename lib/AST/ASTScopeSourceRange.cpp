@@ -467,9 +467,17 @@ ASTScopeImpl::getUncachedSourceRange(const bool omitAssertions) const {
   auto uncachedSourceRange =
       widenSourceRangeForChildren(rangeIncludingIgnoredNodes, omitAssertions);
   if (omitAssertions || rangeForLazyCheck.isInvalid() ||
-  rangeForLazyCheck == uncachedSourceRange); else {
+      rangeForLazyCheck == uncachedSourceRange)
+    ;
+  else {
     auto a = getChildlessSourceRange();
     auto b = getChildren().back()->getUncachedSourceRange();
+    llvm::errs() << "Lazy problem: \n";
+    a.print( llvm::errs(), getSourceManager(), false);
+    llvm::errs() << "\nvs\n";
+    b.print( llvm::errs(), getSourceManager(), false);
+    llvm::errs() << "\n";
+    dump();
   }
   assert(omitAssertions || rangeForLazyCheck.isInvalid() ||
          rangeForLazyCheck == uncachedSourceRange);
