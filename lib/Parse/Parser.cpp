@@ -981,7 +981,7 @@ bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
   }
   if (parseToken(K, TokLoc, ErrorDiag)) {
     diagnose(OtherLoc, OtherNote);
-
+#error wrong for wob strings etc
     TokLoc = PreviousLoc;
     return true;
   }

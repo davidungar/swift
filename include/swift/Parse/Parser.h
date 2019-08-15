@@ -226,6 +226,9 @@ public:
 
   /// The location of the previous token.
   SourceLoc PreviousLoc;
+  
+  /// The end of the previous token.
+  SourceLoc PreviousLocEnd;
 
   /// Stop parsing immediately.
   void cutOffParsing() {
