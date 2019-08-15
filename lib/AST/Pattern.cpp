@@ -443,8 +443,15 @@ SourceRange TypedPattern::getSourceRange() const {
   if (SubPattern->isImplicit())
     return PatTypeRepr->getSourceRange();
 
-  return { SubPattern->getSourceRange().Start,
-           PatTypeRepr->getSourceRange().End };
+  // For LazyASTScopes, the end of the error type is beyond the last token of
+  // the function. This location is too far because the enclosing decl must
+  // enclose it. When trying lazy ASTScopes, the last token position is passed
+  // via the start of the error's source range, so use that.
+  const auto end = PatTypeRepr->getKind() == TypeReprKind::Error
+                       ? PatTypeRepr->getStartLoc()
+                       : PatTypeRepr->getEndLoc();
+
+  return {SubPattern->getSourceRange().Start, end};
 }
 
 /// Construct an ExprPattern.
