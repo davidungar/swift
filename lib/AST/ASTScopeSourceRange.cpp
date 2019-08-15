@@ -462,7 +462,7 @@ ASTScopeImpl::getUncachedSourceRange(const bool omitAssertions) const {
   const auto childlessRange = getChildlessSourceRange(omitAssertions);
   const auto rangeIncludingIgnoredNodes =
       widenSourceRangeForIgnoredASTNodes(childlessRange);
-  assert(rangeForLazyCheck.isInvalid() ||
+  assert(omitAssertions || rangeForLazyCheck.isInvalid() ||
          rangeForLazyCheck == rangeIncludingIgnoredNodes);
   auto uncachedSourceRange =
       widenSourceRangeForChildren(rangeIncludingIgnoredNodes, omitAssertions);

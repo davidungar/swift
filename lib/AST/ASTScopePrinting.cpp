@@ -151,10 +151,11 @@ NullablePtr<const void> ASTScopeImpl::addressForPrinting() const {
 void GenericTypeOrExtensionScope::printSpecifics(llvm::raw_ostream &out) const {
   if (shouldHaveABody() && !doesDeclHaveABody())
     out << "<no body>";
-  else if (auto *n = getCorrespondingNominalTypeDecl().getPtrOrNull())
-    out << "'" << n->getFullName() << "'";
-  else
-    out << "<no extended nominal?!>";
+  // Sadly, the following can trip assertions
+  //  else if (auto *n = getCorrespondingNominalTypeDecl().getPtrOrNull())
+  //    out << "'" << n->getFullName() << "'";
+  //  else
+  //    out << "<no extended nominal?!>";
 }
 
 void GenericParamScope::printSpecifics(llvm::raw_ostream &out) const {
