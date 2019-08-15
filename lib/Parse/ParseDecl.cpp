@@ -3701,6 +3701,10 @@ bool Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
     }
   }
   if (parseMatchingToken(tok::r_brace, RBLoc, ErrorDiag, LBLoc)) {
+    // The right brace must include the whole of the previous token in order
+    // so that an unexpanded lazy \c IterableTypeScope includes its contents.
+    if (Context.LangOpts.LazyASTScopes)
+      RBLoc = Tok.getLoc().getAdvancedLoc(-1);
     // Synthesize an r_brace syntax node if the token is absent
     SyntaxContext->synthesize(tok::r_brace, RBLoc);
   }
