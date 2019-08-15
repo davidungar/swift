@@ -516,12 +516,20 @@ ParserResult<TypeRepr> Parser::parseDeclResultType(Diag<> MessageID) {
 
   auto result = parseType(MessageID);
 
-  if (!result.isParseError() && Tok.is(tok::r_square)) {
+  if (result.isParseError())
+    return result;
+
+  switch (Tok.getKind()) {
+  default:
+    return result;
+
+  case tok::r_square: {
     auto diag = diagnose(Tok, diag::extra_rbracket);
     diag.fixItInsert(result.get()->getStartLoc(), getTokenText(tok::l_square));
     consumeToken();
-    return makeParserErrorResult(new (Context) ErrorTypeRepr(Tok.getLoc()));
-  } else if (!result.isParseError() && Tok.is(tok::colon)) {
+    break;
+  }
+  case tok::colon: {
     auto colonTok = consumeToken();
     auto secondType = parseType(diag::expected_dictionary_value_type);
 
@@ -531,18 +539,20 @@ ParserResult<TypeRepr> Parser::parseDeclResultType(Diag<> MessageID) {
       if (Tok.is(tok::r_square)) {
         consumeToken();
       } else {
-        diag.fixItInsertAfter(secondType.get()->getEndLoc(), getTokenText(tok::r_square));
+        diag.fixItInsertAfter(secondType.get()->getEndLoc(),
+                              getTokenText(tok::r_square));
       }
     }
-    // When doing lazy ASTScopes, the end of the function needs to be the last
-    // token, so that it is enclosed by the source range of an IterableTypeDecl.
-    // Pass this information as the start of the error range.
-    const auto errorStart =
-        Context.LangOpts.LazyASTScopes ? PreviousLoc : Tok.getLoc();
-    return makeParserErrorResult(new (Context)
-                                     ErrorTypeRepr({errorStart, Tok.getLoc()}));
+    break;
+    }
   }
-  return result;
+  // When doing lazy ASTScopes, the end of the function needs to be the last
+  // token, so that it is enclosed by the source range of an IterableTypeDecl.
+  // Pass this information as the start of the error range.
+  const auto errorStart =
+      Context.LangOpts.LazyASTScopes ? PreviousLoc : Tok.getLoc();
+  return makeParserErrorResult(new (Context)
+                                   ErrorTypeRepr({errorStart, Tok.getLoc()}));
 }
 
 ParserStatus Parser::parseGenericArguments(SmallVectorImpl<TypeRepr *> &Args,
