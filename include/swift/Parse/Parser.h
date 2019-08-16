@@ -571,7 +571,7 @@ public:
 
   /// Retrieve the location just past the end of the previous
   /// source location.
-  SourceLoc getEndOfPreviousLoc();
+  SourceLoc getEndOfPreviousLoc() const;
 
   /// If the current token is the specified kind, consume it and
   /// return true.  Otherwise, return false without consuming it.
@@ -1069,6 +1069,9 @@ public:
   parseDeclPrecedenceGroup(ParseDeclOptions flags, DeclAttributes &attributes);
 
   ParserResult<TypeRepr> parseDeclResultType(Diag<> MessageID);
+
+  /// Get the location for a type error.
+  SourceLoc getTypeErrorLoc() const;
 
   //===--------------------------------------------------------------------===//
   // Type Parsing

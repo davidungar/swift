@@ -515,19 +515,17 @@ ParserResult<TypeRepr> Parser::parseDeclResultType(Diag<> MessageID) {
   }
 
   auto result = parseType(MessageID);
-  if (result.isParseError())
-    return result;
-  switch (Tok.getKind()) {
-  default:
-    return result;
-  case tok::r_square: {
+
+  if (!result.isParseError() && Tok.is(tok::r_square)) {
     auto diag = diagnose(Tok, diag::extra_rbracket);
     diag.fixItInsert(result.get()->getStartLoc(), getTokenText(tok::l_square));
-    break;
-  }
-  case tok::colon: {
+    consumeToken();
+    return makeParserErrorResult(new (Context)
+                                     ErrorTypeRepr(getTypeErrorLoc()));
+  } else if (!result.isParseError() && Tok.is(tok::colon)) {
     auto colonTok = consumeToken();
     auto secondType = parseType(diag::expected_dictionary_value_type);
+
     auto diag = diagnose(colonTok, diag::extra_colon);
     diag.fixItInsert(result.get()->getStartLoc(), getTokenText(tok::l_square));
     if (!secondType.isParseError()) {
@@ -538,12 +536,17 @@ ParserResult<TypeRepr> Parser::parseDeclResultType(Diag<> MessageID) {
                               getTokenText(tok::r_square));
       }
     }
-    break;
+    return makeParserErrorResult(new (Context)
+                                     ErrorTypeRepr(getTypeErrorLoc()));
   }
-  }
-  const auto EndOffset = Context.LangOpts.LazyASTScopes ? -1 : 0;
-  return makeParserErrorResult(
-      new (Context) ErrorTypeRepr(Tok.getLoc().getAdvancedLoc(EndOffset)));
+  return result;
+}
+
+SourceLoc Parser::getTypeErrorLoc() const {
+  /// LazyASTScopes require that the ends of types, etc. which are at the end of
+  /// \c IterableTypeContext \c Decls, such as \c StructDecl not be beyond the
+  /// end of the enclosing \c Decl.
+  return Context.LangOpts.LazyASTScopes ? getEndOfPreviousLoc() : Tok.getLoc();
 }
 
 ParserStatus Parser::parseGenericArguments(SmallVectorImpl<TypeRepr *> &Args,

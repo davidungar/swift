@@ -596,7 +596,7 @@ ParsedTokenSyntax Parser::consumeTokenSyntax() {
   return ParsedToken;
 }
 
-SourceLoc Parser::getEndOfPreviousLoc() {
+SourceLoc Parser::getEndOfPreviousLoc() const {
   return Lexer::getLocForEndOfToken(SourceMgr, PreviousLoc);
 }
 
@@ -982,8 +982,8 @@ bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
 
     // The right brace must include the whole of the previous token in order
     // so that an unexpanded lazy \c IterableTypeScope includes its contents.
-    if (Context.LangOpts.LazyASTScopes)
-      TokLoc = Tok.getLoc().getAdvancedLoc(-1);
+    TokLoc =
+        Context.LangOpts.LazyASTScopes ? getEndOfPreviousLoc() : PreviousLoc;
     return true;
   }
 
