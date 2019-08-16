@@ -515,28 +515,35 @@ ParserResult<TypeRepr> Parser::parseDeclResultType(Diag<> MessageID) {
   }
 
   auto result = parseType(MessageID);
-
-  if (!result.isParseError() && Tok.is(tok::r_square)) {
+  if (result.isParseError())
+    return result;
+  switch (Tok.getKind()) {
+  default:
+    return result;
+  case tok::r_square: {
     auto diag = diagnose(Tok, diag::extra_rbracket);
     diag.fixItInsert(result.get()->getStartLoc(), getTokenText(tok::l_square));
-    consumeToken();
-    return makeParserErrorResult(new (Context) ErrorTypeRepr(Tok.getLoc()));
-  } else if (!result.isParseError() && Tok.is(tok::colon)) {
+    break;
+  }
+  case tok::colon: {
     auto colonTok = consumeToken();
     auto secondType = parseType(diag::expected_dictionary_value_type);
-
     auto diag = diagnose(colonTok, diag::extra_colon);
     diag.fixItInsert(result.get()->getStartLoc(), getTokenText(tok::l_square));
     if (!secondType.isParseError()) {
       if (Tok.is(tok::r_square)) {
         consumeToken();
       } else {
-        diag.fixItInsertAfter(secondType.get()->getEndLoc(), getTokenText(tok::r_square));
+        diag.fixItInsertAfter(secondType.get()->getEndLoc(),
+                              getTokenText(tok::r_square));
       }
     }
-    return makeParserErrorResult(new (Context) ErrorTypeRepr(Tok.getLoc()));
+    break;
   }
-  return result;
+  }
+  const auto EndOffset = Context.LangOpts.LazyASTScopes ? -1 : 0;
+  return makeParserErrorResult(
+      new (Context) ErrorTypeRepr(Tok.getLoc().getAdvancedLoc(EndOffset)));
 }
 
 ParserStatus Parser::parseGenericArguments(SmallVectorImpl<TypeRepr *> &Args,

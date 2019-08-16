@@ -806,9 +806,10 @@ public:
                   Diag<DiagArgTypes...> ID, ArgTypes... Args) {
     return parseToken(K, L, Diagnostic(ID, Args...));
   }
-  
-  /// Parse the specified expected token and return its location on success.  On failure, emit the specified
-  /// error diagnostic,  a note at the specified note location, and return the location of the previous token.
+
+  /// Parse the specified expected token and return its location on success.  On
+  /// failure, emit the specified error diagnostic, a note at the specified
+  /// note location, and return the location before the current token.
   bool parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
                           SourceLoc OtherLoc);
 

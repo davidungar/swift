@@ -968,8 +968,6 @@ bool Parser::parseToken(tok K, SourceLoc &TokLoc, const Diagnostic &D) {
   return true;
 }
 
-/// Parse the specified expected token and return its location on success.  On failure, emit the specified
-/// error diagnostic,  a note at the specified note location, and return the location of the previous token.
 bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
                                 SourceLoc OtherLoc) {
   Diag<> OtherNote;
@@ -982,7 +980,10 @@ bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
   if (parseToken(K, TokLoc, ErrorDiag)) {
     diagnose(OtherLoc, OtherNote);
 
-    TokLoc = PreviousLoc;
+    // The right brace must include the whole of the previous token in order
+    // so that an unexpanded lazy \c IterableTypeScope includes its contents.
+    if (Context.LangOpts.LazyASTScopes)
+      TokLoc = Tok.getLoc().getAdvancedLoc(-1);
     return true;
   }
 
