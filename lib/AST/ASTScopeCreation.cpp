@@ -789,7 +789,8 @@ public:
   VISIT_AND_CREATE_WHOLE_PORTION(OpaqueTypeDecl, OpaqueTypeScope)
 #undef VISIT_AND_CREATE_WHOLE_PORTION
 
-  // This declaration is handled from addChildrenForAllExplicitAccessors
+  // This declaration is handled from
+  // addChildrenForAllLocalizableAccessorsInSourceOrder
   NullablePtr<ASTScopeImpl> visitAccessorDecl(AccessorDecl *, ASTScopeImpl *p,
                                               ScopeCreator &scopeCreator) {
     llvm_unreachable("Should not see an accessor decl");
