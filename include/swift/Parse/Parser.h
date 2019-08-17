@@ -813,6 +813,9 @@ public:
   bool parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
                           SourceLoc OtherLoc);
 
+  /// Returns the proper location for a missing right brace, parenthesis, etc.
+  SourceLoc getConfabulatedMatchingTokenLoc() const;
+
   /// Parse a comma separated list of some elements.
   ParserStatus parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
                          bool AllowSepAfterLast, Diag<> ErrorDiag,

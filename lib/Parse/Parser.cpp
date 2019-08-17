@@ -980,14 +980,18 @@ bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
   if (parseToken(K, TokLoc, ErrorDiag)) {
     diagnose(OtherLoc, OtherNote);
 
-    // The right brace must include the whole of the previous token in order
-    // so that an unexpanded lazy \c IterableTypeScope includes its contents.
-    TokLoc =
-        Context.LangOpts.LazyASTScopes ? getEndOfPreviousLoc() : PreviousLoc;
+    TokLoc = getConfabulatedMatchingTokenLoc();
     return true;
   }
 
   return false;
+}
+
+SourceLoc Parser::getConfabulatedMatchingTokenLoc() const {
+  // The right brace, parenthesis, etc. must include the whole of the previous
+  // token in order so that an unexpanded lazy \c IterableTypeScope includes its
+  // contents.
+  return Context.LangOpts.LazyASTScopes ? getEndOfPreviousLoc() : PreviousLoc;
 }
 
 static SyntaxKind getListElementKind(SyntaxKind ListKind) {
@@ -1095,7 +1099,8 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
 
   if (Status.isError()) {
     // If we've already got errors, don't emit missing RightK diagnostics.
-    RightLoc = Tok.is(RightK) ? consumeToken() : PreviousLoc;
+    RightLoc =
+        Tok.is(RightK) ? consumeToken() : getConfabulatedMatchingTokenLoc();
   } else if (parseMatchingToken(RightK, RightLoc, ErrorDiag, LeftLoc)) {
     Status.setIsParseError();
   }
