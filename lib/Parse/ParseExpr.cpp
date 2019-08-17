@@ -1992,6 +1992,8 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   llvm::SaveAndRestore<Token> SavedTok(Tok);
   llvm::SaveAndRestore<ParsedTrivia> SavedLeadingTrivia(LeadingTrivia);
   llvm::SaveAndRestore<ParsedTrivia> SavedTrailingTrivia(TrailingTrivia);
+  // For errors, we need the real PreviousLoc
+  llvm::SaveAndRestore<SourceLoc> SavedPreviousLoc(PreviousLoc);
 
   // We're not in a place where an interpolation would be valid.
   if (!CurLocalContext) {
