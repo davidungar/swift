@@ -815,6 +815,8 @@ public:
 
   /// Returns the proper location for a missing right brace, parenthesis, etc.
   SourceLoc getConfabulatedMatchingTokenLoc() const;
+  
+  SourceLoc getErrorOrMissingLocForLazyASTScopes() const;
 
   /// Parse a comma separated list of some elements.
   ParserStatus parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,

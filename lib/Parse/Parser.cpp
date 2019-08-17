@@ -991,7 +991,11 @@ SourceLoc Parser::getConfabulatedMatchingTokenLoc() const {
   // The right brace, parenthesis, etc. must include the whole of the previous
   // token in order so that an unexpanded lazy \c IterableTypeScope includes its
   // contents.
-  return Context.LangOpts.LazyASTScopes ? getEndOfPreviousLoc() : PreviousLoc;
+  return Context.LangOpts.LazyASTScopes ? getErrorOrMissingLocForLazyASTScopes() : PreviousLoc;
+}
+
+SourceLoc Parser::getErrorOrMissingLocForLazyASTScopes() const {
+  return PreviousLoc; // or getEndOfPreviousLoc
 }
 
 static SyntaxKind getListElementKind(SyntaxKind ListKind) {

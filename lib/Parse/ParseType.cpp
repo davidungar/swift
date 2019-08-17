@@ -532,8 +532,7 @@ ParserResult<TypeRepr> Parser::parseDeclResultType(Diag<> MessageID) {
       if (Tok.is(tok::r_square)) {
         consumeToken();
       } else {
-        diag.fixItInsertAfter(secondType.get()->getEndLoc(),
-                              getTokenText(tok::r_square));
+        diag.fixItInsertAfter(secondType.get()->getEndLoc(), getTokenText(tok::r_square));
       }
     }
     return makeParserErrorResult(new (Context)
@@ -546,7 +545,7 @@ SourceLoc Parser::getTypeErrorLoc() const {
   /// LazyASTScopes require that the ends of types, etc. which are at the end of
   /// \c IterableTypeContext \c Decls, such as \c StructDecl not be beyond the
   /// end of the enclosing \c Decl.
-  return Context.LangOpts.LazyASTScopes ? getEndOfPreviousLoc() : Tok.getLoc();
+  return Context.LangOpts.LazyASTScopes ? getErrorOrMissingLocForLazyASTScopes() : Tok.getLoc();
 }
 
 ParserStatus Parser::parseGenericArguments(SmallVectorImpl<TypeRepr *> &Args,
