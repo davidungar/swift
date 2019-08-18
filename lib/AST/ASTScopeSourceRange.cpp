@@ -508,15 +508,11 @@ public:
   std::pair<bool, Expr *> walkToExprPre(Expr *E) {
     if (!E)
       return {true, E};
-      // It turns out that the end of the source range of an expression
-      // containing an interpolated string literal is the last token in
-      // an expression segment, so it's OK.
-//    if (auto *isl = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
-//      if (end.isInvalid() ||
-//          SM.isBeforeInBuffer(end, isl->getTrailingQuoteLoc()))
-//        end = isl->getTrailingQuoteLoc();
-//    } else
-     if (auto *epl = dyn_cast<EditorPlaceholderExpr>(E)) {
+    if (auto *isl = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
+      if (end.isInvalid() ||
+          SM.isBeforeInBuffer(end, isl->getTrailingQuoteLoc()))
+        end = isl->getTrailingQuoteLoc();
+    } else if (auto *epl = dyn_cast<EditorPlaceholderExpr>(E)) {
       if (end.isInvalid() ||
           SM.isBeforeInBuffer(end, epl->getTrailingAngleBracketLoc()))
         end = epl->getTrailingAngleBracketLoc();

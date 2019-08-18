@@ -927,9 +927,7 @@ public:
 
   SourceLoc getLoc() const { return SubExpr ? SubExpr->getLoc() : SourceLoc(); }
 
-  SourceRange getSourceRange() const {
-    return SubExpr ? SubExpr->getSourceRange() : SourceRange();
-  }
+  SourceRange getSourceRange() const;
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Tap;

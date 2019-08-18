@@ -2225,6 +2225,26 @@ VarDecl * TapExpr::getVar() const {
   return dyn_cast<VarDecl>(Body->getElement(0).dyn_cast<Decl *>());
 }
 
+SourceRange TapExpr::getSourceRange() const {
+  // Before LazyASTScopes, was:
+  // return SubExpr ? SubExpr->getSourceRange() : SourceRange();
+
+  // Include the body in the range, assuming the body follows the SubExpr.
+  // ASTScopes needs the body in the range in order to do lookups into the
+  // expressions in interpolated strings.
+
+  // Also, be (perhaps overly) defensive about null pointers & invalid
+  // locations.
+  if (!getSubExpr())
+    return SourceRange();
+  if (!getBody())
+    return getSubExpr()->getSourceRange();
+  const auto start = SubExpr->getStartLoc();
+  const auto bodyEnd = getBody()->getEndLoc();
+  const auto end = bodyEnd.isValid() ? bodyEnd : getSubExpr()->getEndLoc();
+  return SourceRange(start, end);
+}
+
 // See swift/Basic/Statistic.h for declaration: this enables tracing Exprs, is
 // defined here to avoid too much layering violation / circular linkage
 // dependency.
