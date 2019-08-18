@@ -926,8 +926,12 @@ public:
   void setBody(BraceStmt * b) { Body = b; }
 
   SourceLoc getLoc() const { return SubExpr ? SubExpr->getLoc() : SourceLoc(); }
+  
+  SourceLoc getStartLoc() const {
+    return SubExpr ? SubExpr->getStartLoc() : SourceLoc();
+  }
 
-  SourceRange getSourceRange() const;
+  SourceLoc getEndLoc() const;
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Tap;
@@ -1016,6 +1020,12 @@ public:
     // SourceLocs are token based, and the interpolated string is one string
     // token, so the range should be (Start == End).
     return Loc;
+  }
+
+  /// ASTScope lookup request the location of the last token that could possibly
+  /// be looked up. Maybe someday this could be the same as \c getEndLoc?
+  SourceLoc getEndLocForNameLookup() const {
+    return getAppendingExpr() ? getAppendingExpr()->getEndLoc() : SourceLoc();
   }
 
   /// Call the \c callback with information about each segment in turn.

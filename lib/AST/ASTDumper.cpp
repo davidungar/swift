@@ -1940,7 +1940,17 @@ public:
   }
   void visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
     printCommon(E, "interpolated_string_literal_expr");
-    
+
+    // Print the end loc for name lookup
+    if (auto Ty = GetTypeOfExpr(E)) {
+      auto &Ctx = Ty->getASTContext();
+      auto ELNL = E->getEndLocForNameLookup();
+      if (ELNL.isValid()) {
+        PrintWithColorRAII(OS, LocationColor) << " end_loc_for_name_lookup=";
+        ELNL.print(PrintWithColorRAII(OS, LocationColor).getOS(),
+                   Ctx.SourceMgr);
+      }
+    }
     PrintWithColorRAII(OS, LiteralValueColor)
       << " literal_capacity="
       << E->getLiteralCapacity() << " interpolation_count="

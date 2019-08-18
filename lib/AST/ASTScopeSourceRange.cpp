@@ -509,11 +509,9 @@ public:
     if (!E)
       return {true, E};
     if (auto *isl = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
-      if (auto *const ae = isl->getAppendingExpr()) {
-        const auto e = ae->getEndLoc();
-        if (e.isValid() && (end.isInvalid() || SM.isBeforeInBuffer(end, e)))
-          end = e;
-      }
+      const auto e = isl->getEndLocForNameLookup();
+      if (e.isValid() && (end.isInvalid() || SM.isBeforeInBuffer(end, e)))
+        end = e;
     } else if (auto *epl = dyn_cast<EditorPlaceholderExpr>(E)) {
       if (end.isInvalid() ||
           SM.isBeforeInBuffer(end, epl->getTrailingAngleBracketLoc()))
