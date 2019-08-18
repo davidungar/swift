@@ -509,9 +509,11 @@ public:
     if (!E)
       return {true, E};
     if (auto *isl = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
-      if (end.isInvalid() ||
-          SM.isBeforeInBuffer(end, isl->getTrailingQuoteLoc()))
-        end = isl->getTrailingQuoteLoc();
+      if (auto *const ae = isl->getAppendingExpr()) {
+        const auto e = ae->getEndLoc();
+        if (e.isValid() && (end.isInvalid() || SM.isBeforeInBuffer(end, e)))
+          end = e;
+      }
     } else if (auto *epl = dyn_cast<EditorPlaceholderExpr>(E)) {
       if (end.isInvalid() ||
           SM.isBeforeInBuffer(end, epl->getTrailingAngleBracketLoc()))
@@ -519,7 +521,7 @@ public:
     }
     return ASTWalker::walkToExprPre(E);
   }
-  SourceLoc getTrailingQuoteLoc() const { return end; }
+  SourceLoc getEffectiveEndLoc() const { return end; }
 };
 } // namespace
 
@@ -534,8 +536,8 @@ SourceRange ASTScopeImpl::getEffectiveSourceRange(const ASTNode n) const {
   assert(e);
   EffectiveEndFinder finder(getSourceManager());
   e->walk(finder);
-  return SourceRange(e->getLoc(), finder.getTrailingQuoteLoc().isValid()
-                                      ? finder.getTrailingQuoteLoc()
+  return SourceRange(e->getLoc(), finder.getEffectiveEndLoc().isValid()
+                                      ? finder.getEffectiveEndLoc()
                                       : e->getEndLoc());
 }
 
