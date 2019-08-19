@@ -497,7 +497,7 @@ void ASTScopeImpl::clearCachedSourceRangesOfMeAndAncestors() {
     p.get()->clearCachedSourceRangesOfMeAndAncestors();
 }
 
-#pragma mark ignored nodes and compensating for EditorPlaceHolders
+#pragma mark ignored nodes and compensating for InterpolatedStringLiteralExprs and EditorPlaceHolders
 
 namespace {
 class EffectiveEndFinder : public ASTWalker {
@@ -510,7 +510,12 @@ public:
   std::pair<bool, Expr *> walkToExprPre(Expr *E) {
     if (!E)
       return {true, E};
-    if (auto *epl = dyn_cast<EditorPlaceholderExpr>(E)) {
+    if (auto *isl = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
+//HERE      const auto e = isl->getEndLocForNameLookup();
+      const auto e = isl->getTrailingQuoteLoc();
+      if (e.isValid() && (end.isInvalid() || SM.isBeforeInBuffer(end, e)))
+        end = e;
+    } else if (auto *epl = dyn_cast<EditorPlaceholderExpr>(E)) {
       if (end.isInvalid() ||
           SM.isBeforeInBuffer(end, epl->getTrailingAngleBracketLoc()))
         end = epl->getTrailingAngleBracketLoc();

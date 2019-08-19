@@ -997,7 +997,15 @@ SourceLoc Parser::getConfabulatedMatchingTokenLoc() const {
 }
 
 SourceLoc Parser::getErrorOrMissingLocForLazyASTScopes() const {
-  return PreviousLoc; // or getEndOfPreviousLoc
+  auto const PreviousTok = Lexer::getTokenAtLocation(Context.SourceMgr,
+                                                     PreviousLoc);
+  // If it's a string literal, it might be an InterpolatedStringLiteral.
+  // In that case the missing close paren, etc. needs to go at the end
+  // because there might be things to be looked up for ASTScope in the
+  // middle.
+  return PreviousTok.getKind() != tok::string_literal
+    ? PreviousLoc
+    : PreviousLoc.getAdvancedLoc(PreviousTok.getLength() - 1);
 }
 
 static SyntaxKind getListElementKind(SyntaxKind ListKind) {

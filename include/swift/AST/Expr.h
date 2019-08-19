@@ -949,6 +949,12 @@ public:
 class InterpolatedStringLiteralExpr : public LiteralExpr {
   /// Points at the beginning quote.
   SourceLoc Loc;
+  /// Points at the ending quote.
+  /// Needed for the upcoming \c ASTScope subsystem because lookups can be
+  /// targeted to inside an \c InterpolatedStringLiteralExpr. It would be nicer
+  /// to use \c EndLoc for this value, but then \c Lexer::getLocForEndOfToken()
+  /// would not work for \c stringLiteral->getEndLoc().
+  SourceLoc TrailingQuoteLoc;
   TapExpr *AppendingExpr;
 
   // Set by Sema:
@@ -960,11 +966,13 @@ class InterpolatedStringLiteralExpr : public LiteralExpr {
 
 public:
   InterpolatedStringLiteralExpr(SourceLoc Loc,
+                                SourceLoc TrailingQuoteLoc,
                                 unsigned LiteralCapacity,
                                 unsigned InterpolationCount,
                                 TapExpr *AppendingExpr)
       : LiteralExpr(ExprKind::InterpolatedStringLiteral, /*Implicit=*/false),
         Loc(Loc),
+        TrailingQuoteLoc(TrailingQuoteLoc),
         AppendingExpr(AppendingExpr) {
     Bits.InterpolatedStringLiteralExpr.InterpolationCount = InterpolationCount;
     Bits.InterpolatedStringLiteralExpr.LiteralCapacity = LiteralCapacity;
@@ -1019,10 +1027,20 @@ public:
   SourceLoc getEndLoc() const {
     // SourceLocs are token based, and the interpolated string is one string
     // token, so the range should be (Start == End).
-    // Except that we need to do lookups into InterpolatedStringLiterals,
-    // so it works better to treat them as the expressions they are.
-    return AppendingExpr ? AppendingExpr->getEndLoc() : Loc;
+    return Loc;
   }
+  
+  /// Could also be computed by relexing.
+  SourceLoc getTrailingQuoteLoc() const {
+    return TrailingQuoteLoc;
+  }
+
+  /// ASTScope lookup request the location of the last token that could possibly
+  /// be looked up.
+  //HERE
+  //  SourceLoc getEndLocForNameLookup() const {
+  //    return getAppendingExpr() ? getAppendingExpr()->getEndLoc() : SourceLoc();
+  //  }
 
   /// Call the \c callback with information about each segment in turn.
   void forEachSegment(ASTContext &Ctx,
