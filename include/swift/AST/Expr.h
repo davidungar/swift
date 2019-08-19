@@ -1019,13 +1019,9 @@ public:
   SourceLoc getEndLoc() const {
     // SourceLocs are token based, and the interpolated string is one string
     // token, so the range should be (Start == End).
-    return Loc;
-  }
-
-  /// ASTScope lookup request the location of the last token that could possibly
-  /// be looked up. Maybe someday this could be the same as \c getEndLoc?
-  SourceLoc getEndLocForNameLookup() const {
-    return getAppendingExpr() ? getAppendingExpr()->getEndLoc() : SourceLoc();
+    // Except that we need to do lookups into InterpolatedStringLiterals,
+    // so it works better to treat them as the expressions they are.
+    return AppendingExpr ? AppendingExpr->getEndLoc() : Loc;
   }
 
   /// Call the \c callback with information about each segment in turn.

@@ -1913,7 +1913,6 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
 
   // The start location of the entire string literal.
   SourceLoc Loc = Tok.getLoc();
-  SourceLoc EndLoc = Loc.getAdvancedLoc(Tok.getLength());
 
   StringRef OpenDelimiterStr, OpenQuoteStr, CloseQuoteStr, CloseDelimiterStr;
   unsigned DelimiterLength = Tok.getCustomDelimiterLen();
@@ -2030,7 +2029,13 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
     Status = parseStringSegments(Segments, EntireTok, InterpolationVar, 
                                  Stmts, LiteralCapacity, InterpolationCount);
 
-    auto Body = BraceStmt::create(Context, Loc, Stmts, EndLoc,
+    // Put the brace at the last token parsed in the string
+    // so that if an enclosing ParenExpr hits eof looking for the close paren,
+    // it can set the end to PreviousLoc and still nest correctly.
+    // Far enough to encompass all things that might be looked up,
+    // near enough to not hang out past an enclosing node, even for erroneous
+    // code.
+    auto Body = BraceStmt::create(Context, Loc, Stmts, PreviousLoc,
                                   /*implicit=*/false);
     AppendingExpr = new (Context) TapExpr(nullptr, Body);
   }
