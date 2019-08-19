@@ -453,36 +453,38 @@ void ASTScopeImpl::cacheSourceRangeOfMeAndDescendants(
   cachedSourceRange = getUncachedSourceRange(omitAssertions);
 }
 
+bool ASTScopeImpl::checkLazySourceRange(const SourceRange expandedRange) const {
+  if (!getASTContext().LangOpts.LazyASTScopes)
+    return true;
+  const auto unexpandedRange = sourceRangeForDeferredExpansion();
+  if (unexpandedRange.isInvalid() || expandedRange.isInvalid())
+    return true;
+  if (unexpandedRange == expandedRange)
+    return true;
+
+  auto b = getChildren().back()->getUncachedSourceRange();
+  llvm::errs() << "*** Lazy range problem. Parent: ***\n";
+  unexpandedRange.print(llvm::errs(), getSourceManager(), false);
+  llvm::errs() << "\n*** vs last child: ***\n";
+  b.print(llvm::errs(), getSourceManager(), false);
+  llvm::errs() << "\n";
+  print(llvm::errs(), 0, false);
+  llvm::errs() << "\n";
+
+  return false;
+}
+
 SourceRange
 ASTScopeImpl::getUncachedSourceRange(const bool omitAssertions) const {
-  const SourceRange rangeForLazyCheck = getASTContext().LangOpts.LazyASTScopes
-                                            ? sourceRangeForDeferredExpansion()
-                                            : SourceRange();
-  (void)rangeForLazyCheck;
   const auto childlessRange = getChildlessSourceRange(omitAssertions);
   const auto rangeIncludingIgnoredNodes =
       widenSourceRangeForIgnoredASTNodes(childlessRange);
-  assert(omitAssertions || rangeForLazyCheck.isInvalid() ||
-         rangeForLazyCheck == rangeIncludingIgnoredNodes);
-  auto uncachedSourceRange =
+  const auto uncachedSourceRange =
       widenSourceRangeForChildren(rangeIncludingIgnoredNodes, omitAssertions);
-#ifndef NDEBUG
-  if (omitAssertions || rangeForLazyCheck.isInvalid() ||
-      rangeForLazyCheck == uncachedSourceRange)
-    ;
-  else {
-    auto a = getChildlessSourceRange();
-    auto b = getChildren().back()->getUncachedSourceRange();
-    llvm::errs() << "Lazy problem: \n";
-    a.print(llvm::errs(), getSourceManager(), false);
-    llvm::errs() << "\nvs\n";
-    b.print(llvm::errs(), getSourceManager(), false);
-    llvm::errs() << "\n";
-    print(llvm::errs(), 0, false);
-  }
-#endif
-  assert(omitAssertions || rangeForLazyCheck.isInvalid() ||
-         rangeForLazyCheck == uncachedSourceRange);
+  assert(
+      omitAssertions ||
+      checkLazySourceRange(uncachedSourceRange) &&
+          "Lazy scopes must have compatible ranges before and after expansion");
   return uncachedSourceRange;
 }
 
