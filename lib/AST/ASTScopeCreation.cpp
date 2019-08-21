@@ -331,7 +331,7 @@ private:
   // A safe way to discover this, without creating a circular request.
   // Cannot call getAttachedPropertyWrappers.
   static bool hasAttachedPropertyWrapper(VarDecl *vd) {
-    return AttachedPropertyWrapperScope::getSourceRangeFor(vd).isValid();
+    return AttachedPropertyWrapperScope::getSourceRangeOfVarDecl(vd).isValid();
   }
 
 public:
@@ -843,8 +843,11 @@ public:
 
   NullablePtr<ASTScopeImpl> visitBraceStmt(BraceStmt *bs, ASTScopeImpl *p,
                                            ScopeCreator &scopeCreator) {
-    if (BraceStmtScope::shouldCreateScope(bs))
+    if (BraceStmtScope::shouldCreateScope(bs)) {
       scopeCreator.createSubtreeIfUnique<BraceStmtScope>(p, bs);
+      if (auto *s = scopeCreator.getASTContext().Stats)
+        ++s->getFrontendCounters().NumBraceStmtASTScopes;
+    }
     return p;
   }
 
@@ -863,9 +866,9 @@ public:
     auto *insertionPoint = parentScope;
     for (unsigned i = 0; i < patternBinding->getPatternList().size(); ++i) {
       // TODO: Won't need to do so much work to avoid creating one without
-      // a SourceRange once rdar://53627317 is done and getChildlessSourceRange
-      // for PatternEntryDeclScope is simplified to use the PatternEntry's
-      // source range.
+      // a SourceRange once rdar://53627317 is done and
+      // getSourceRangeOfThisASTNode for PatternEntryDeclScope is simplified to
+      // use the PatternEntry's source range.
       auto &patternEntry = patternBinding->getPatternList()[i];
       if (!patternEntry.getOriginalInit()) {
         bool found = false;
@@ -952,13 +955,6 @@ NullablePtr<ASTScopeImpl> ScopeCreator::createScopeFor(ASTNode n,
 
 void ScopeCreator::addChildrenForAllLocalizableAccessorsInSourceOrder(
     AbstractStorageDecl *asd, ASTScopeImpl *parent) {
-  //  auto  &SM = ctx.SourceMgr;
-  //  auto file =
-  //  SM.getIdentifierForBuffer(SM.findBufferContainingLoc(parent->getSourceRange().Start));
-  //  auto line = SM.getLineNumber(parent->getSourceRange().Start);
-  //  bool dumpEm = file.endswith("ArrayBody.swift")  &&  line == 51;
-  //
-
   // Accessors are always nested within their abstract storage
   // declaration. The nesting may not be immediate, because subscripts may
   // have intervening scopes for generics.
@@ -1021,10 +1017,7 @@ ASTScopeImpl *ASTScopeImpl::expandAndBeCurrent(ScopeCreator &scopeCreator) {
   }
   beCurrent();
   setChildrenCountWhenLastExpanded();
-  assert((getChildlessSourceRange().isValid() || !getChildren().empty()) &&
-         "need to be able to find source range");
-  assert(verifyThatChildrenAreContainedWithin(getSourceRange()) &&
-         "Search will fail");
+  assert(checkSourceRangeAfterExpansion());
   return insertionPoint;
 }
 
@@ -1173,7 +1166,10 @@ GenericTypeOrExtensionScope::expandAScopeThatCreatesANewInsertionPoint(
 ASTScopeImpl *BraceStmtScope::expandAScopeThatCreatesANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   // TODO: remove the sort after performing rdar://53254395
-  return scopeCreator.addNodesToTree(this, stmt->getElements());
+  auto *insertionPoint = scopeCreator.addNodesToTree(this, stmt->getElements());
+  if (auto *s = scopeCreator.getASTContext().Stats)
+    ++s->getFrontendCounters().NumBraceStmtASTScopeExpansions;
+  return insertionPoint;
 }
 
 ASTScopeImpl *TopLevelCodeScope::expandAScopeThatCreatesANewInsertionPoint(
@@ -1210,7 +1206,7 @@ void AbstractFunctionDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
   if (!isa<AccessorDecl>(decl)) {
     leaf = scopeCreator.createGenericParamScopes(decl, decl->getGenericParams(),
                                                  leaf);
-    if (isLocalizable(decl) && getParamsSourceLoc(decl).isValid()) {
+    if (isLocalizable(decl) && getParmsSourceLocOfAFD(decl).isValid()) {
       // See rdar://54188611
       // swift::createDesignatedInitOverride just clones the parameters, so they
       // end up with a bogus SourceRange, maybe *before* the start of the
@@ -1430,15 +1426,22 @@ ASTScopeImpl *GenericTypeOrExtensionWherePortion::expandScope(
 
 #pragma mark createBodyScope
 
+void IterableTypeScope::countBodies(ScopeCreator &scopeCreator) const {
+  if (auto *s = scopeCreator.getASTContext().Stats)
+    ++s->getFrontendCounters().NumIterableTypeBodyASTScopes;
+}
+
 void ExtensionScope::createBodyScope(ASTScopeImpl *leaf,
                                      ScopeCreator &scopeCreator) {
   scopeCreator.createSubtree2D<ExtensionScope, IterableTypeBodyPortion>(leaf,
                                                                         decl);
+  countBodies(scopeCreator);
 }
 void NominalTypeScope::createBodyScope(ASTScopeImpl *leaf,
                                        ScopeCreator &scopeCreator) {
   scopeCreator.createSubtree2D<NominalTypeScope, IterableTypeBodyPortion>(leaf,
                                                                           decl);
+  countBodies(scopeCreator);
 }
 
 #pragma mark createTrailingWhereClauseScope
@@ -1611,6 +1614,8 @@ void GenericTypeOrExtensionScope::expandBody(ScopeCreator &) {}
 void IterableTypeScope::expandBody(ScopeCreator &scopeCreator) {
   auto nodes = asNodeVector(getIterableDeclContext().get()->getMembers());
   scopeCreator.addNodesToTree(this, nodes);
+  if (auto *s = scopeCreator.getASTContext().Stats)
+    ++s->getFrontendCounters().NumIterableTypeBodyASTScopeExpansions;
 }
 
 #pragma mark - reexpandIfObsolete
@@ -1676,6 +1681,7 @@ const Decl *GenericTypeOrExtensionWholePortion::getReferrentOfScope(
 NullablePtr<ASTScopeImpl> ASTScopeImpl::insertionPointForDeferredExpansion() {
   return nullptr;
 }
+
 NullablePtr<ASTScopeImpl>
 IterableTypeScope::insertionPointForDeferredExpansion() {
   return portion->insertionPointForDeferredExpansion(this);
@@ -1689,20 +1695,7 @@ IterableTypeBodyPortion::insertionPointForDeferredExpansion(
     IterableTypeScope *s) const {
   return s->getParent().get();
 }
-SourceRange ASTScopeImpl::sourceRangeForDeferredExpansion() const {
-  return SourceRange();
-}
-SourceRange IterableTypeScope::sourceRangeForDeferredExpansion() const {
-  return portion->sourceRangeForDeferredExpansion(this);
-}
-SourceRange
-Portion::sourceRangeForDeferredExpansion(const IterableTypeScope *) const {
-  return SourceRange();
-}
-SourceRange IterableTypeBodyPortion::sourceRangeForDeferredExpansion(
-    const IterableTypeScope *s) const {
-  return getChildlessSourceRangeOf(s, false);
-}
+
 
 void ASTScopeImpl::beCurrent() {}
 bool ASTScopeImpl::isCurrent() const { return true; }
@@ -1843,8 +1836,7 @@ public:
     //    catchForDebugging(D, "DictionaryBridging.swift", 694);
     if (const auto *dc = dyn_cast<DeclContext>(D))
       record(dc);
-    if (auto *icd =
-            dyn_cast<IfConfigDecl>(D)) { // TODO: fix ASTWalker with option
+    if (auto *icd = dyn_cast<IfConfigDecl>(D)) {
       walkToClauses(icd);
       return false;
     }
