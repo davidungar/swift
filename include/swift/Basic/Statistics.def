@@ -160,6 +160,12 @@ FRONTEND_STATISTIC(AST, NumUnqualifiedLookup)
 /// AnyObject lookup.
 FRONTEND_STATISTIC(AST, NumModuleLookupClassMember)
 
+/// Number of body scopes for iterable types
+FRONTEND_STATISTIC(AST, NumIterableTypeBodyScopes)
+
+/// Number of expansions of body scopes for iterable types
+FRONTEND_STATISTIC(AST, NumIterableTypeBodyScopeInitialExpansions)
+
 /// Number of full function bodies parsed.
 FRONTEND_STATISTIC(Parse, NumFunctionsParsed)
 

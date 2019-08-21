@@ -1430,15 +1430,22 @@ ASTScopeImpl *GenericTypeOrExtensionWherePortion::expandScope(
 
 #pragma mark createBodyScope
 
+void IterableTypeScope::countBodies(ScopeCreator &scopeCreator) const {
+  if (auto *s = scopeCreator.getASTContext().Stats)
+    ++s->getFrontendCounters().NumIterableTypeBodyScopes;
+}
+
 void ExtensionScope::createBodyScope(ASTScopeImpl *leaf,
                                      ScopeCreator &scopeCreator) {
   scopeCreator.createSubtree2D<ExtensionScope, IterableTypeBodyPortion>(leaf,
                                                                         decl);
+  countBodies(scopeCreator);
 }
 void NominalTypeScope::createBodyScope(ASTScopeImpl *leaf,
                                        ScopeCreator &scopeCreator) {
   scopeCreator.createSubtree2D<NominalTypeScope, IterableTypeBodyPortion>(leaf,
                                                                           decl);
+  countBodies(scopeCreator);
 }
 
 #pragma mark createTrailingWhereClauseScope
@@ -1609,8 +1616,14 @@ void AbstractFunctionBodyScope::expandBody(ScopeCreator &scopeCreator) {
 void GenericTypeOrExtensionScope::expandBody(ScopeCreator &) {}
 
 void IterableTypeScope::expandBody(ScopeCreator &scopeCreator) {
+  const bool wasEmpty = getChildren().empty();
   auto nodes = asNodeVector(getIterableDeclContext().get()->getMembers());
   scopeCreator.addNodesToTree(this, nodes);
+  const bool isEmpty = getChildren().empty();
+  if (auto *s = scopeCreator.getASTContext().Stats) {
+    if (wasEmpty && !isEmpty)
+      ++s->getFrontendCounters().NumIterableTypeBodyScopeInitialExpansions;
+  }
 }
 
 #pragma mark - reexpandIfObsolete
