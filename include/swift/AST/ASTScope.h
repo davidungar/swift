@@ -1791,6 +1791,9 @@ public:
   NullablePtr<ClosureExpr> parentClosureIfAny() const; // public??
   Stmt *getStmt() const override { return stmt; }
 
+  NullablePtr<ASTScopeImpl> insertionPointForDeferredExpansion() override;
+  SourceRange sourceRangeForDeferredExpansion() const override;
+
 protected:
   bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
                              DeclConsumer) const override;

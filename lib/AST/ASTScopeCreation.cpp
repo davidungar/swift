@@ -843,8 +843,11 @@ public:
 
   NullablePtr<ASTScopeImpl> visitBraceStmt(BraceStmt *bs, ASTScopeImpl *p,
                                            ScopeCreator &scopeCreator) {
-    if (BraceStmtScope::shouldCreateScope(bs))
+    if (BraceStmtScope::shouldCreateScope(bs)) {
       scopeCreator.createSubtreeIfUnique<BraceStmtScope>(p, bs);
+      if (auto *s = scopeCreator.getASTContext().Stats)
+        ++s->getFrontendCounters().NumBraceStmtASTScopes;
+    }
     return p;
   }
 
@@ -1173,7 +1176,10 @@ GenericTypeOrExtensionScope::expandAScopeThatCreatesANewInsertionPoint(
 ASTScopeImpl *BraceStmtScope::expandAScopeThatCreatesANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   // TODO: remove the sort after performing rdar://53254395
-  return scopeCreator.addNodesToTree(this, stmt->getElements());
+  auto *insertionPoint = scopeCreator.addNodesToTree(this, stmt->getElements());
+  if (auto *s = scopeCreator.getASTContext().Stats)
+    ++s->getFrontendCounters().NumBraceStmtASTScopeExpansions;
+  return insertionPoint;
 }
 
 ASTScopeImpl *TopLevelCodeScope::expandAScopeThatCreatesANewInsertionPoint(
@@ -1432,7 +1438,7 @@ ASTScopeImpl *GenericTypeOrExtensionWherePortion::expandScope(
 
 void IterableTypeScope::countBodies(ScopeCreator &scopeCreator) const {
   if (auto *s = scopeCreator.getASTContext().Stats)
-    ++s->getFrontendCounters().NumIterableTypeBodyScopes;
+    ++s->getFrontendCounters().NumIterableTypeBodyASTScopes;
 }
 
 void ExtensionScope::createBodyScope(ASTScopeImpl *leaf,
@@ -1616,14 +1622,10 @@ void AbstractFunctionBodyScope::expandBody(ScopeCreator &scopeCreator) {
 void GenericTypeOrExtensionScope::expandBody(ScopeCreator &) {}
 
 void IterableTypeScope::expandBody(ScopeCreator &scopeCreator) {
-  const bool wasEmpty = getChildren().empty();
   auto nodes = asNodeVector(getIterableDeclContext().get()->getMembers());
   scopeCreator.addNodesToTree(this, nodes);
-  const bool isEmpty = getChildren().empty();
-  if (auto *s = scopeCreator.getASTContext().Stats) {
-    if (wasEmpty && !isEmpty)
-      ++s->getFrontendCounters().NumIterableTypeBodyScopeInitialExpansions;
-  }
+  if (auto *s = scopeCreator.getASTContext().Stats)
+    ++s->getFrontendCounters().NumIterableTypeBodyASTScopeExpansions;
 }
 
 #pragma mark - reexpandIfObsolete
@@ -1689,6 +1691,13 @@ const Decl *GenericTypeOrExtensionWholePortion::getReferrentOfScope(
 NullablePtr<ASTScopeImpl> ASTScopeImpl::insertionPointForDeferredExpansion() {
   return nullptr;
 }
+
+NullablePtr<ASTScopeImpl> BraceStmtScope::insertionPointForDeferredExpansion() {
+  // I think this might not work because of nested insertion points
+  // return this;
+  return nullptr;
+}
+
 NullablePtr<ASTScopeImpl>
 IterableTypeScope::insertionPointForDeferredExpansion() {
   return portion->insertionPointForDeferredExpansion(this);
@@ -1701,6 +1710,9 @@ NullablePtr<ASTScopeImpl>
 IterableTypeBodyPortion::insertionPointForDeferredExpansion(
     IterableTypeScope *s) const {
   return s->getParent().get();
+}
+SourceRange BraceStmtScope::sourceRangeForDeferredExpansion() const {
+  return SourceRange(); // getChildlessSourceRange();
 }
 SourceRange ASTScopeImpl::sourceRangeForDeferredExpansion() const {
   return SourceRange();
