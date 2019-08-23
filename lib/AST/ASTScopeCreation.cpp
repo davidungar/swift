@@ -28,6 +28,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Parse/Lexer.h"
 #include "llvm/Support/Compiler.h"
 #include <algorithm>
 #include <unordered_set>
@@ -1724,9 +1725,30 @@ SourceRange
 Portion::sourceRangeForDeferredExpansion(const IterableTypeScope *) const {
   return SourceRange();
 }
+
+// If right brace is missing, the source range of the body will end
+// at the last token, which may be a one of the special cases below.
+static SourceLoc getEndLocEvenWhenRBraceIsMissing(const SourceManager &SM,
+                                                  const SourceLoc endLoc) {
+  const auto tok = Lexer::getTokenAtLocation(SM, endLoc);
+  switch (tok.getKind()) {
+  default:
+    return endLoc;
+  case tok::string_literal:
+    return tok.getRange().getEnd();
+  case tok::identifier:
+    return Identifier::isEditorPlaceholder(tok.getText())
+               ? tok.getRange().getEnd()
+               : endLoc;
+  }
+}
+
 SourceRange IterableTypeBodyPortion::sourceRangeForDeferredExpansion(
     const IterableTypeScope *s) const {
-  return getChildlessSourceRangeOf(s, false);
+  const auto bracesRange = getChildlessSourceRangeOf(s, false);
+  const auto &SM = s->getSourceManager();
+  return SourceRange(bracesRange.Start,
+                     getEndLocEvenWhenRBraceIsMissing(SM, bracesRange.End));
 }
 
 void ASTScopeImpl::beCurrent() {}

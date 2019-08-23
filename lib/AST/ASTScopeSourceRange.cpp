@@ -500,6 +500,10 @@ void ASTScopeImpl::clearCachedSourceRangesOfMeAndAncestors() {
 #pragma mark ignored nodes and compensating for InterpolatedStringLiteralExprs and EditorPlaceHolders
 
 namespace {
+// TODO: try testing the last token to see if it is an
+// InterpolatedStringLiteralExpr or an EditorPlaceHolder.
+// Then relex to find the end.
+// (Should use CharSourceRanges but they would perform an extra addition.)
 class EffectiveEndFinder : public ASTWalker {
   SourceLoc end;
   const SourceManager &SM;
