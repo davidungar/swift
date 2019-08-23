@@ -1693,12 +1693,6 @@ NullablePtr<ASTScopeImpl> ASTScopeImpl::insertionPointForDeferredExpansion() {
   return nullptr;
 }
 
-NullablePtr<ASTScopeImpl> BraceStmtScope::insertionPointForDeferredExpansion() {
-  // I think this might not work because of nested insertion points
-  // return this;
-  return nullptr;
-}
-
 NullablePtr<ASTScopeImpl>
 IterableTypeScope::insertionPointForDeferredExpansion() {
   return portion->insertionPointForDeferredExpansion(this);
@@ -1711,9 +1705,6 @@ NullablePtr<ASTScopeImpl>
 IterableTypeBodyPortion::insertionPointForDeferredExpansion(
     IterableTypeScope *s) const {
   return s->getParent().get();
-}
-SourceRange BraceStmtScope::sourceRangeForDeferredExpansion() const {
-  return SourceRange(); // getChildlessSourceRange();
 }
 SourceRange ASTScopeImpl::sourceRangeForDeferredExpansion() const {
   return SourceRange();
