@@ -74,6 +74,9 @@ bool ASTScopeImpl::checkSourceRangeAfterExpansion() const {
          "need to be able to find source range");
   assert(verifyThatChildrenAreContainedWithin(getSourceRangeOfScope()) &&
          "Search will fail");
+  assert(checkLazySourceRange() &&
+         "Lazy scopes must have compatible ranges before and after expansion");
+
   return true;
 }
 
@@ -466,10 +469,11 @@ void ASTScopeImpl::computeAndCacheSourceRangeOfScope(
   cachedSourceRange = computeSourceRangeOfScope(omitAssertions);
 }
 
-bool ASTScopeImpl::checkLazySourceRange(const SourceRange expandedRange) const {
+bool ASTScopeImpl::checkLazySourceRange() const {
   if (!getASTContext().LangOpts.LazyASTScopes)
     return true;
   const auto unexpandedRange = sourceRangeForDeferredExpansion();
+  const auto expandedRange = computeSourceRangeOfScopeWithChildASTNodes();
   if (unexpandedRange.isInvalid() || expandedRange.isInvalid())
     return true;
   if (unexpandedRange == expandedRange)
@@ -489,16 +493,21 @@ bool ASTScopeImpl::checkLazySourceRange(const SourceRange expandedRange) const {
 
 SourceRange
 ASTScopeImpl::computeSourceRangeOfScope(const bool omitAssertions) const {
+  // If we don't need to consider children, it's cheaper
+  const auto deferredRange = sourceRangeForDeferredExpansion();
+  return deferredRange.isValid()
+             ? deferredRange
+             : computeSourceRangeOfScopeWithChildASTNodes(omitAssertions);
+}
+
+SourceRange ASTScopeImpl::computeSourceRangeOfScopeWithChildASTNodes(
+    const bool omitAssertions) const {
   const auto rangeOfJustThisASTNode =
       getSourceRangeOfThisASTNode(omitAssertions);
   const auto rangeIncludingIgnoredNodes =
       widenSourceRangeForIgnoredASTNodes(rangeOfJustThisASTNode);
   const auto uncachedSourceRange =
       widenSourceRangeForChildren(rangeIncludingIgnoredNodes, omitAssertions);
-  assert(
-      omitAssertions ||
-      checkLazySourceRange(uncachedSourceRange) &&
-          "Lazy scopes must have compatible ranges before and after expansion");
   return uncachedSourceRange;
 }
 
@@ -661,12 +670,14 @@ static SourceLoc getEndLocEvenWhenRBraceIsMissing(const SourceManager &SM,
   default:
     return endLoc;
   case tok::string_literal:
-    return tok.getRange().getEnd();
+    break;
   case tok::identifier:
-    return Identifier::isEditorPlaceholder(tok.getText())
-               ? tok.getRange().getEnd()
-               : endLoc;
+    // subtract one to get a closed-range endpoint from a half-open
+    if (!Identifier::isEditorPlaceholder(tok.getText()))
+      return endLoc;
+    break;
   }
+  return tok.getRange().getEnd().getAdvancedLoc(-1);
 }
 
 SourceRange ASTScopeImpl::sourceRangeForDeferredExpansion() const {

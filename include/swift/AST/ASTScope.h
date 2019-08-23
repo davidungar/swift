@@ -214,6 +214,8 @@ public:
 
 private:
   SourceRange computeSourceRangeOfScope(bool omitAssertions = false) const;
+  SourceRange
+  computeSourceRangeOfScopeWithChildASTNodes(bool omitAssertions = false) const;
   bool ensureNoAncestorsSourceRangeIsCached() const;
 
 #pragma mark - source range adjustments
@@ -313,7 +315,7 @@ protected:
 private:
   /// Compare the pre-expasion range with the post-expansion range and return
   /// false if lazyiness couild miss lookups.
-  bool checkLazySourceRange(SourceRange expanded) const;
+  bool checkLazySourceRange() const;
 
 protected:
   /// Some scopes can be expanded lazily.
