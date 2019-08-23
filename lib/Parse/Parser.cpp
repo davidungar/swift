@@ -980,32 +980,32 @@ bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
   if (parseToken(K, TokLoc, ErrorDiag)) {
     diagnose(OtherLoc, OtherNote);
 
-    TokLoc = getConfabulatedMatchingTokenLoc();
+    TokLoc = getLocForMissingMatchingToken();
     return true;
   }
 
   return false;
 }
 
-SourceLoc Parser::getConfabulatedMatchingTokenLoc() const {
-  // The right brace, parenthesis, etc. must include the whole of the previous
-  // token in order so that an unexpanded lazy \c IterableTypeScope includes its
-  // contents.
-  return Context.LangOpts.LazyASTScopes
-    ? getErrorOrMissingLocForLazyASTScopes()
-    : PreviousLoc;
+SourceLoc Parser::getLocForMissingMatchingToken() const {
+  // At present, use the same location whether it's an error or whether
+  // the matching token is missing.
+  // Both cases supply a location for something the user didn't type.
+  return getErrorOrMissingLoc();
 }
 
-SourceLoc Parser::getErrorOrMissingLocForLazyASTScopes() const {
-  auto const PreviousTok = Lexer::getTokenAtLocation(Context.SourceMgr,
-                                                     PreviousLoc);
-  // If it's a string literal, it might be an InterpolatedStringLiteral.
-  // In that case the missing close paren, etc. needs to go at the end
-  // because there might be things to be looked up for ASTScope in the
-  // middle.
-  return PreviousTok.getKind() != tok::string_literal
-    ? PreviousLoc
-    : PreviousLoc.getAdvancedLoc(PreviousTok.getLength() - 1);
+SourceLoc Parser::getErrorOrMissingLoc() const {
+  // The next token might start a new enclosing construct,
+  // and SourceLoc's are always at the start of a token (for example, for
+  // fixits, so use the previous token's SourceLoc and allow a subnode to end
+  // right at the same place as its supernode.
+
+  // The tricky case is when the previous token is an InterpolatedStringLiteral.
+  // Then, there will be names in scope whose SourceLoc is *after* the
+  // the location of a missing close brace.
+  // ASTScope tree creation will have to cope.
+
+  return PreviousLoc;
 }
 
 static SyntaxKind getListElementKind(SyntaxKind ListKind) {
@@ -1114,7 +1114,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
   if (Status.isError()) {
     // If we've already got errors, don't emit missing RightK diagnostics.
     RightLoc =
-        Tok.is(RightK) ? consumeToken() : getConfabulatedMatchingTokenLoc();
+        Tok.is(RightK) ? consumeToken() : getLocForMissingMatchingToken();
   } else if (parseMatchingToken(RightK, RightLoc, ErrorDiag, LeftLoc)) {
     Status.setIsParseError();
   }

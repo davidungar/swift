@@ -808,15 +808,23 @@ public:
   }
 
   /// Parse the specified expected token and return its location on success.  On
-  /// failure, emit the specified error diagnostic, a note at the specified
-  /// note location, and return the location before the current token.
+  /// failure, emit the specified error diagnostic,  a note at the specified
+  /// note location, and return the location of the previous token.
   bool parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
                           SourceLoc OtherLoc);
 
   /// Returns the proper location for a missing right brace, parenthesis, etc.
-  SourceLoc getConfabulatedMatchingTokenLoc() const;
-  
-  SourceLoc getErrorOrMissingLocForLazyASTScopes() const;
+  SourceLoc getLocForMissingMatchingToken() const;
+
+  /// When encountering an error or a missing matching token (e.g. '}'), return
+  /// the location to use for it. This value should be at the last token in
+  /// the ASTNode being parsed so that it nests within any enclosing nodes, and,
+  /// for ASTScope lookups, it does not preceed any identifiers to be looked up.
+  /// However, the latter case does not hold when  parsing an interpolated
+  /// string literal because there may be identifiers to be looked up in the
+  /// literal and their locations will not precede the location of a missing
+  /// close brace.
+  SourceLoc getErrorOrMissingLoc() const;
 
   /// Parse a comma separated list of some elements.
   ParserStatus parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,

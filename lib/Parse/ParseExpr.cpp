@@ -1913,11 +1913,7 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
 
   // The start location of the entire string literal.
   SourceLoc Loc = Tok.getLoc();
-  // Put the close brace of the of the body of the AppendingExpr just inside
-  // of the literal so that it doesn't go past where a missing close brace
-  // for an enclosing IterableTypeDecl will be added.
-  // (See \c parseMatchingToken.)
-  SourceLoc EndLoc = Loc.getAdvancedLoc(Tok.getLength() - 1);
+  SourceLoc EndLoc = Loc.getAdvancedLoc(Tok.getLength());
 
   StringRef OpenDelimiterStr, OpenQuoteStr, CloseQuoteStr, CloseDelimiterStr;
   unsigned DelimiterLength = Tok.getCustomDelimiterLen();
@@ -1996,7 +1992,8 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   llvm::SaveAndRestore<Token> SavedTok(Tok);
   llvm::SaveAndRestore<ParsedTrivia> SavedLeadingTrivia(LeadingTrivia);
   llvm::SaveAndRestore<ParsedTrivia> SavedTrailingTrivia(TrailingTrivia);
-  // For errors, we need the real PreviousLoc
+  // For errors, we need the real PreviousLoc, i.e. the start of the
+  // whole InterpolatedStringLiteral.
   llvm::SaveAndRestore<SourceLoc> SavedPreviousLoc(PreviousLoc);
 
   // We're not in a place where an interpolation would be valid.
@@ -2036,7 +2033,6 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
     Status = parseStringSegments(Segments, EntireTok, InterpolationVar, 
                                  Stmts, LiteralCapacity, InterpolationCount);
 
-    // See the definition of \c EndLoc above.
     auto Body = BraceStmt::create(Context, Loc, Stmts, EndLoc,
                                   /*implicit=*/false);
     AppendingExpr = new (Context) TapExpr(nullptr, Body);
@@ -3434,7 +3430,7 @@ ParserResult<Expr> Parser::parseExprCollection() {
   if (Status.isError()) {
     // If we've already got errors, don't emit missing RightK diagnostics.
     RSquareLoc = Tok.is(tok::r_square) ? consumeToken()
-                                       : getConfabulatedMatchingTokenLoc();
+                                       : getLocForMissingMatchingToken();
   } else if (parseMatchingToken(tok::r_square, RSquareLoc,
                                 diag::expected_rsquare_array_expr,
                                 LSquareLoc)) {
