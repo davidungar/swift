@@ -257,6 +257,9 @@ protected:
 
   virtual SourceRange getSourceRangeOfEnclosedParams(bool omitAssertions) const;
 
+private:
+  bool checkSourceRangeAfterExpansion() const;
+
 #pragma mark common queries
 public:
   virtual NullablePtr<ClosureExpr> getClosureIfClosureScope() const;

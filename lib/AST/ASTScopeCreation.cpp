@@ -28,7 +28,6 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/STLExtras.h"
-#include "swift/Parse/Lexer.h"
 #include "llvm/Support/Compiler.h"
 #include <algorithm>
 #include <unordered_set>
@@ -1025,10 +1024,7 @@ ASTScopeImpl *ASTScopeImpl::expandAndBeCurrent(ScopeCreator &scopeCreator) {
   }
   beCurrent();
   setChildrenCountWhenLastExpanded();
-  assert((getSourceRangeOfThisASTNode().isValid() || !getChildren().empty()) &&
-         "need to be able to find source range");
-  assert(verifyThatChildrenAreContainedWithin(getSourceRange()) &&
-         "Search will fail");
+  assert(checkSourceRangeAfterExpansion());
   return insertionPoint;
 }
 

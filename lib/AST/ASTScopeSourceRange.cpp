@@ -27,6 +27,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Parse/Lexer.h"
 #include "llvm/Support/Compiler.h"
 #include <algorithm>
 
@@ -35,7 +36,7 @@ using namespace ast_scope;
 
 static SourceLoc getStartOfFirstParam(ClosureExpr *closure);
 static SourceLoc getEndLocEvenWhenRBraceIsMissing(const SourceManager &,
-                                                  SourceLoc endLoc)
+                                                  SourceLoc endLoc);
 
 SourceRange ASTScopeImpl::widenSourceRangeForIgnoredASTNodes(
     const SourceRange range) const {
@@ -66,6 +67,14 @@ ASTScopeImpl::widenSourceRangeForChildren(const SourceRange range,
   auto r = range;
   r.widen(childRange);
   return r;
+}
+
+bool ASTScopeImpl::checkSourceRangeAfterExpansion() const {
+  assert((getSourceRangeOfThisASTNode().isValid() || !getChildren().empty()) &&
+         "need to be able to find source range");
+  assert(verifyThatChildrenAreContainedWithin(getSourceRange()) &&
+         "Search will fail");
+  return true;
 }
 
 #pragma mark validation
