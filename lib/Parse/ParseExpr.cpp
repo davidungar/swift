@@ -29,7 +29,7 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
-
+extern bool xxx;
 using namespace swift;
 using namespace swift::syntax;
 
@@ -1770,7 +1770,11 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
     case Lexer::StringSegment::Literal: {
 
       // The end location of the entire string literal.
-      SourceLoc EndLoc = EntireTok.getLoc().getAdvancedLoc(EntireTok.getLength());
+      SourceLoc EndLoc = EntireTok.getLoc().getAdvancedLoc(EntireTok.getLength() -
+//HERE 1
+ 0
+
+      );
 
       auto TokenLoc = First ? Loc : Segment.Loc;
       auto Literal = createStringLiteralExprFromSegment(Context, L, Segment,
@@ -1799,6 +1803,8 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
         CommentLength = SourceMgr.getByteDistance(EntireTok.getCommentRange().
           getStart(), TokenLoc);
       }
+      if (xxx)
+        llvm::errs() << "HERE34 ";
       consumeExtraToken(Token(tok::string_literal,
                               CharSourceRange(SourceMgr, TokenLoc, TokEnd).str(),
                               CommentLength));
@@ -1913,6 +1919,7 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
 
   // The start location of the entire string literal.
   SourceLoc Loc = Tok.getLoc();
+  SourceLoc EndLoc = Loc.getAdvancedLoc(Tok.getLength()); // HERE
 
   StringRef OpenDelimiterStr, OpenQuoteStr, CloseQuoteStr, CloseDelimiterStr;
   unsigned DelimiterLength = Tok.getCustomDelimiterLen();
@@ -2034,7 +2041,10 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
 
     // At this point, PreviousLoc points to the last token parsed within
     // the body, so use that for the brace statement location.
-    auto Body = BraceStmt::create(Context, Loc, Stmts, PreviousLoc,
+    // Stmts.front() is a location-less InterpolationVar
+    auto Body = BraceStmt::create(Context, Stmts[1].getStartLoc(), Stmts,
+    // EndLoc, //HERE
+                             Stmts.back().getEndLoc(),  //HERE    
                                   /*implicit=*/false);
     AppendingExpr = new (Context) TapExpr(nullptr, Body);
   }

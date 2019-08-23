@@ -30,7 +30,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include <vector>
 #include <regex>
-
+bool xxx;
 using namespace swift;
 using namespace ide;
 
@@ -417,6 +417,7 @@ bool SyntaxModelContext::walk(SyntaxModelWalker &Walker) {
 
 void ModelASTWalker::visitSourceFile(SourceFile &SrcFile,
                                      ArrayRef<SyntaxNode> Tokens) {
+                                      xxx = true;
   TokenNodes = Tokens;
   SrcFile.walk(*this);
 

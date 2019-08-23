@@ -57,6 +57,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
+extern bool xxx;
 using namespace swift;
 
 void ASTWalker::anchor() {}
