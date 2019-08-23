@@ -198,7 +198,7 @@ public:
 #pragma mark - source range queries
 
 public:
-  SourceRange getSourceRange(bool omitAssertions = false) const;
+  SourceRange getSourceRangeOfScope(bool omitAssertions = false) const;
 
   /// InterpolatedStringLiteralExprs and EditorPlaceHolders respond to
   /// getSourceRange with the starting point. But we might be asked to lookup an

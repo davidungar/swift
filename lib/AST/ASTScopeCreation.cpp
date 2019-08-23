@@ -955,13 +955,6 @@ NullablePtr<ASTScopeImpl> ScopeCreator::createScopeFor(ASTNode n,
 
 void ScopeCreator::addChildrenForAllLocalizableAccessorsInSourceOrder(
     AbstractStorageDecl *asd, ASTScopeImpl *parent) {
-  //  auto  &SM = ctx.SourceMgr;
-  //  auto file =
-  //  SM.getIdentifierForBuffer(SM.findBufferContainingLoc(parent->getSourceRange().Start));
-  //  auto line = SM.getLineNumber(parent->getSourceRange().Start);
-  //  bool dumpEm = file.endswith("ArrayBody.swift")  &&  line == 51;
-  //
-
   // Accessors are always nested within their abstract storage
   // declaration. The nesting may not be immediate, because subscripts may
   // have intervening scopes for generics.

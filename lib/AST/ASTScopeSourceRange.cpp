@@ -56,9 +56,9 @@ ASTScopeImpl::widenSourceRangeForChildren(const SourceRange range,
     return range;
   }
   const auto childStart =
-      getChildren().front()->getSourceRange(omitAssertions).Start;
+      getChildren().front()->getSourceRangeOfScope(omitAssertions).Start;
   const auto childEnd =
-      getChildren().back()->getSourceRange(omitAssertions).End;
+      getChildren().back()->getSourceRangeOfScope(omitAssertions).End;
   auto childRange = SourceRange(childStart, childEnd);
   assert(omitAssertions || childRange.isValid());
 
@@ -72,7 +72,7 @@ ASTScopeImpl::widenSourceRangeForChildren(const SourceRange range,
 bool ASTScopeImpl::checkSourceRangeAfterExpansion() const {
   assert((getSourceRangeOfThisASTNode().isValid() || !getChildren().empty()) &&
          "need to be able to find source range");
-  assert(verifyThatChildrenAreContainedWithin(getSourceRange()) &&
+  assert(verifyThatChildrenAreContainedWithin(getSourceRangeOfScope()) &&
          "Search will fail");
   return true;
 }
@@ -80,7 +80,7 @@ bool ASTScopeImpl::checkSourceRangeAfterExpansion() const {
 #pragma mark validation
 
 bool ASTScopeImpl::hasValidSourceRange() const {
-  const auto sourceRange = getSourceRange();
+  const auto sourceRange = getSourceRangeOfScope();
   return sourceRange.Start.isValid() && sourceRange.End.isValid() &&
          !getSourceManager().isBeforeInBuffer(sourceRange.End,
                                               sourceRange.Start);
@@ -93,8 +93,8 @@ bool ASTScopeImpl::hasValidSourceRangeOfIgnoredASTNodes() const {
 bool ASTScopeImpl::precedesInSource(const ASTScopeImpl *next) const {
   if (!hasValidSourceRange() || !next->hasValidSourceRange())
     return false;
-  return !getSourceManager().isBeforeInBuffer(next->getSourceRange().Start,
-                                              getSourceRange().End);
+  return !getSourceManager().isBeforeInBuffer(
+      next->getSourceRangeOfScope().Start, getSourceRangeOfScope().End);
 }
 
 bool ASTScopeImpl::verifyThatChildrenAreContainedWithin(
@@ -103,8 +103,8 @@ bool ASTScopeImpl::verifyThatChildrenAreContainedWithin(
   if (getChildren().empty())
     return true;
   const SourceRange rangeOfChildren =
-      SourceRange(getChildren().front()->getSourceRange().Start,
-                  getChildren().back()->getSourceRange().End);
+      SourceRange(getChildren().front()->getSourceRangeOfScope().Start,
+                  getChildren().back()->getSourceRangeOfScope().End);
   if (getSourceManager().rangeContains(range, rangeOfChildren))
     return true;
   auto &out = verificationError() << "children not contained in its parent\n";
@@ -429,7 +429,8 @@ SourceRange LookupParentDiversionScope::getSourceRangeOfThisASTNode(
 
 #pragma mark source range caching
 
-SourceRange ASTScopeImpl::getSourceRange(const bool omitAssertions) const {
+SourceRange
+ASTScopeImpl::getSourceRangeOfScope(const bool omitAssertions) const {
   if (!isSourceRangeCached(omitAssertions))
     cacheSourceRangeOfMeAndDescendants(omitAssertions);
   return *cachedSourceRange;
@@ -540,8 +541,6 @@ public:
 };
 } // namespace
 
-// FIXME: Alter how EditorPlaceHolder and InterpolgatedStringLiteralExpr are
-// parsed so getSourceRange is enough.
 SourceRange ASTScopeImpl::getEffectiveSourceRange(const ASTNode n) const {
   if (const auto *d = n.dyn_cast<Decl *>())
     return d->getSourceRange();

@@ -135,18 +135,20 @@ ASTScopeImpl::findChildContaining(SourceLoc loc,
 
     bool operator()(const ASTScopeImpl *scope, SourceLoc loc) {
       assert(scope->checkChildlessSourceRange());
-      return sourceMgr.isBeforeInBuffer(scope->getSourceRange().End, loc);
+      return sourceMgr.isBeforeInBuffer(scope->getSourceRangeOfScope().End,
+                                        loc);
     }
     bool operator()(SourceLoc loc, const ASTScopeImpl *scope) {
       assert(scope->checkChildlessSourceRange());
-      return sourceMgr.isBeforeInBuffer(loc, scope->getSourceRange().End);
+      return sourceMgr.isBeforeInBuffer(loc,
+                                        scope->getSourceRangeOfScope().End);
     }
   };
   auto *const *child = std::lower_bound(
       getChildren().begin(), getChildren().end(), loc, CompareLocs{sourceMgr});
 
   if (child != getChildren().end() &&
-      sourceMgr.rangeContainsTokenLoc((*child)->getSourceRange(), loc))
+      sourceMgr.rangeContainsTokenLoc((*child)->getSourceRangeOfScope(), loc))
     return *child;
 
   return nullptr;
