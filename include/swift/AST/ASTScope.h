@@ -207,13 +207,13 @@ public:
   /// FIXME: Alter how these are parsed so getSourceRange is enough.
   SourceRange getEffectiveSourceRange(ASTNode) const;
 
-  void cacheSourceRangeOfMeAndDescendants(bool omitAssertions = false) const;
+  void computeAndCacheSourceRangeOfScope(bool omitAssertions = false) const;
   bool isSourceRangeCached(bool omitAssertions = false) const;
 
   bool checkSourceRangeOfThisASTNode() const;
 
 private:
-  SourceRange getUncachedSourceRange(bool omitAssertions = false) const;
+  SourceRange computeSourceRangeOfScope(bool omitAssertions = false) const;
   bool ensureNoAncestorsSourceRangeIsCached() const;
 
 #pragma mark - source range adjustments

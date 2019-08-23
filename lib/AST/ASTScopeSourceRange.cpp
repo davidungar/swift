@@ -433,7 +433,7 @@ SourceRange LookupParentDiversionScope::getSourceRangeOfThisASTNode(
 SourceRange
 ASTScopeImpl::getSourceRangeOfScope(const bool omitAssertions) const {
   if (!isSourceRangeCached(omitAssertions))
-    cacheSourceRangeOfMeAndDescendants(omitAssertions);
+    computeAndCacheSourceRangeOfScope(omitAssertions);
   return *cachedSourceRange;
 }
 
@@ -454,16 +454,16 @@ bool ASTScopeImpl::ensureNoAncestorsSourceRangeIsCached() const {
   return true;
 }
 
-void ASTScopeImpl::cacheSourceRangeOfMeAndDescendants(
+void ASTScopeImpl::computeAndCacheSourceRangeOfScope(
     const bool omitAssertions) const {
   // In order to satisfy the invariant that, if my range is uncached,
   // my parent's range is uncached, (which is needed to optimize invalidation
   // by obviating the need to uncache all the way to the root every time),
   // when caching a range, must ensure all children's ranges are cached.
   for (auto *c : getChildren())
-    c->cacheSourceRangeOfMeAndDescendants(omitAssertions);
+    c->computeAndCacheSourceRangeOfScope(omitAssertions);
 
-  cachedSourceRange = getUncachedSourceRange(omitAssertions);
+  cachedSourceRange = computeSourceRangeOfScope(omitAssertions);
 }
 
 bool ASTScopeImpl::checkLazySourceRange(const SourceRange expandedRange) const {
@@ -475,7 +475,7 @@ bool ASTScopeImpl::checkLazySourceRange(const SourceRange expandedRange) const {
   if (unexpandedRange == expandedRange)
     return true;
 
-  auto b = getChildren().back()->getUncachedSourceRange();
+  auto b = getChildren().back()->computeSourceRangeOfScope();
   llvm::errs() << "*** Lazy range problem. Parent: ***\n";
   unexpandedRange.print(llvm::errs(), getSourceManager(), false);
   llvm::errs() << "\n*** vs last child: ***\n";
@@ -488,10 +488,11 @@ bool ASTScopeImpl::checkLazySourceRange(const SourceRange expandedRange) const {
 }
 
 SourceRange
-ASTScopeImpl::getUncachedSourceRange(const bool omitAssertions) const {
-  const auto childlessRange = getSourceRangeOfThisASTNode(omitAssertions);
+ASTScopeImpl::computeSourceRangeOfScope(const bool omitAssertions) const {
+  const auto rangeOfJustThisASTNode =
+      getSourceRangeOfThisASTNode(omitAssertions);
   const auto rangeIncludingIgnoredNodes =
-      widenSourceRangeForIgnoredASTNodes(childlessRange);
+      widenSourceRangeForIgnoredASTNodes(rangeOfJustThisASTNode);
   const auto uncachedSourceRange =
       widenSourceRangeForChildren(rangeIncludingIgnoredNodes, omitAssertions);
   assert(
