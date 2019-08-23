@@ -120,7 +120,7 @@ const ASTScopeImpl *ASTScopeImpl::findInnermostEnclosingScopeImpl(
 }
 
 bool ASTScopeImpl::checkChildlessSourceRange() const {
-  const auto r = getChildlessSourceRange();
+  const auto r = getSourceRangeOfThisASTNode();
   (void)r;
   assert(!getSourceManager().isBeforeInBuffer(r.End, r.Start));
   return true;

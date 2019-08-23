@@ -867,9 +867,9 @@ public:
     auto *insertionPoint = parentScope;
     for (unsigned i = 0; i < patternBinding->getPatternList().size(); ++i) {
       // TODO: Won't need to do so much work to avoid creating one without
-      // a SourceRange once rdar://53627317 is done and getChildlessSourceRange
-      // for PatternEntryDeclScope is simplified to use the PatternEntry's
-      // source range.
+      // a SourceRange once rdar://53627317 is done and
+      // getSourceRangeOfThisASTNode for PatternEntryDeclScope is simplified to
+      // use the PatternEntry's source range.
       auto &patternEntry = patternBinding->getPatternList()[i];
       if (!patternEntry.getOriginalInit()) {
         bool found = false;
@@ -1025,7 +1025,7 @@ ASTScopeImpl *ASTScopeImpl::expandAndBeCurrent(ScopeCreator &scopeCreator) {
   }
   beCurrent();
   setChildrenCountWhenLastExpanded();
-  assert((getChildlessSourceRange().isValid() || !getChildren().empty()) &&
+  assert((getSourceRangeOfThisASTNode().isValid() || !getChildren().empty()) &&
          "need to be able to find source range");
   assert(verifyThatChildrenAreContainedWithin(getSourceRange()) &&
          "Search will fail");
