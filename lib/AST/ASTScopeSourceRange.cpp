@@ -34,6 +34,8 @@ using namespace swift;
 using namespace ast_scope;
 
 static SourceLoc getStartOfFirstParam(ClosureExpr *closure);
+static SourceLoc getEndLocEvenWhenRBraceIsMissing(const SourceManager &,
+                                                  SourceLoc endLoc)
 
 SourceRange ASTScopeImpl::widenSourceRangeForIgnoredASTNodes(
     const SourceRange range) const {
@@ -635,4 +637,44 @@ AbstractFunctionDeclScope::getParamsSourceLoc(AbstractFunctionDecl *decl) {
        : fd->isDeferBody()     ? fd->getNameLoc()
        :                         fd->getParameters()->getLParenLoc();
   // clang-format on
+}
+
+# pragma mark unexpected source range
+
+// If right brace is missing, the source range of the body will end
+// at the last token, which may be a one of the special cases below.
+static SourceLoc getEndLocEvenWhenRBraceIsMissing(const SourceManager &SM,
+                                                  const SourceLoc endLoc) {
+  const auto tok = Lexer::getTokenAtLocation(SM, endLoc);
+  switch (tok.getKind()) {
+  default:
+    return endLoc;
+  case tok::string_literal:
+    return tok.getRange().getEnd();
+  case tok::identifier:
+    return Identifier::isEditorPlaceholder(tok.getText())
+               ? tok.getRange().getEnd()
+               : endLoc;
+  }
+}
+
+SourceRange ASTScopeImpl::sourceRangeForDeferredExpansion() const {
+  return SourceRange();
+}
+SourceRange IterableTypeScope::sourceRangeForDeferredExpansion() const {
+  return portion->sourceRangeForDeferredExpansion(this);
+}
+SourceRange
+Portion::sourceRangeForDeferredExpansion(const IterableTypeScope *) const {
+  return SourceRange();
+}
+
+
+
+SourceRange IterableTypeBodyPortion::sourceRangeForDeferredExpansion(
+    const IterableTypeScope *s) const {
+  const auto bracesRange = getChildlessSourceRangeOf(s, false);
+  const auto &SM = s->getSourceManager();
+  return SourceRange(bracesRange.Start,
+                     getEndLocEvenWhenRBraceIsMissing(SM, bracesRange.End));
 }
