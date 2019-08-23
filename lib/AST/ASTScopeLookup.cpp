@@ -119,7 +119,7 @@ const ASTScopeImpl *ASTScopeImpl::findInnermostEnclosingScopeImpl(
                                                       scopeCreator);
 }
 
-bool ASTScopeImpl::checkChildlessSourceRange() const {
+bool ASTScopeImpl::checkSourceRangeOfThisASTNode() const {
   const auto r = getSourceRangeOfThisASTNode();
   (void)r;
   assert(!getSourceManager().isBeforeInBuffer(r.End, r.Start));
@@ -134,12 +134,12 @@ ASTScopeImpl::findChildContaining(SourceLoc loc,
     SourceManager &sourceMgr;
 
     bool operator()(const ASTScopeImpl *scope, SourceLoc loc) {
-      assert(scope->checkChildlessSourceRange());
+      assert(scope->checkSourceRangeOfThisASTNode());
       return sourceMgr.isBeforeInBuffer(scope->getSourceRangeOfScope().End,
                                         loc);
     }
     bool operator()(SourceLoc loc, const ASTScopeImpl *scope) {
-      assert(scope->checkChildlessSourceRange());
+      assert(scope->checkSourceRangeOfThisASTNode());
       return sourceMgr.isBeforeInBuffer(loc,
                                         scope->getSourceRangeOfScope().End);
     }
