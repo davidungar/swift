@@ -130,7 +130,7 @@ private:
 
   // Must be updated after last child is added and after last child's source
   // position is known
-  mutable Optional<SourceRange> cachedSourceRange;
+  mutable Optional<CharSourceRange> cachedSourceRange;
 
   // When ignoring ASTNodes in a scope, they still must count towards a scope's
   // source range. So include their ranges here
@@ -198,7 +198,7 @@ public:
 #pragma mark - source range queries
 
 public:
-  SourceRange getSourceRangeOfScope(bool omitAssertions = false) const;
+  CharSourceRange getSourceRangeOfScope(bool omitAssertions = false) const;
 
   /// InterpolatedStringLiteralExprs and EditorPlaceHolders respond to
   /// getSourceRange with the starting point. But we might be asked to lookup an
@@ -207,13 +207,13 @@ public:
   /// FIXME: Alter how these are parsed so getSourceRange is enough.
   SourceRange getEffectiveSourceRange(ASTNode) const;
 
-  void computeAndCacheSourceRangeOfScope(bool omitAssertions = false) const;
+  void computeAndCacheRangeOfScope(bool omitAssertions = false) const;
   bool isSourceRangeCached(bool omitAssertions = false) const;
 
   bool checkSourceRangeOfThisASTNode() const;
 
 private:
-  SourceRange computeSourceRangeOfScope(bool omitAssertions = false) const;
+  CharSourceRange computeRangeOfScope(bool omitAssertions = false) const;
   SourceRange
   computeSourceRangeOfScopeWithChildASTNodes(bool omitAssertions = false) const;
   bool ensureNoAncestorsSourceRangeIsCached() const;
@@ -322,7 +322,7 @@ protected:
   /// Such scopes must: not change their source ranges after expansion, and
   /// their expansion must return an insertion point outside themselves.
   virtual NullablePtr<ASTScopeImpl> insertionPointForDeferredExpansion();
-  virtual SourceRange sourceRangeForDeferredExpansion() const;
+  virtual SourceRange computeLazyRange() const;
 
 public:
   // Some nodes (VarDecls and Accessors) are created directly from
@@ -572,7 +572,7 @@ public:
   virtual NullablePtr<ASTScopeImpl>
   insertionPointForDeferredExpansion(IterableTypeScope *) const;
   virtual SourceRange
-  sourceRangeForDeferredExpansion(const IterableTypeScope *) const;
+  computeLazyRange(const IterableTypeScope *) const;
   };
 
   // For the whole Decl scope of a GenericType or an Extension
@@ -651,7 +651,7 @@ public:
   NullablePtr<ASTScopeImpl>
   insertionPointForDeferredExpansion(IterableTypeScope *) const override;
   SourceRange
-  sourceRangeForDeferredExpansion(const IterableTypeScope *) const override;
+  computeLazyRange(const IterableTypeScope *) const override;
 };
 
 /// GenericType or Extension scope
@@ -750,7 +750,7 @@ public:
   void makeBodyCurrent();
   bool isBodyCurrent() const;
   NullablePtr<ASTScopeImpl> insertionPointForDeferredExpansion() override;
-  SourceRange sourceRangeForDeferredExpansion() const override;
+  SourceRange computeLazyRange() const override;
 
   void countBodies(ScopeCreator &) const;
 };

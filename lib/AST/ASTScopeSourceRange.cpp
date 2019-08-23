@@ -433,10 +433,10 @@ SourceRange LookupParentDiversionScope::getSourceRangeOfThisASTNode(
 
 #pragma mark source range caching
 
-SourceRange
+CharSourceRange
 ASTScopeImpl::getSourceRangeOfScope(const bool omitAssertions) const {
   if (!isSourceRangeCached(omitAssertions))
-    computeAndCacheSourceRangeOfScope(omitAssertions);
+    computeAndCacheRangeOfScope(omitAssertions);
   return *cachedSourceRange;
 }
 
@@ -457,31 +457,33 @@ bool ASTScopeImpl::ensureNoAncestorsSourceRangeIsCached() const {
   return true;
 }
 
-void ASTScopeImpl::computeAndCacheSourceRangeOfScope(
+void ASTScopeImpl::computeAndCacheRangeOfScope(
     const bool omitAssertions) const {
   // In order to satisfy the invariant that, if my range is uncached,
   // my parent's range is uncached, (which is needed to optimize invalidation
   // by obviating the need to uncache all the way to the root every time),
   // when caching a range, must ensure all children's ranges are cached.
   for (auto *c : getChildren())
-    c->computeAndCacheSourceRangeOfScope(omitAssertions);
+    c->computeAndCacheRangeOfScope(omitAssertions);
 
-  cachedSourceRange = computeSourceRangeOfScope(omitAssertions);
+  cachedSourceRange = computeRangeOfScope(omitAssertions);
 }
 
 bool ASTScopeImpl::checkLazySourceRange() const {
   if (!getASTContext().LangOpts.LazyASTScopes)
     return true;
-  const auto unexpandedRange = sourceRangeForDeferredExpansion();
-  const auto expandedRange = computeSourceRangeOfScopeWithChildASTNodes();
-  if (unexpandedRange.isInvalid() || expandedRange.isInvalid())
+  const auto lazyRange = computeLazyRange();
+  if (lazyRange.isInvalid())
     return true;
-  if (unexpandedRange == expandedRange)
+  const auto expandedRange = computeSourceRangeOfScopeWithChildASTNodes();
+  if (expandedRange.isInvalid())
+    return true;
+  if (lazyRange == expandedRange)
     return true;
 
-  auto b = getChildren().back()->computeSourceRangeOfScope();
+  auto b = getChildren().back()->computeRangeOfScope();
   llvm::errs() << "*** Lazy range problem. Parent: ***\n";
-  unexpandedRange.print(llvm::errs(), getSourceManager(), false);
+  lazyRange.print(llvm::errs(), getSourceManager(), false);
   llvm::errs() << "\n*** vs last child: ***\n";
   b.print(llvm::errs(), getSourceManager(), false);
   llvm::errs() << "\n";
@@ -491,10 +493,10 @@ bool ASTScopeImpl::checkLazySourceRange() const {
   return false;
 }
 
-SourceRange
-ASTScopeImpl::computeSourceRangeOfScope(const bool omitAssertions) const {
+CharSourceRange
+ASTScopeImpl::computeRangeOfScope(const bool omitAssertions) const {
   // If we don't need to consider children, it's cheaper
-  const auto deferredRange = sourceRangeForDeferredExpansion();
+  const auto deferredRange = computeLazyRange();
   return deferredRange.isValid()
              ? deferredRange
              : computeSourceRangeOfScopeWithChildASTNodes(omitAssertions);
@@ -680,23 +682,22 @@ static SourceLoc getEndLocEvenWhenRBraceIsMissing(const SourceManager &SM,
   return tok.getRange().getEnd().getAdvancedLoc(-1);
 }
 
-SourceRange ASTScopeImpl::sourceRangeForDeferredExpansion() const {
-  return SourceRange();
+CharSourceRange ASTScopeImpl::computeLazyRange() const {
+  return CharSourceRange();
 }
-SourceRange IterableTypeScope::sourceRangeForDeferredExpansion() const {
-  return portion->sourceRangeForDeferredExpansion(this);
+CharSourceRange IterableTypeScope::computeLazyRange() const {
+  return portion->computeLazyRange(this);
 }
-SourceRange
-Portion::sourceRangeForDeferredExpansion(const IterableTypeScope *) const {
-  return SourceRange();
+CharSourceRange
+Portion::computeLazyRange(const IterableTypeScope *) const {
+  return CharSourceRange();
 }
 
-
-
-SourceRange IterableTypeBodyPortion::sourceRangeForDeferredExpansion(
+CharSourceRange IterableTypeBodyPortion::computeLazyRange(
     const IterableTypeScope *s) const {
   const auto bracesRange = getChildlessSourceRangeOf(s, false);
   const auto &SM = s->getSourceManager();
-  return SourceRange(bracesRange.Start,
-                     getEndLocEvenWhenRBraceIsMissing(SM, bracesRange.End));
+  // Add one because CharSourceRanges are semi-open
+  return CharSourceRange(bracesRange.Start,
+                     getEndLocEvenWhenRBraceIsMissing(SM, bracesRange.End).getAdvancedLoc(1));
 }
