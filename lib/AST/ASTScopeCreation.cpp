@@ -1206,7 +1206,7 @@ void AbstractFunctionDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
   if (!isa<AccessorDecl>(decl)) {
     leaf = scopeCreator.createGenericParamScopes(decl, decl->getGenericParams(),
                                                  leaf);
-    if (isLocalizable(decl) && getParamsSourceLoc(decl).isValid()) {
+    if (isLocalizable(decl) && getParmsSourceLocOfAFD(decl).isValid()) {
       // See rdar://54188611
       // swift::createDesignatedInitOverride just clones the parameters, so they
       // end up with a bogus SourceRange, maybe *before* the start of the

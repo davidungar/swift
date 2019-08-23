@@ -311,7 +311,8 @@ SourceRange AbstractFunctionDeclScope::getSourceRangeOfThisASTNode(
 
 SourceRange ParameterListScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
-  const auto rangeForGoodInput = getSourceRangeOfEnclosedParams(omitAssertions);
+  const auto rangeForGoodInput =
+      getSourceRangeOfEnclosedParamsOfASTNode(omitAssertions);
   auto r = SourceRange(rangeForGoodInput.Start,
                        fixupEndForBadInput(rangeForGoodInput));
   assert(getSourceManager().rangeContains(
@@ -602,20 +603,21 @@ static SourceLoc getStartOfFirstParam(ClosureExpr *closure) {
   return closure->getStartLoc();
 }
 
-#pragma mark getSourceRangeOfEnclosedParams
+#pragma mark getSourceRangeOfEnclosedParamsOfASTNode
 
-SourceRange
-ASTScopeImpl::getSourceRangeOfEnclosedParams(const bool omitAssertions) const {
-  return getParent().get()->getSourceRangeOfEnclosedParams(omitAssertions);
+SourceRange ASTScopeImpl::getSourceRangeOfEnclosedParamsOfASTNode(
+    const bool omitAssertions) const {
+  return getParent().get()->getSourceRangeOfEnclosedParamsOfASTNode(
+      omitAssertions);
 }
 
-SourceRange
-EnumElementScope::getSourceRangeOfEnclosedParams(bool omitAssertions) const {
+SourceRange EnumElementScope::getSourceRangeOfEnclosedParamsOfASTNode(
+    bool omitAssertions) const {
   auto *pl = decl->getParameterList();
   return pl ? pl->getSourceRange() : SourceRange();
 }
 
-SourceRange SubscriptDeclScope::getSourceRangeOfEnclosedParams(
+SourceRange SubscriptDeclScope::getSourceRangeOfEnclosedParamsOfASTNode(
     const bool omitAssertions) const {
   auto r = SourceRange(decl->getIndices()->getLParenLoc(), decl->getEndLoc());
   // Because of "subscript(x: MyStruct#^PARAM_1^#) -> Int { return 0 }"
@@ -624,15 +626,15 @@ SourceRange SubscriptDeclScope::getSourceRangeOfEnclosedParams(
   return r;
 }
 
-SourceRange AbstractFunctionDeclScope::getSourceRangeOfEnclosedParams(
+SourceRange AbstractFunctionDeclScope::getSourceRangeOfEnclosedParamsOfASTNode(
     const bool omitAssertions) const {
-  const auto s = getParamsSourceLoc(decl);
+  const auto s = getParmsSourceLocOfAFD(decl);
   const auto e = getSourceRangeOfThisASTNode(omitAssertions).End;
   return s.isInvalid() || e.isInvalid() ? SourceRange() : SourceRange(s, e);
 }
 
 SourceLoc
-AbstractFunctionDeclScope::getParamsSourceLoc(AbstractFunctionDecl *decl) {
+AbstractFunctionDeclScope::getParmsSourceLocOfAFD(AbstractFunctionDecl *decl) {
   if (auto *c = dyn_cast<ConstructorDecl>(decl))
     return c->getParameters()->getLParenLoc();
 
