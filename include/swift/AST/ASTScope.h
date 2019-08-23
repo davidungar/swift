@@ -1062,7 +1062,7 @@ public:
   const SourceRange sourceRangeWhenCreated;
 
   AttachedPropertyWrapperScope(VarDecl *e)
-      : decl(e), sourceRangeWhenCreated(getSourceRangeFor(e)) {
+      : decl(e), sourceRangeWhenCreated(getSourceRangeOfVarDecl(e)) {
     assert(sourceRangeWhenCreated.isValid());
   }
   virtual ~AttachedPropertyWrapperScope() {}
@@ -1077,7 +1077,7 @@ public:
   NullablePtr<const void> addressForPrinting() const override { return decl; }
   virtual NullablePtr<DeclContext> getDeclContext() const override;
 
-  static SourceRange getSourceRangeFor(const VarDecl *);
+  static SourceRange getSourceRangeOfVarDecl(const VarDecl *);
 
 private:
   void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);

@@ -331,7 +331,7 @@ private:
   // A safe way to discover this, without creating a circular request.
   // Cannot call getAttachedPropertyWrappers.
   static bool hasAttachedPropertyWrapper(VarDecl *vd) {
-    return AttachedPropertyWrapperScope::getSourceRangeFor(vd).isValid();
+    return AttachedPropertyWrapperScope::getSourceRangeOfVarDecl(vd).isValid();
   }
 
 public:
