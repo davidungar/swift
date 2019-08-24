@@ -74,6 +74,11 @@ class IterableTypeScope;
 class TypeAliasScope;
 class ScopeCreator;
 
+class AnnotatedInsertionPoint {
+  NullablePtr<ASTScopeImpl *> insertionPoint;
+  const char *explanation;
+};
+
 #pragma mark the root ASTScopeImpl class
 
 /// Describes a lexical scope within a source file.
@@ -677,7 +682,8 @@ public:
   NullablePtr<const void> getReferrent() const override;
 
 private:
-  ASTScopeImpl *expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
+  AnnotatedInsertionPoint
+  expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
 
 public:
   SourceRange
@@ -943,7 +949,8 @@ protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
 
 private:
-  ASTScopeImpl *expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
+  AnnotatedInsertionPoint
+  expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
   SourceLoc fixupEndForBadInput(SourceRange) const;
 
 public:
@@ -1144,7 +1151,8 @@ protected:
   bool isCurrent() const override;
 
 private:
-  ASTScopeImpl *expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
+  AnnotatedInsertionPoint
+  expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
 
 public:
   std::string getClassName() const override;
@@ -1174,7 +1182,8 @@ protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
 
 private:
-  ASTScopeImpl *expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
+  AnnotatedInsertionPoint
+  expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
 
 public:
   std::string getClassName() const override;
@@ -1212,7 +1221,8 @@ protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
 
 private:
-  ASTScopeImpl *expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
+  AnnotatedInsertionPoint
+  expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
 
 public:
   std::string getClassName() const override;
@@ -1386,7 +1396,8 @@ protected:
   bool isCurrent() const override;
 
 private:
-  ASTScopeImpl *expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
+  AnnotatedInsertionPoint
+  expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
   std::vector<ASTScopeImpl *> rescueBodyScopesToReuse();
 
 public:
@@ -1601,7 +1612,8 @@ protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
 
 private:
-  ASTScopeImpl *expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
+  AnnotatedInsertionPoint
+  expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
 
 public:
   std::string getClassName() const override;
@@ -1782,7 +1794,8 @@ protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
 
 private:
-  ASTScopeImpl *expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
+  AnnotatedInsertionPoint
+  expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
 
 public:
   std::string getClassName() const override;
