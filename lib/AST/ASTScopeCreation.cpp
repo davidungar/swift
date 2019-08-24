@@ -170,7 +170,9 @@ public:
 
   ScopeCreator(SourceFile *SF)
       : ctx(SF->getASTContext()),
-        sourceFileScope(new (ctx) ASTSourceFileScope(SF, this)) {}
+        sourceFileScope(new (ctx) ASTSourceFileScope(SF, this)) {
+    ctx.addDestructorCleanup(scopedNodes);
+  }
 
   ScopeCreator(const ScopeCreator &) = delete;  // ensure no copies
   ScopeCreator(const ScopeCreator &&) = delete; // ensure no moves
@@ -663,10 +665,8 @@ public:
     out << "(swift::ASTSourceFileScope*) " << sourceFileScope << "\n";
   }
 
-  // Make vanilla new illegal for ASTScopes.
+  // Make vanilla new illegal.
   void *operator new(size_t bytes) = delete;
-  // Need this because have virtual destructors
-  void operator delete(void *data) {}
 
   // Only allow allocation of scopes using the allocator of a particular source
   // file.
