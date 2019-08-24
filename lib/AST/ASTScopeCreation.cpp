@@ -1095,13 +1095,6 @@ NO_EXPANSION(LookupParentDiversionScope)
 #undef CREATES_NEW_INSERTION_POINT
 #undef NO_NEW_INSERTION_POINT
 
-// This insertionPoint stuff is tricky, use a particular function to make it
-// easier to search & debug
-static NullablePtr<ASTScopeImpl> newInsertionPoint(NullablePtr<ASTScopeImpl> ip,
-                                                   const char *why) {
-  return ip;
-}
-
 AnnotatedInsertionPoint
 ParameterListScope::expandAScopeThatCreatesANewInsertionPoint(
     ScopeCreator &scopeCreator) {
@@ -1155,7 +1148,7 @@ PatternEntryInitializerScope::expandAScopeThatCreatesANewInsertionPoint(
   // Create a child for the initializer expression.
   scopeCreator.addToScopeTree(ASTNode(getPatternEntry().getOriginalInit()),
                               this);
-  return {this, "Why?"};
+  return {this, "Why? not used"};
 }
 
 AnnotatedInsertionPoint
@@ -1164,16 +1157,17 @@ ConditionalClauseScope::expandAScopeThatCreatesANewInsertionPoint(
   const StmtConditionElement &sec = getStmtConditionElement();
   switch (sec.getKind()) {
   case StmtConditionElement::CK_Availability:
-    return this;
+    return {this, "No introduced variables"};
   case StmtConditionElement::CK_Boolean:
     scopeCreator.addToScopeTree(sec.getBoolean(), this);
-    return this;
+    return {this, "No introduced variables"};
   case StmtConditionElement::CK_PatternBinding:
     scopeCreator.addToScopeTree(sec.getInitializer(), this);
     auto *const ccPatternUseScope =
         scopeCreator.constructExpandAndInsertUncheckable<
             ConditionalClausePatternUseScope>(this, sec.getPattern(), endLoc);
-    return {ccPatternUseScope, "Succeeding code must be in scope of conditional variables");
+    return {ccPatternUseScope,
+            "Succeeding code must be in scope of conditional variables"};
   }
 }
 
@@ -1191,7 +1185,8 @@ GuardStmtScope::expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &
       scopeCreator
           .constructExpandAndInsertUncheckable<LookupParentDiversionScope>(
               this, conditionLookupParent, stmt->getEndLoc());
-  return {lookupParentDiversionScope, "Succeeding code must be in scope of guard variables");
+  return {lookupParentDiversionScope,
+          "Succeeding code must be in scope of guard variables"};
 }
 
 AnnotatedInsertionPoint

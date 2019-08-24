@@ -74,8 +74,8 @@ class IterableTypeScope;
 class TypeAliasScope;
 class ScopeCreator;
 
-class AnnotatedInsertionPoint {
-  NullablePtr<ASTScopeImpl *> insertionPoint;
+struct AnnotatedInsertionPoint {
+  ASTScopeImpl *insertionPoint;
   const char *explanation;
 };
 
