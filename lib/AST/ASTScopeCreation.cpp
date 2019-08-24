@@ -1148,7 +1148,12 @@ PatternEntryInitializerScope::expandAScopeThatCreatesANewInsertionPoint(
   // Create a child for the initializer expression.
   scopeCreator.addToScopeTree(ASTNode(getPatternEntry().getOriginalInit()),
                               this);
-  return {this, "Why? not used"};
+  if (handleUseBeforeDef)
+    return {this, "PatternEntryDeclScope::expand.* needs initializer scope to "
+                  "get its endpoint in order to push back start of "
+                  "PatternEntryUseScope"};
+
+  return {nullptr, "Unused"};
 }
 
 AnnotatedInsertionPoint
