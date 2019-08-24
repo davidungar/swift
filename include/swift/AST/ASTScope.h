@@ -511,7 +511,7 @@ protected:
 public:
   NullablePtr<DeclContext> getDeclContext() const override;
 
-  void addNewDeclsToTree();
+  void createAndInsertScopesForNewDecls();
 
   const SourceFile *getSourceFile() const override;
   NullablePtr<const void> addressForPrinting() const override { return SF; }
@@ -1775,10 +1775,8 @@ class BraceStmtScope final : public AbstractStmtScope {
 
 public:
   BraceStmt *const stmt;
-  BraceStmtScope(BraceStmt *e) : stmt(e) { assert(shouldCreateScope(e)); }
+  BraceStmtScope(BraceStmt *e) : stmt(e) {}
   virtual ~BraceStmtScope() {}
-
-  static bool shouldCreateScope(const BraceStmt *);
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
