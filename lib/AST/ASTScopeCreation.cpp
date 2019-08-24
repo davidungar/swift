@@ -831,7 +831,8 @@ public:
   }
   NullablePtr<ASTScopeImpl> visitDoStmt(DoStmt *ds, ASTScopeImpl *p,
                                         ScopeCreator &scopeCreator) {
-    return scopeCreator.addToScopeTreeAndReturnInsertionPoint(ds->getBody(), p);
+    scopeCreator.addToScopeTreeAndReturnInsertionPoint(ds->getBody(), p);
+    return p; // Don't put subsequent decls inside the "do"
   }
   NullablePtr<ASTScopeImpl> visitTopLevelCodeDecl(TopLevelCodeDecl *d,
                                                   ASTScopeImpl *p,
