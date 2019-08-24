@@ -798,9 +798,9 @@ public:
 
   // This declaration is handled from
   // addChildrenForAllLocalizableAccessorsInSourceOrder
-  NullablePtr<ASTScopeImpl> visitAccessorDecl(AccessorDecl *, ASTScopeImpl *p,
+  NullablePtr<ASTScopeImpl> visitAccessorDecl(AccessorDecl *ad, ASTScopeImpl *p,
                                               ScopeCreator &scopeCreator) {
-    llvm_unreachable("Should not see an accessor decl");
+    return visitAbstractFunctionDecl(ad, p, scopeCreator);
   }
 
   NullablePtr<ASTScopeImpl> visitProtocolDecl(ProtocolDecl *e, ASTScopeImpl *p,
@@ -972,16 +972,13 @@ void ScopeCreator::addChildrenForAllLocalizableAccessorsInSourceOrder(
   // Assume we don't have to deal with inactive clauses of IfConfigs here
   llvm::copy_if(asd->getAllAccessors(), std::back_inserter(accessorsToScope),
                 [&](AccessorDecl *ad) {
-                  return isLocalizable(ad) &&
-                         enclosingAbstractStorageDecl == ad->getStorage();
+                  return enclosingAbstractStorageDecl == ad->getStorage();
                 });
 
   // Sort in order to include synthesized ones, which are out of order.
   // Part of rdar://53921774 rm extra copy
-  for (auto *accessor : sortBySourceRange(accessorsToScope)) {
-    ASTVisitorForScopeCreation().visitAbstractFunctionDecl(accessor, parent,
-                                                           *this);
-  }
+  for (auto *accessor : sortBySourceRange(accessorsToScope))
+    createAndInsertScopeTreeFor(accessor, parent);
 }
 
 #pragma mark creation helpers
@@ -1129,8 +1126,8 @@ ASTScopeImpl *
 PatternEntryInitializerScope::expandAScopeThatCreatesANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   // Create a child for the initializer expression.
-  ASTVisitorForScopeCreation().visitExpr(getPatternEntry().getOriginalInit(), this,
-                                         scopeCreator);
+  scopeCreator.createAndInsertScopeTreeFor(
+      ASTNode(getPatternEntry().getOriginalInit()), this);
   return this;
 }
 
@@ -1141,12 +1138,10 @@ ASTScopeImpl *ConditionalClauseScope::expandAScopeThatCreatesANewInsertionPoint(
   case StmtConditionElement::CK_Availability:
     return this;
   case StmtConditionElement::CK_Boolean:
-    ASTVisitorForScopeCreation().visitExpr(sec.getBoolean(), this,
-                                           scopeCreator);
+    scopeCreator.createAndInsertScopeTreeFor(sec.getBoolean(), this);
     return this;
   case StmtConditionElement::CK_PatternBinding:
-    ASTVisitorForScopeCreation().visitExpr(sec.getInitializer(), this,
-                                           scopeCreator);
+    scopeCreator.createAndInsertScopeTreeFor(sec.getInitializer(), this);
     return scopeCreator
         .constructExpandAndInsert<ConditionalClausePatternUseScope>(
             this, sec.getPattern(), endLoc);
@@ -1184,8 +1179,7 @@ ASTScopeImpl *BraceStmtScope::expandAScopeThatCreatesANewInsertionPoint(
 
 ASTScopeImpl *TopLevelCodeScope::expandAScopeThatCreatesANewInsertionPoint(
     ScopeCreator &scopeCreator) {
-  return scopeCreator
-      .createAndInsertScopeTreeFor(ASTNode(decl->getBody()), this)
+  return scopeCreator.createAndInsertScopeTreeFor(decl->getBody(), this)
       .getPtrOr(this);
 }
 
@@ -1240,8 +1234,8 @@ void EnumElementScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
   if (auto *pl = decl->getParameterList())
     scopeCreator.constructExpandAndInsert<ParameterListScope>(this, pl,
                                                               nullptr);
-  if (auto *expr = decl->getRawValueExpr()) // might contain a closure
-    ASTVisitorForScopeCreation().visitExpr(expr, this, scopeCreator);
+  // might contain a closure
+  scopeCreator.createAndInsertScopeTreeFor(decl->getRawValueExpr(), this);
 }
 
 void AbstractFunctionBodyScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
@@ -1271,23 +1265,20 @@ void WhileStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
 void RepeatWhileScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   scopeCreator.createAndInsertScopeTreeFor(stmt->getBody(), this);
-  ASTVisitorForScopeCreation().visitExpr(stmt->getCond(), this, scopeCreator);
+  scopeCreator.createAndInsertScopeTreeFor(stmt->getCond(), this);
 }
 
 void DoCatchStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   scopeCreator.createAndInsertScopeTreeFor(stmt->getBody(), this);
 
-  for (auto catchClause : stmt->getCatches()) {
-    ASTVisitorForScopeCreation().visitCatchStmt(catchClause, this,
-                                                scopeCreator);
-  }
+  for (auto catchClause : stmt->getCatches())
+    scopeCreator.createAndInsertScopeTreeFor(catchClause, this);
 }
 
 void SwitchStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
-  ASTVisitorForScopeCreation().visitExpr(stmt->getSubjectExpr(), this,
-                                         scopeCreator);
+  scopeCreator.createAndInsertScopeTreeFor(stmt->getSubjectExpr(), this);
 
   for (auto caseStmt : stmt->getCases()) {
     if (isLocalizable(caseStmt))
@@ -1298,8 +1289,7 @@ void SwitchStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
 
 void ForEachStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
-  ASTVisitorForScopeCreation().visitExpr(stmt->getSequence(), this,
-                                         scopeCreator);
+  scopeCreator.createAndInsertScopeTreeFor(stmt->getSequence(), this);
 
   // Add a child describing the scope of the pattern.
   // In error cases such as:
@@ -1316,22 +1306,20 @@ void ForEachStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
 
 void ForEachPatternScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
-  ASTVisitorForScopeCreation().visitExpr(stmt->getWhere(), this, scopeCreator);
+  scopeCreator.createAndInsertScopeTreeFor(stmt->getWhere(), this);
   scopeCreator.createAndInsertScopeTreeFor(stmt->getBody(), this);
 }
 
 void CatchStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
-  ASTVisitorForScopeCreation().visitExpr(stmt->getGuardExpr(), this,
-                                         scopeCreator);
+  scopeCreator.createAndInsertScopeTreeFor(stmt->getGuardExpr(), this);
   scopeCreator.createAndInsertScopeTreeFor(stmt->getBody(), this);
 }
 
 void CaseStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   for (auto &caseItem : stmt->getMutableCaseLabelItems())
-    ASTVisitorForScopeCreation().visitExpr(caseItem.getGuardExpr(), this,
-                                           scopeCreator);
+    scopeCreator.createAndInsertScopeTreeFor(caseItem.getGuardExpr(), this);
 
   // Add a child for the case body.
   scopeCreator.createAndInsertScopeTreeFor(stmt->getBody(), this);
@@ -1388,7 +1376,7 @@ void DefaultArgumentInitializerScope::
         ScopeCreator &scopeCreator) {
   auto *initExpr = decl->getDefaultValue();
   assert(initExpr);
-  ASTVisitorForScopeCreation().visitExpr(initExpr, this, scopeCreator);
+  scopeCreator.createAndInsertScopeTreeFor(initExpr, this);
 }
 
 void AttachedPropertyWrapperScope::
@@ -1396,7 +1384,7 @@ void AttachedPropertyWrapperScope::
         ScopeCreator &scopeCreator) {
   for (auto *attr : decl->getAttrs().getAttributes<CustomAttr>()) {
     if (auto *expr = attr->getArg())
-      ASTVisitorForScopeCreation().visitExpr(expr, this, scopeCreator);
+      scopeCreator.createAndInsertScopeTreeFor(expr, this);
   }
 }
 
