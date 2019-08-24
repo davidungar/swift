@@ -35,6 +35,11 @@
 using namespace swift;
 using namespace ast_scope;
 
+/// If true, nest scopes so a variable is out of scope before its declaration
+/// Does not handle capture rules for local functions properly.
+/// If false don't push uses down into subscopes after decls.
+static const bool handleUseBeforeDef = false;
+
 #pragma mark source range utilities
 static bool rangeableIsIgnored(const Decl *d) { return d->isImplicit(); }
 static bool rangeableIsIgnored(const Expr *d) {
@@ -184,17 +189,26 @@ public:
     auto *ip = insertionPoint;
     for (auto nd : expandIfConfigClausesThenCullAndSortElementsOrMembers(
              nodesOrDeclsToAdd)) {
-      if (shouldThisNodeBeScopedWhenFoundInSourceFileBraceStmtOrType(nd))
-        ip = addToScopeTree(nd, ip).getPtrOr(ip);
-      else
+      if (!shouldThisNodeBeScopedWhenFoundInSourceFileBraceStmtOrType(nd))
         ip->widenSourceRangeForIgnoredASTNode(nd);
+      else {
+        auto *deeperIP =
+            addToScopeTreeAndReturnInsertionPoint(nd, ip).getPtrOr(ip);
+        ip = handleUseBeforeDef ? deeperIP : ip;
+      }
     }
     return ip;
   }
 
 public:
+  /// For each of searching, call this unless the insertion point is needed
+  void addToScopeTree(ASTNode n, ASTScopeImpl *parent) {
+    (void)addToScopeTreeAndReturnInsertionPoint(n, parent);
+  }
   /// Return new insertion point if the scope was not a duplicate
-  NullablePtr<ASTScopeImpl> addToScopeTree(ASTNode, ASTScopeImpl *parent);
+  /// For ease of searching, don't call unless insertion point is needed
+  NullablePtr<ASTScopeImpl>
+  addToScopeTreeAndReturnInsertionPoint(ASTNode, ASTScopeImpl *parent);
 
   bool isWorthTryingToCreateScopeFor(ASTNode n) const {
     if (!n)
@@ -820,7 +834,7 @@ public:
   }
   NullablePtr<ASTScopeImpl> visitDoStmt(DoStmt *ds, ASTScopeImpl *p,
                                         ScopeCreator &scopeCreator) {
-    return scopeCreator.addToScopeTree(ds->getBody(), p);
+    return scopeCreator.addToScopeTreeAndReturnInsertionPoint(ds->getBody(), p);
   }
   NullablePtr<ASTScopeImpl> visitTopLevelCodeDecl(TopLevelCodeDecl *d,
                                                   ASTScopeImpl *p,
@@ -948,8 +962,9 @@ public:
 
 // These definitions are way down here so it can call into
 // NodeAdder
-NullablePtr<ASTScopeImpl> ScopeCreator::addToScopeTree(ASTNode n,
-                                                       ASTScopeImpl *parent) {
+NullablePtr<ASTScopeImpl>
+ScopeCreator::addToScopeTreeAndReturnInsertionPoint(ASTNode n,
+                                                    ASTScopeImpl *parent) {
   if (!isWorthTryingToCreateScopeFor(n))
     return parent;
   if (auto *p = n.dyn_cast<Decl *>())
@@ -1182,7 +1197,9 @@ ASTScopeImpl *BraceStmtScope::expandAScopeThatCreatesANewInsertionPoint(
 
 ASTScopeImpl *TopLevelCodeScope::expandAScopeThatCreatesANewInsertionPoint(
     ScopeCreator &scopeCreator) {
-  return scopeCreator.addToScopeTree(decl->getBody(), this).getPtrOr(this);
+  return scopeCreator
+      .addToScopeTreeAndReturnInsertionPoint(decl->getBody(), this)
+      .getPtrOr(this);
 }
 
 #pragma mark expandAScopeThatDoesNotCreateANewInsertionPoint
