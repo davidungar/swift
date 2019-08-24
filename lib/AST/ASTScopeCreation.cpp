@@ -850,10 +850,11 @@ public:
 
   NullablePtr<ASTScopeImpl> visitBraceStmt(BraceStmt *bs, ASTScopeImpl *p,
                                            ScopeCreator &scopeCreator) {
-    scopeCreator.ifUniqueConstructExpandAndInsert<BraceStmtScope>(p, bs);
+    auto maybeBraceScope =
+        scopeCreator.ifUniqueConstructExpandAndInsert<BraceStmtScope>(p, bs);
     if (auto *s = scopeCreator.getASTContext().Stats)
       ++s->getFrontendCounters().NumBraceStmtASTScopes;
-    return p;
+    return maybeBraceScope.getPtrOr(p);
   }
 
   NullablePtr<ASTScopeImpl>
