@@ -96,7 +96,7 @@ class ScopeCreator;
 /// -dump-scope-maps expanded
 /// \endcode
 class ASTScopeImpl {
-  friend class ASTVisitorForScopeCreation;
+  friend class NodeAdder;
   friend class Portion;
   friend class GenericTypeOrExtensionWholePortion;
   friend class NomExtDeclPortion;
@@ -511,7 +511,7 @@ protected:
 public:
   NullablePtr<DeclContext> getDeclContext() const override;
 
-  void createAndInsertScopesForNewDecls();
+  void addNewDeclsToScopeTree();
 
   const SourceFile *getSourceFile() const override;
   NullablePtr<const void> addressForPrinting() const override { return SF; }
