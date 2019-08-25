@@ -600,10 +600,11 @@ public:
     // Doing otherwise distorts the source range
     // of their parents.
     assert(!n.isDecl(DeclKind::Accessor) && "Should not see accessors here");
-    assert(!n.isStmt(StmtKind::Brace) &&
-           "Unlike C++, Swift does not have brace statements just appearing in "
-           "sequences of code. If it did, the insertion point stuff would "
-           "screw up.");
+    // Can occur in illegal code
+    if (auto *const s = n.dyn_cast<Stmt *>()) {
+      if (auto *const bs = dyn_cast<BraceStmt>(s))
+        assert(bs->getNumElements() == 0 && "Might mess up insertion point");
+    }
     return !n.isDecl(DeclKind::Var);
   }
 
