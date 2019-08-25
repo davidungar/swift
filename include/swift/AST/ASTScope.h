@@ -1794,8 +1794,7 @@ protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
 
 private:
-  AnnotatedInsertionPoint
-  expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
 
 public:
   std::string getClassName() const override;
