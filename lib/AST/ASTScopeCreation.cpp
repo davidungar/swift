@@ -600,6 +600,10 @@ public:
     // Doing otherwise distorts the source range
     // of their parents.
     assert(!n.isDecl(DeclKind::Accessor) && "Should not see accessors here");
+    assert(!n.isStmt(StmtKind::Brace) &&
+           "Unlike C++, Swift does not have brace statements just appearing in "
+           "sequences of code. If it did, the insertion point stuff would "
+           "screw up.");
     return !n.isDecl(DeclKind::Var);
   }
 
@@ -1062,6 +1066,7 @@ CREATES_NEW_INSERTION_POINT(GuardStmtScope)
 CREATES_NEW_INSERTION_POINT(PatternEntryDeclScope)
 CREATES_NEW_INSERTION_POINT(PatternEntryInitializerScope)
 CREATES_NEW_INSERTION_POINT(GenericTypeOrExtensionScope)
+CREATES_NEW_INSERTION_POINT(BraceStmtScope)
 CREATES_NEW_INSERTION_POINT(TopLevelCodeScope)
 
 NO_NEW_INSERTION_POINT(AbstractFunctionBodyScope)
@@ -1069,7 +1074,6 @@ NO_NEW_INSERTION_POINT(AbstractFunctionDeclScope)
 NO_NEW_INSERTION_POINT(AttachedPropertyWrapperScope)
 NO_NEW_INSERTION_POINT(EnumElementScope)
 
-NO_NEW_INSERTION_POINT(BraceStmtScope)
 NO_NEW_INSERTION_POINT(CaptureListScope)
 NO_NEW_INSERTION_POINT(CaseStmtScope)
 NO_NEW_INSERTION_POINT(CatchStmtScope)
@@ -1203,15 +1207,30 @@ GenericTypeOrExtensionScope::expandAScopeThatCreatesANewInsertionPoint(
 }
 
 AnnotatedInsertionPoint
+BraceStmtScope::expandAScopeThatCreatesANewInsertionPoint(
+    ScopeCreator &scopeCreator) {
+  // TODO: remove the sort after performing rdar://53254395
+  auto *insertionPoint =
+      scopeCreator.addSiblingsToScopeTree(this, stmt->getElements());
+  if (auto *s = scopeCreator.getASTContext().Stats)
+    ++s->getFrontendCounters().NumBraceStmtASTScopeExpansions;
+  return {
+      insertionPoint,
+      "For top-level code decls, need the scope under, say a guard statment."};
+}
+
+AnnotatedInsertionPoint
 TopLevelCodeScope::expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &
                                                              scopeCreator) {
-  assert(getChildren().empty() && "Should be empty pre-expansion");
-  scopeCreator.addToScopeTreeAndReturnInsertionPoint(decl->getBody(), this);
-  if (getChildren().empty())
-    return {this, "no body"};
-  return {getChildren().front(), "successive decls (in successive top-level "
-                                 "codes should just be in the same brace "
-                                 "statement scope"};
+
+  if (auto *body =
+          scopeCreator
+              .addToScopeTreeAndReturnInsertionPoint(decl->getBody(), this)
+              .getPtrOrNull())
+    return {body, "So next top level code scope and put its decls in its body "
+                  "under a guard statement scope (etc) from the last top level "
+                  "code scope"};
+  return {this, "No body"};
 }
 
 #pragma mark expandAScopeThatDoesNotCreateANewInsertionPoint
@@ -1219,16 +1238,6 @@ TopLevelCodeScope::expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &
 void ASTSourceFileScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   llvm_unreachable("expanded by addNewDeclsToScopeTree()");
-}
-
-void BraceStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
-    ScopeCreator &scopeCreator) {
-  // No new insertion point because decls after a brace statement
-  // don't see the decls in the brace statement.
-  // TODO: remove the sort after performing rdar://53254395
-  scopeCreator.addSiblingsToScopeTree(this, stmt->getElements());
-  if (auto *s = scopeCreator.getASTContext().Stats)
-    ++s->getFrontendCounters().NumBraceStmtASTScopeExpansions;
 }
 
 // Create child scopes for every declaration in a body.
