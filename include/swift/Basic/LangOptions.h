@@ -256,7 +256,7 @@ namespace swift {
     /// Default is in \c ParseLangArgs
     ///
     /// This is a staging flag; eventually it will be removed.
-    bool EnableASTScopeLookup = false;
+    bool EnableASTScopeLookup = true;
 
     /// Someday, ASTScopeLookup will supplant lookup in the parser
     bool DisableParserLookup = false;
@@ -269,7 +269,7 @@ namespace swift {
     bool WarnIfASTScopeLookup = false;
 
     /// Build the ASTScope tree lazily
-    bool LazyASTScopes = false;
+    bool LazyASTScopes = true;
 
     /// Whether to use the import as member inference system
     ///
