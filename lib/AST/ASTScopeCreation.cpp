@@ -284,8 +284,7 @@ public:
   NullablePtr<ASTScopeImpl>
   ifUniqueConstructExpandAndInsert(ASTScopeImpl *parent, Args... args) {
     Scope dryRun(args...);
-    auto referrent = dryRun.getReferrent();
-    assert(referrent &&
+    assert(dryRun.getReferrent() &&
            "Checking for duplicate ASTNode but class does not support it");
     if (scopedNodes.insert(&dryRun))
       return constructExpandAndInsert<Scope>(parent, args...);

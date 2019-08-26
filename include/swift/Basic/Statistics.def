@@ -172,6 +172,10 @@ FRONTEND_STATISTIC(AST, NumBraceStmtASTScopes)
 /// Number of expansions of brace statement scopes for iterable types
 FRONTEND_STATISTIC(AST, NumBraceStmtASTScopeExpansions)
 
+/// Number of ASTScope lookups
+FRONTEND_STATISTIC(AST, NumASTScopeLookups)
+
+
 /// Number of full function bodies parsed.
 FRONTEND_STATISTIC(Parse, NumFunctionsParsed)
 
