@@ -1608,17 +1608,17 @@ void ScopeCreator::forEachClosureIn(
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (auto *closure = dyn_cast<ClosureExpr>(E)) {
         foundClosure(nullptr, closure);
-        return {true, E}; // keep going for closure in closure
+        return {false, E};
       }
       if (auto *capture = dyn_cast<CaptureListExpr>(E)) {
         foundClosure(capture, capture->getClosureBody());
-        return {true, E};
+        return {false, E};
       }
       return {true, E};
     }
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
       if (auto *bs = dyn_cast<BraceStmt>(S)) { // closures hidden in here
-        return {true, S}; 
+        return {true, S};
       }
       return {false, S};
     }
