@@ -166,8 +166,23 @@ class ScopeCreator final {
   ASTContext &ctx;
 
 public:
+  /// Because type checking can mutate the AST, eagerly build the tree, then
+  /// freeze it
+  enum class Temperature {
+    Warm,  // Can be lazy
+    Frozen // Done!
+  };
+
+private:
+  /// Because type checking can mutate the AST, eagerly build the tree, then
+  /// freeze it
+  Temperature temperature = Temperature::Warm;
+
+public:
   ASTSourceFileScope *const sourceFileScope;
   ASTContext &getASTContext() const { return ctx; }
+  bool getIsFrozen() const { return temperature == Temperature::Frozen; }
+  void freeze() { temperature = Temperature::Frozen; }
 
   /// The AST can have duplicate nodes, and we don't want to create scopes for
   /// those.
@@ -617,9 +632,11 @@ public:
     auto allDeclContexts = findLocalizableDeclContextsInAST();
     llvm::DenseMap<const DeclContext *, const ASTScopeImpl *> bogusDCs;
     bool rebuilt = false;
-    sourceFileScope->preOrderDo([&](ASTScopeImpl *scope) {
-      rebuilt |= scope->reexpandIfObsolete(*this);
-    });
+    if (!getIsFrozen()) {
+      sourceFileScope->preOrderDo([&](ASTScopeImpl *scope) {
+        rebuilt |= scope->reexpandIfObsolete(*this);
+      });
+    }
     sourceFileScope->postOrderDo([&](ASTScopeImpl *scope) {
       if (auto *dc = scope->getDeclContext().getPtrOrNull()) {
         auto iter = allDeclContexts.find(dc);
@@ -699,10 +716,19 @@ public:
 
 ASTScope::ASTScope(SourceFile *SF) : impl(createScopeTree(SF)) {}
 
+void ASTScope::buildScopeTreeEagerly() { impl->buildScopeTreeEagerly(); }
+
 ASTSourceFileScope *ASTScope::createScopeTree(SourceFile *SF) {
   ScopeCreator *scopeCreator = new (SF->getASTContext()) ScopeCreator(SF);
   scopeCreator->sourceFileScope->addNewDeclsToScopeTree();
   return scopeCreator->sourceFileScope;
+}
+
+void ASTSourceFileScope::buildScopeTreeEagerly() {
+  assert(!scopeCreator->getIsFrozen());
+  addNewDeclsToScopeTree();
+  preOrderDo([&](ASTScopeImpl *s) { s->reexpandIfObsolete(*scopeCreator); });
+  scopeCreator->freeze();
 }
 
 void ASTSourceFileScope::addNewDeclsToScopeTree() {
@@ -1671,7 +1697,7 @@ void IterableTypeScope::expandBody(ScopeCreator &scopeCreator) {
 #pragma mark - reexpandIfObsolete
 
 bool ASTScopeImpl::reexpandIfObsolete(ScopeCreator &scopeCreator) {
-  if (isCurrent())
+  if (scopeCreator.getIsFrozen() || isCurrent())
     return false;
   reexpand(scopeCreator);
   return true;
