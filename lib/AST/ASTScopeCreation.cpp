@@ -721,7 +721,9 @@ public:
 
 ASTScope::ASTScope(SourceFile *SF) : impl(createScopeTree(SF)) {}
 
-void ASTScope::buildScopeTreeEagerly() { impl->buildScopeTreeEagerly(); }
+void ASTScope::buildScopeTreeEagerly() {
+  impl->buildScopeTreeEagerly();
+}
 
 ASTSourceFileScope *ASTScope::createScopeTree(SourceFile *SF) {
   ScopeCreator *scopeCreator = new (SF->getASTContext()) ScopeCreator(SF);
