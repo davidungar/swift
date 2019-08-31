@@ -404,7 +404,7 @@ public:
             parent, vd);
     });
   }
-  // HERE
+
 public:
   /// Create the matryoshka nested generic param scopes (if any)
   /// that are subscopes of the receiver. Return
@@ -753,16 +753,14 @@ ASTSourceFileScope *ASTScope::createScopeTree(SourceFile *SF) {
 
 void ASTSourceFileScope::buildScopeTreeEagerly() {
   scopeCreator->beFreezing();
+  // Eagerly expand any decls already in the tree.
+  preOrderDo([&](ASTScopeImpl *s) { s->reexpandIfObsolete(*scopeCreator); });
   addNewDeclsToScopeTree();
   scopeCreator->beFrozen();
 }
 
 void ASTSourceFileScope::addNewDeclsToScopeTree() {
   assert(SF && scopeCreator);
-  if (!scopeCreator->getIsFreezing() || SF->getFilename().endswith("swift"));
-  else {
-  llvm::errs() << "HERE";
-}
   ArrayRef<Decl *> decls = SF->Decls;
   // Assume that decls are only added at the end, in source order
   ArrayRef<Decl *> newDecls = decls.slice(numberOfDeclsAlreadySeen);
@@ -1727,7 +1725,9 @@ void IterableTypeScope::expandBody(ScopeCreator &scopeCreator) {
 #pragma mark - reexpandIfObsolete
 
 bool ASTScopeImpl::reexpandIfObsolete(ScopeCreator &scopeCreator) {
-  if (scopeCreator.getIsFrozen() || (isCurrent() && !scopeCreator.ctx.LangOpts.StressASTScopeLookup))
+  if (scopeCreator.getIsFrozen() ||
+      (isCurrent() &&
+       !scopeCreator.getASTContext().LangOpts.StressASTScopeLookup))
     return false;
   reexpand(scopeCreator);
   return true;
