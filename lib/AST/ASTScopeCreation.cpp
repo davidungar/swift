@@ -739,6 +739,10 @@ void ASTSourceFileScope::buildScopeTreeEagerly() {
 
 void ASTSourceFileScope::addNewDeclsToScopeTree() {
   assert(SF && scopeCreator);
+  if (!scopeCreator->getIsFreezing() || SF->getFilename().endswith("swift"));
+  else {
+  llvm::errs() << "HERE";
+}
   ArrayRef<Decl *> decls = SF->Decls;
   // Assume that decls are only added at the end, in source order
   ArrayRef<Decl *> newDecls = decls.slice(numberOfDeclsAlreadySeen);

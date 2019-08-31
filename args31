@@ -1,0 +1,160 @@
+ \
+  -frontend \
+  -c \
+  -filelist /Users/ungar/filelist31 \
+  -supplementary-output-file-map /Users/ungar/suppfilemap31 \
+  -target x86_64-apple-ios11.0-simulator \
+  -enable-objc-interop \
+  -sdk /Applications/XcodeInt.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator13.0.sdk \
+  -I /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/1PasswordExtension \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/Apollo \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/AppAuth \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/Bolts \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/Braintree \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/Branch \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/Bugsnag \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/CocoaAsyncSocket \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/CocoaLumberjack \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/FBSDKCoreKit \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/FBSDKLoginKit \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/FBSDKShareKit \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/KSReachability \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/Mantle \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/PromiseKit \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/RNSVG \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/React \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/ReactNativePermissions \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/RxSwift \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/SDWebImage \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/SQLite.swift \
+ \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/Sift \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/Starscream \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/TMCache \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/Yoga \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/ios-ntp \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/libPhoneNumber-iOS \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/mParticle-Apple-SDK \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/react-native-blur \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/react-native-contacts \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/react-native-image-picker \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/react-native-video \
+  -F /Users/ungar/repos/airbnb/skylodge-sources/apps2/ios/vendor \
+  -F /Users/ungar/repos/airbnb/skylodge-sources/apps2/ios/vendor/AlipaySDK \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/1PasswordExtension \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/Apollo \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/AppAuth \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/Bolts \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/Braintree \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/Branch \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/Bugsnag \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/CocoaAsyncSocket \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/CocoaLumberjack \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/FBSDKCoreKit \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/FBSDKLoginKit \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/FBSDKShareKit \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/KSReachability \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/Mantle \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/PromiseKit \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/RNSVG \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/React \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/ReactNativePermissions \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/RxSwift \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/SDWebImage \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/SQLite.swift \
+ \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/Sift \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/Starscream \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/TMCache \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/Yoga \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/ios-ntp \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/libPhoneNumber-iOS \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/mParticle-Apple-SDK \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/react-native-blur \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/react-native-contacts \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/react-native-image-picker \
+  -F /Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/react-native-video \
+  -F /Users/ungar/repos/airbnb/skylodge-sources/apps2/ios/vendor \
+  -F /Users/ungar/repos/airbnb/skylodge-sources/apps2/ios/vendor/AlipaySDK \
+  -F /Users/ungar/repos/airbnb/skylodge-sources/apps2/ios/vendor/WeChatSDK \
+  -F /Users/ungar/repos/airbnb/skylodge-sources/apps2/ios/vendor/du \
+  -enable-testing \
+  -g \
+  -module-cache-path /Users/ungar/repos/airbnb/derivedData/ModuleCache.noindex \
+  -profile-generate \
+  -profile-coverage-mapping \
+  -swift-version 4.2 \
+  -enforce-exclusivity=checked \
+  -stats-output-dir AST30D \
+  -trace-stats-events \
+  -Onone \
+  -serialize-debugging-options \
+  -enable-anonymous-context-mangled-names \
+  -Xcc \
+  -I/Users/ungar/repos/airbnb/derivedData/Build/Intermediates.noindex/Airbnb.build/Debug-iphonesimulator/Airbnb.build/swift-overrides.hmap \
+  -Xcc \
+  -iquote \
+  -Xcc /Users/ungar/repos/airbnb/derivedData/Build/Intermediates.noindex/Airbnb.build/Debug-iphonesimulator/Airbnb.build/Airbnb-generated-files.hmap \
+  -Xcc \
+  -I/Users/ungar/repos/airbnb/derivedData/Build/Intermediates.noindex/Airbnb.build/Debug-iphonesimulator/Airbnb.build/Airbnb-own-target-headers.hmap \
+  -Xcc \
+  -I/Users/ungar/repos/airbnb/derivedData/Build/Intermediates.noindex/Airbnb.build/Debug-iphonesimulator/Airbnb.build/Airbnb-all-non-framework-target-headers.hmap \
+  -Xcc \
+  -ivfsoverlay \
+  -Xcc /Users/ungar/repos/airbnb/derivedData/Build/Intermediates.noindex/Airbnb.build/Debug-iphonesimulator/Airbnb.build/all-product-headers.yaml \
+  -Xcc \
+  -iquote \
+  -Xcc /Users/ungar/repos/airbnb/derivedData/Build/Intermediates.noindex/Airbnb.build/Debug-iphonesimulator/Airbnb.build/Airbnb-project-headers.hmap \
+  -Xcc \
+  -I/Users/ungar/repos/airbnb/derivedData/Build/Products/Debug-iphonesimulator/include \
+  -Xcc \
+  -I/Users/ungar/repos/airbnb/skylodge-sources/apps2/ios/Pods/Headers/Public \
+  -Xcc \
+  -I/Users/ungar/repos/airbnb/skylodge-sources/apps2/ios/Pods/Headers/Public/EarlGrey \
+  -Xcc \
+  -I/Users/ungar/repos/airbnb/skylodge-sources/apps2/ios/Pods/Headers/Public/SwiftFormat \
+  -Xcc \
+  -I/Users/ungar/repos/airbnb/skylodge-sources/apps2/ios/Pods/Headers/Public/SwiftGen \
+  -Xcc \
+  -I/Users/ungar/repos/airbnb/skylodge-sources/apps2/ios/lib \
+  -Xcc \
+  -I/Users/ungar/repos/airbnb/skylodge-sources/apps2/ios/vendor \
+  -Xcc \
+  -I/Users/ungar/repos/airbnb/skylodge-sources/apps2/ios/ReactNative/node_modules/react-native/Libraries/LinkingIOS \
+  -Xcc \
+  -I/Users/ungar/repos/airbnb/skylodge-sources/apps2/react-native/node_modules/react-native-code-push/ios \
+  -Xcc \
+  -I/Users/ungar/repos/airbnb/skylodge-sources/apps2/ios/Pods/Headers/Public \
+  -Xcc \
+  -I/Users/ungar/repos/airbnb/skylodge-sources/apps2/ios/Pods/Headers/Public/EarlGrey \
+  -Xcc \
+  -I/Users/ungar/repos/airbnb/skylodge-sources/apps2/ios/Pods/Headers/Public/SwiftFormat \
+  -Xcc \
+  -I/Users/ungar/repos/airbnb/skylodge-sources/apps2/ios/Pods/Headers/Public/SwiftGen \
+  -Xcc \
+  -I/Users/ungar/repos/airbnb/skylodge-sources/apps2/ios/lib \
+  -Xcc \
+  -I/Users/ungar/repos/airbnb/skylodge-sources/apps2/ios/vendor \
+  -Xcc \
+  -I/Users/ungar/repos/airbnb/skylodge-sources/apps2/ios/ReactNative/node_modules/react-native/Libraries/LinkingIOS \
+  -Xcc \
+  -I/Users/ungar/repos/airbnb/skylodge-sources/apps2/react-native/node_modules/react-native-code-push/ios \
+  -Xcc \
+  -I/Users/ungar/repos/airbnb/derivedData/Build/Intermediates.noindex/Airbnb.build/Debug-iphonesimulator/Airbnb.build/DerivedSources-normal/x86_64 \
+  -Xcc \
+  -I/Users/ungar/repos/airbnb/derivedData/Build/Intermediates.noindex/Airbnb.build/Debug-iphonesimulator/Airbnb.build/DerivedSources/x86_64 \
+  -Xcc \
+  -I/Users/ungar/repos/airbnb/derivedData/Build/Intermediates.noindex/Airbnb.build/Debug-iphonesimulator/Airbnb.build/DerivedSources \
+  -Xcc \
+  -DCONFIGURATION_Debug \
+  -Xcc \
+  -DDEBUG \
+  -Xcc \
+  -working-directory/Users/ungar/repos/airbnb/skylodge-sources/apps2/ios \
+  -module-name Airbnb \
+  -num-threads 20 \
+  -output-filelist /var/folders/x5/1mc0d6ns7fzc987kv2f_yl880000gn/T/outputs-7b772e \
+  -index-store-path /Users/ungar/repos/airbnb/derivedData/Index/DataStore \
+  -index-system-modules

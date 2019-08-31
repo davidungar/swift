@@ -397,7 +397,7 @@ static void insertPrecedenceGroupDecl(NameBinder &binder, SourceFile &SF,
 /// unresolved type names as well. This handles import directives and forward
 /// references.
 void swift::performNameBinding(SourceFile &SF, unsigned StartElem) {
-  SharedTimer timer("Name binding");
+  // SharedTimer timer("Name binding");
   // Make sure we skip adding the standard library imports if the
   // source file is empty.
   if (SF.ASTStage == SourceFile::NameBound || SF.Decls.empty()) {
