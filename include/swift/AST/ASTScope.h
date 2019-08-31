@@ -324,7 +324,7 @@ private:
   /// false if lazyiness couild miss lookups.
   bool checkLazySourceRange() const;
 
-protected:
+public:
   /// Some scopes can be expanded lazily.
   /// Such scopes must: not change their source ranges after expansion, and
   /// their expansion must return an insertion point outside themselves.
@@ -1007,6 +1007,10 @@ protected:
                              DeclConsumer) const override;
   Optional<bool>
   resolveIsCascadingUseForThisScope(Optional<bool>) const override;
+
+public:
+  NullablePtr<ASTScopeImpl> insertionPointForDeferredExpansion() override;
+  SourceRange sourceRangeForDeferredExpansion() const override;
 };
 
 /// Body of methods, functions in types.
