@@ -169,8 +169,9 @@ public:
   /// Because type checking can mutate the AST, eagerly build the tree, then
   /// freeze it
   enum class Temperature {
-    Warm,  // Can be lazy
-    Frozen // Done!
+    Warm,     // Can be lazy
+    Freezing, // Should expand everything eagerly
+    Frozen    // No more changes, except when Decls are added to the source file
   };
 
 private:
@@ -182,7 +183,9 @@ public:
   ASTSourceFileScope *const sourceFileScope;
   ASTContext &getASTContext() const { return ctx; }
   bool getIsFrozen() const { return temperature == Temperature::Frozen; }
-  void freeze() { temperature = Temperature::Frozen; }
+  bool getIsFreezing() const { return temperature == Temperature::Freezing; }
+  void beFreezing() { temperature = Temperature::Freezing; }
+  void beFrozen() { temperature = Temperature::Frozen; }
 
   /// The AST can have duplicate nodes, and we don't want to create scopes for
   /// those.
@@ -622,7 +625,9 @@ public:
     return !n.isDecl(DeclKind::Var);
   }
 
-  bool shouldBeLazy() const { return ctx.LangOpts.LazyASTScopes; }
+  bool shouldBeLazy() const {
+    return !getIsFreezing() && ctx.LangOpts.LazyASTScopes;
+  }
 
 public:
   /// For debugging. Return true if scope tree contains all the decl contexts in
@@ -725,10 +730,9 @@ ASTSourceFileScope *ASTScope::createScopeTree(SourceFile *SF) {
 }
 
 void ASTSourceFileScope::buildScopeTreeEagerly() {
-  assert(!scopeCreator->getIsFrozen());
+  scopeCreator->beFreezing();
   addNewDeclsToScopeTree();
-  preOrderDo([&](ASTScopeImpl *s) { s->reexpandIfObsolete(*scopeCreator); });
-  scopeCreator->freeze();
+  scopeCreator->beFrozen();
 }
 
 void ASTSourceFileScope::addNewDeclsToScopeTree() {
