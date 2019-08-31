@@ -564,7 +564,11 @@ SourceRange IterableTypeScope::sourceRangeForDeferredExpansion() const {
   return portion->sourceRangeForDeferredExpansion(this);
 }
 SourceRange AbstractFunctionBodyScope::sourceRangeForDeferredExpansion() const {
-  return getSourceRangeOfThisASTNode();
+  const auto bsr = decl->getBodySourceRange();
+  const SourceLoc endEvenIfNoCloseBraceAndEndsWithInterpolatedStringLiteral =
+      getLocEncompassingPotentialLookups(getSourceManager(), bsr.End);
+  return SourceRange(bsr.Start,
+                     endEvenIfNoCloseBraceAndEndsWithInterpolatedStringLiteral);
 }
 SourceRange
 Portion::sourceRangeForDeferredExpansion(const IterableTypeScope *) const {
