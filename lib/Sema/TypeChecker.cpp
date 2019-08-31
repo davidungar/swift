@@ -359,7 +359,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     return;
 
   // Eagerly build a scope tree before type checking
-  // Because type-checking mutates the AST and that throws off the scope-based
+  // because type-checking mutates the AST and that throws off the scope-based
   // lookups.
   SF.getScope().buildScopeTreeEagerly();
 
