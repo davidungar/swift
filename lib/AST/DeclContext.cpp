@@ -819,6 +819,12 @@ bool IterableDeclContext::hasUnparsedMembers() const {
   return true;
 }
 
+unsigned IterableDeclContext::getMemberCount() const {
+  if (hasUnparsedMembers())
+    loadAllMembers();
+  return MemberCount;
+}
+
 void IterableDeclContext::loadAllMembers() const {
   ASTContext &ctx = getASTContext();
 

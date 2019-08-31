@@ -736,10 +736,7 @@ class IterableTypeScope : public GenericTypeScope {
   /// Because of \c parseDelayedDecl members can get added after the tree is
   /// constructed, and they can be out of order. Detect this happening by
   /// remembering the member count.
-  ///
-  /// Also, now that members are parsed lazily, ensure that we call getMembers
-  /// at least once. Do this by initializing to an invalid value.
-  unsigned memberCount = ~0;
+  unsigned memberCount = 0;
 
 public:
   IterableTypeScope(const Portion *p) : GenericTypeScope(p) {}
