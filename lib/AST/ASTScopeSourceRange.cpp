@@ -69,12 +69,12 @@ ASTScopeImpl::widenSourceRangeForChildren(const SourceRange range,
   return r;
 }
 
-bool ASTScopeImpl::checkSourceRangeAfterExpansion() const {
+bool ASTScopeImpl::checkSourceRangeAfterExpansion(const ASTContext &ctx) const {
   assert((getSourceRangeOfThisASTNode().isValid() || !getChildren().empty()) &&
          "need to be able to find source range");
   assert(verifyThatChildrenAreContainedWithin(getSourceRangeOfScope()) &&
          "Search will fail");
-  assert(checkLazySourceRange() &&
+  assert(checkLazySourceRange(ctx) &&
          "Lazy scopes must have compatible ranges before and after expansion");
 
   return true;
@@ -485,8 +485,8 @@ void ASTScopeImpl::computeAndCacheSourceRangeOfScope(
   cachedSourceRange = computeSourceRangeOfScope(omitAssertions);
 }
 
-bool ASTScopeImpl::checkLazySourceRange() const {
-  if (!getASTContext().LangOpts.LazyASTScopes)
+bool ASTScopeImpl::checkLazySourceRange(const ASTContext &ctx) const {
+  if (!ctx.LangOpts.LazyASTScopes)
     return true;
   const auto unexpandedRange = sourceRangeForDeferredExpansion();
   const auto expandedRange = computeSourceRangeOfScopeWithChildASTNodes();

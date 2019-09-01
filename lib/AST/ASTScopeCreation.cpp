@@ -1092,7 +1092,7 @@ ASTScopeImpl *ASTScopeImpl::expandAndBeCurrent(ScopeCreator &scopeCreator) {
   }
   beCurrent();
   setChildrenCountWhenLastExpanded();
-  assert(checkSourceRangeAfterExpansion());
+  assert(checkSourceRangeAfterExpansion(scopeCreator.getASTContext()));
   return insertionPoint;
 }
 
