@@ -582,7 +582,7 @@ MagicIdentifierLiteralExpr::Kind ASTGen::getMagicIdentifierLiteralKind(tok Kind)
 }
 
 ValueDecl *ASTGen::lookupInScope(DeclName Name) {
-  return Context.LangOpts.EnableASTScopeLookup
+  return Context.LangOpts.EnableASTScopeLookup && Context.LangOpts.DisableParserLookup
              ? nullptr
              : (*ParserState)->getScopeInfo().lookupValueName(Name);
 }

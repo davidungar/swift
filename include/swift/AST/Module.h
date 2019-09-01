@@ -1243,6 +1243,8 @@ public:
 
   bool canBeParsedInFull() const;
 
+  bool isSuitableForASTScopes() const { return canBeParsedInFull(); }
+
   syntax::SourceFileSyntax getSyntaxRoot() const;
   void setSyntaxRoot(syntax::SourceFileSyntax &&Root);
   bool hasSyntaxRoot() const;
