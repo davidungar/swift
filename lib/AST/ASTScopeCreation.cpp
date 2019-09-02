@@ -1066,6 +1066,9 @@ void ASTScopeImpl::addChild(ASTScopeImpl *child, ASTContext &ctx) {
   assert(!child->getParent() && "child should not already have parent");
   child->parent = this;
   clearCachedSourceRangesOfMeAndAncestors();
+  // When adding a ProtocolDecl, createGenericParamsIfMissing() can call back into this tree.
+  // So make sure childrenCountWhenLastExpanded is up to date.
+  setChildrenCountWhenLastExpanded();
 }
 
 void ASTScopeImpl::removeChildren() {
@@ -1091,7 +1094,6 @@ ASTScopeImpl *ASTScopeImpl::expandAndBeCurrent(ScopeCreator &scopeCreator) {
            insertionPointForDeferredExpansion().get() == insertionPoint);
   }
   beCurrent();
-  setChildrenCountWhenLastExpanded();
   assert(checkSourceRangeAfterExpansion(scopeCreator.getASTContext()));
   return insertionPoint;
 }
