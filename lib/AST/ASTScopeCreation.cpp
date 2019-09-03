@@ -1505,25 +1505,30 @@ void AttachedPropertyWrapperScope::
 
 ASTScopeImpl *GenericTypeOrExtensionWholePortion::expandScope(
     GenericTypeOrExtensionScope *scope, ScopeCreator &scopeCreator) const {
+  // Get now in case recursion emancipates scope
+  auto *const ip = scope->getParent().get();
+  
   // Prevent circular request bugs caused by illegal input and
   // doing lookups that getExtendedNominal in the midst of getExtendedNominal.
   // rdar://53972776
   if (scope->shouldHaveABody() && !scope->doesDeclHaveABody())
-    return scope->getParent().get();
+    return ip;
 
   auto *deepestScope = scopeCreator.addNestedGenericParamScopesToTree(
       scope->getDecl(), scope->getGenericContext()->getGenericParams(), scope);
   if (scope->getGenericContext()->getTrailingWhereClause())
     scope->createTrailingWhereClauseScope(deepestScope, scopeCreator);
   scope->createBodyScope(deepestScope, scopeCreator);
-  return scope->getParent().get();
+  return ip;
 }
 
 ASTScopeImpl *
 IterableTypeBodyPortion::expandScope(GenericTypeOrExtensionScope *scope,
                                      ScopeCreator &scopeCreator) const {
+  // Get it now in case of recursion and this one gets emancipated
+  auto *const ip = scope->getParent().get();
   scope->expandBody(scopeCreator);
-  return scope->getParent().get();
+  return ip;
 }
 
 ASTScopeImpl *GenericTypeOrExtensionWherePortion::expandScope(
