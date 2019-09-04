@@ -306,7 +306,9 @@ TypeRepr *ASTGen::generate(CompositionTypeSyntax Type, SourceLoc &Loc) {
 
   auto FirstTypeLoc = advanceLocBegin(Loc, FirstElem);
   auto FirstAmpersandLoc = advanceLocBegin(Loc, *FirstElem.getAmpersand());
-  auto LastTypeLoc = advanceLocBegin(Loc, LastElem);
+  // Use the end loc, not the start of the last type, for ASTScope lookup
+  // so that the source range encompasses all names that might be looked up.
+  auto LastTypeLoc = ElemTypes.back()->getEndLoc();
   return CompositionTypeRepr::create(Context, ElemTypes, FirstTypeLoc,
                                      {FirstAmpersandLoc, LastTypeLoc});
 }
@@ -582,7 +584,8 @@ MagicIdentifierLiteralExpr::Kind ASTGen::getMagicIdentifierLiteralKind(tok Kind)
 }
 
 ValueDecl *ASTGen::lookupInScope(DeclName Name) {
-  return Context.LangOpts.EnableASTScopeLookup
+  return Context.LangOpts.EnableASTScopeLookup &&
+                 Context.LangOpts.DisableParserLookup
              ? nullptr
              : (*ParserState)->getScopeInfo().lookupValueName(Name);
 }
