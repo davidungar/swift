@@ -306,7 +306,9 @@ TypeRepr *ASTGen::generate(CompositionTypeSyntax Type, SourceLoc &Loc) {
 
   auto FirstTypeLoc = advanceLocBegin(Loc, FirstElem);
   auto FirstAmpersandLoc = advanceLocBegin(Loc, *FirstElem.getAmpersand());
-  auto LastTypeLoc = advanceLocBegin(Loc, LastElem);
+  // Use the end loc, not the start of the last type, for ASTScope lookup
+  //  auto LastTypeLoc = advanceLocBegin(Loc, LastElem);
+  auto LastTypeLoc = ElemTypes.back()->getEndLoc();
   return CompositionTypeRepr::create(Context, ElemTypes, FirstTypeLoc,
                                      {FirstAmpersandLoc, LastTypeLoc});
 }
