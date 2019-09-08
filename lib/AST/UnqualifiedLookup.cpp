@@ -326,10 +326,10 @@ namespace {
     /// them back as a last-ditch effort.
     /// Could be cleaner someday with a richer interface to UnqualifiedLookup.
     void setAsideUnavailableResults(size_t firstPossiblyUnavailableResult);
-    
+
     void recordDependencyOnTopLevelName(DeclContext *topLevelContext,
-                                        DeclName name, bool isCascadingUse);
-    
+                                        bool isCascadingUse);
+
     void addImportedResults(DeclContext *const dc);
     
     void addNamesKnownToDebugClient(DeclContext *dc);
@@ -590,7 +590,7 @@ void UnqualifiedLookupFactory::lookupInModuleScopeContext(
   ifNotDoneYet([&] {
     // If no result has been found yet, the dependency must be on a top-level
     // name, since up to now, the search has been for non-top-level names.
-    recordDependencyOnTopLevelName(dc, Name, isCascadingUse.getValueOr(true));
+    recordDependencyOnTopLevelName(dc, isCascadingUse.getValueOr(true));
     lookUpTopLevelNamesInModuleScopeContext(dc);
   });
 }
@@ -956,9 +956,8 @@ void UnqualifiedLookupFactory::setAsideUnavailableResults(
   filterForDiscriminator(Results, DebugClient);
 }
 
-
 void UnqualifiedLookupFactory::recordDependencyOnTopLevelName(
-    DeclContext *topLevelContext, DeclName name, bool isCascadingUse) {
+    DeclContext *topLevelContext, bool isCascadingUse) {
   recordLookupOfTopLevelName(topLevelContext, Name, isCascadingUse);
   recordedSF = dyn_cast<SourceFile>(topLevelContext);
   recordedIsCascadingUse = isCascadingUse;
@@ -1121,7 +1120,7 @@ void UnqualifiedLookupFactory::experimentallyLookInASTScopes() {
     const Optional<bool> isCascadingUseAfterLookup =
         ASTScope::computeIsCascadingUse(history, isCascadingUseAtStartOfLookup);
 
-    recordDependencyOnTopLevelName(moduleScopeContext, Name,
+    recordDependencyOnTopLevelName(moduleScopeContext,
                                    isCascadingUseAfterLookup.getValueOr(true));
     lookUpTopLevelNamesInModuleScopeContext(moduleScopeContext);
   });
