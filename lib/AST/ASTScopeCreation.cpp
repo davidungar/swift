@@ -1507,7 +1507,7 @@ ASTScopeImpl *GenericTypeOrExtensionWholePortion::expandScope(
   // rdar://53972776
   if (scope->shouldHaveABody() && !scope->doesDeclHaveABody())
     return ip;
-
+llvm::errs() << "HERE " << (void*)scope->getGenericContext() <<  " " << isa<ProtocolDecl>(scope->getDecl()) << "\n";
   auto *deepestScope = scopeCreator.addNestedGenericParamScopesToTree(
       scope->getDecl(), scope->getGenericContext()->getGenericParams(), scope);
   if (scope->getGenericContext()->getTrailingWhereClause())
