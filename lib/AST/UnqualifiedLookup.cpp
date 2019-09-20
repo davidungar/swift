@@ -472,7 +472,6 @@ UnqualifiedLookupFactory::UnqualifiedLookupFactory(
 void UnqualifiedLookupFactory::performUnqualifiedLookup() {
 #ifndef NDEBUG
   ++lookupCounter;
-  stopForDebuggingIfStartingTargetLookup(false);
 #endif
   FrontendStatsTracer StatsTracer(Ctx.Stats, "performUnqualifedLookup",
                                   DC->getParentSourceFile());
@@ -492,6 +491,7 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
     return;
   }
 
+  stopForDebuggingIfStartingTargetLookup(false);
   if (Name.isOperator())
     lookupOperatorInDeclContexts(contextAndIsCascadingUse);
   else
