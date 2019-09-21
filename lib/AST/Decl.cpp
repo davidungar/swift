@@ -819,6 +819,16 @@ ArrayRef<Requirement> GenericContext::getGenericRequirements() const {
 }
 
 void GenericContext::setGenericParams(GenericParamList *params) {
+    {
+      if (auto *ED = dyn_cast<ExtensionDecl>(getAsDecl())) {
+        const auto &SM = ED->getASTContext().SourceMgr;
+        const auto loc = ED->getStartLoc();
+        if (loc.isValid() && SM.getLineNumber(loc) == 137 &&
+            SM.getIdentifierForBuffer(SM.findBufferContainingLoc(loc)).endswith("Algorithm.swift")) {
+        llvm::errs() << "HERE GOT\n";
+        }
+      }
+    }
   GenericParams = params;
 
   if (GenericParams) {
@@ -1186,6 +1196,16 @@ static GenericParamList *
 createExtensionGenericParams(ASTContext &ctx,
                              ExtensionDecl *ext,
                              NominalTypeDecl *nominal) {
+ {
+    if (auto *ED = ext) {
+      const auto &SM = ED->getASTContext().SourceMgr;
+      const auto loc = ED->getStartLoc();
+      if (loc.isValid() && SM.getLineNumber(loc) == 137 &&
+          SM.getIdentifierForBuffer(SM.findBufferContainingLoc(loc)).endswith("Algorithm.swift")) {
+      llvm::errs() << "HERE GOT\n";
+      }
+    }
+  }
   // Collect generic parameters from all outer contexts.
   SmallVector<GenericParamList *, 2> allGenericParams;
   nominal->forEachGenericContext([&](GenericParamList *gpList) {

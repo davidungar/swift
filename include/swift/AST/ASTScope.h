@@ -218,6 +218,10 @@ public:
   /// For debugging
   bool doesRangeMatch(unsigned start, unsigned end, StringRef file = "",
                       StringRef className = "");
+  template <typename T>
+  static bool doesRangeableRangeMatch(const T *x, const SourceManager &SM,
+                                      unsigned start, unsigned end,
+                                      StringRef file = "");
 
 private:
   SourceRange computeSourceRangeOfScope(bool omitAssertions = false) const;
@@ -237,6 +241,8 @@ private:
   /// optimization.
   SourceRange widenSourceRangeForChildren(SourceRange range,
                                           bool omitAssertions) const;
+
+                                          
 
   /// Even ASTNodes that do not form scopes must be included in a Scope's source
   /// range. Widen the source range of the receiver to include the (ignored)

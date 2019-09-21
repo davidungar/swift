@@ -40,6 +40,13 @@ llvm::SmallVector<const ASTScopeImpl *, 0> ASTScopeImpl::unqualifiedLookup(
     const DeclContext *const startingContext, DeclConsumer consumer) {
   SmallVector<const ASTScopeImpl *, 0> history;
 
+ {
+    const auto &SM = sourceFile->getASTContext().SourceMgr;
+    auto lc = SM.getLineAndColumn(loc);
+    if (lc.first == 139 && lc.second == 53 && sourceFile->getFilename().endswith("Algorithm.swift"))
+      llvm::errs() << "HERE\n";
+  }
+
   const auto *start =
       findStartingScopeForLookup(sourceFile, name, loc, startingContext);
   if (start)
@@ -194,6 +201,17 @@ void ASTScopeImpl::lookup(SmallVectorImpl<const ASTScopeImpl *> &history,
                           const NullablePtr<const ASTScopeImpl> limit,
                           NullablePtr<const GenericParamList> lastListSearched,
                           DeclConsumer consumer) const {
+  {
+    if (auto *D = getDeclIfAny().getPtrOrNull()) {
+      if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+        const auto &SM = getSourceManager();
+        if (doesRangeableRangeMatch(ED, SM, 137, 152, "Algorithm.swift")) {
+          auto *x = ED->getGenericParams();
+          auto *y = ED->getGenericParams();
+        }
+      }
+    }
+  }
 
   history.push_back(this);
 

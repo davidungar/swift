@@ -94,10 +94,11 @@ static void dumpRangeable(SpecializeAttr *r, llvm::raw_ostream &f) {
 }
 
 /// For Debugging
+/// For Debugging
 template <typename T>
-bool doesRangeableRangeMatch(const T *x, const SourceManager &SM,
-                             unsigned start, unsigned end,
-                             StringRef file = "") {
+bool ASTScopeImpl::doesRangeableRangeMatch(const T *x, const SourceManager &SM,
+                                           unsigned start, unsigned end,
+                                           StringRef file) {
   auto const r = getRangeableSourceRange(x);
   if (r.isInvalid())
     return false;
@@ -110,6 +111,16 @@ bool doesRangeableRangeMatch(const T *x, const SourceManager &SM,
   const auto buf = SM.findBufferContainingLoc(r.Start);
   return SM.getIdentifierForBuffer(buf).endswith(file);
 }
+template bool ASTScopeImpl::doesRangeableRangeMatch<ExtensionDecl>(const ExtensionDecl *x, const SourceManager &SM,
+                                                          unsigned start, unsigned end,
+                                                          StringRef file);
+template bool ASTScopeImpl::doesRangeableRangeMatch<Expr>(const Expr *x, const SourceManager &SM,
+                                                          unsigned start, unsigned end,
+                                                          StringRef file);
+template bool ASTScopeImpl::doesRangeableRangeMatch<Stmt>(const Stmt *x, const SourceManager &SM,
+                                                          unsigned start, unsigned end,
+                                                          StringRef file);
+
 
 #pragma mark end of rangeable
 
