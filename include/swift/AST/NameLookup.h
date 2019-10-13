@@ -143,7 +143,7 @@ public:
   ///
   /// If the current DeclContext is nested in a function body, the SourceLoc
   /// is used to determine which declarations in that body are visible.
-  UnqualifiedLookup(DeclName Name, DeclContext *DC,
+  UnqualifiedLookup(const char* gazorp, DeclName Name, DeclContext *DC,
                     SourceLoc Loc = SourceLoc(), Options options = Options());
   
   using ResultsVector = SmallVector<LookupResultEntry, 4>;
@@ -600,7 +600,7 @@ public:
 
   /// \return the scopes traversed
   static llvm::SmallVector<const ast_scope::ASTScopeImpl *, 0>
-  unqualifiedLookup(SourceFile *, DeclName, SourceLoc,
+  unqualifiedLookup(const char* gazorp, SourceFile *, DeclName, SourceLoc,
                     const DeclContext *startingContext,
                     namelookup::AbstractASTScopeDeclConsumer &);
 

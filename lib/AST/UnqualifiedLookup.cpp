@@ -216,7 +216,7 @@ namespace {
                              size_t &IndexOfFirstOuterResult);
     // clang-format on
     
-    void performUnqualifiedLookup();
+    void performUnqualifiedLookup(const char* gazorp);
     
   private:
     struct ContextAndUnresolvedIsCascadingUse {
@@ -235,7 +235,7 @@ namespace {
 
     void lookUpTopLevelNamesInModuleScopeContext(DeclContext *);
 
-    void lookInASTScopes();
+    void lookInASTScopes(const char* gazorp);
 
     /// Can lookup stop searching for results, assuming hasn't looked for outer
     /// results yet?
@@ -470,7 +470,7 @@ UnqualifiedLookupFactory::UnqualifiedLookupFactory(
 {}
 // clang-format on
 
-void UnqualifiedLookupFactory::performUnqualifiedLookup() {
+void UnqualifiedLookupFactory::performUnqualifiedLookup(const char* gazorp) {
 #ifndef NDEBUG
   ++lookupCounter;
   auto localCounter = lookupCounter;
@@ -491,7 +491,7 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
       haveWarned = true;
       llvm::errs() << "WARNING: TRYING Scope exclusively\n";
     }
-    lookInASTScopes();
+    lookInASTScopes(gazorp);
   } else {
 #ifndef NDEBUG
     stopForDebuggingIfStartingTargetLookup(false);
@@ -509,7 +509,7 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
     UnqualifiedLookupFactory altLookup(Name, DC, Loc, options, results,
                                        indexOfFirstOuterResult);
     if (!useASTScopesForLookup())
-      altLookup.lookInASTScopes();
+      altLookup.lookInASTScopes(gazorp);
     else if (Name.isOperator())
       altLookup.lookupOperatorInDeclContexts(contextAndIsCascadingUse);
     else
@@ -1108,7 +1108,7 @@ UnqualifiedLookupFactory::ResultFinderForTypeContext::findSelfBounds(
 
 #pragma mark ASTScopeImpl support
 
-void UnqualifiedLookupFactory::lookInASTScopes() {
+void UnqualifiedLookupFactory::lookInASTScopes(const char* gazorp) {
 
   ASTScopeDeclConsumerForUnqualifiedLookup consumer(*this);
 
@@ -1116,7 +1116,7 @@ void UnqualifiedLookupFactory::lookInASTScopes() {
   stopForDebuggingIfStartingTargetLookup(true);
 #endif
 
-  const auto history = ASTScope::unqualifiedLookup(DC->getParentSourceFile(),
+  const auto history = ASTScope::unqualifiedLookup(gazorp, DC->getParentSourceFile(),
                                                    Name, Loc, DC, consumer);
 
   ifNotDoneYet([&] {
@@ -1202,7 +1202,7 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::lookInMembers(
 #pragma mark UnqualifiedLookup functions
 
 // clang-format off
-UnqualifiedLookup::UnqualifiedLookup(DeclName Name,
+UnqualifiedLookup::UnqualifiedLookup(const char* gazorp, DeclName Name,
                                      DeclContext *const DC,
                                      SourceLoc Loc,
                                      Options options)
@@ -1214,7 +1214,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name,
     stats->getFrontendCounters().NumUnqualifiedLookup++;
 
   UnqualifiedLookupFactory factory(Name, DC, Loc, options, *this);
-  factory.performUnqualifiedLookup();
+  factory.performUnqualifiedLookup(gazorp);
 }
 
 TypeDecl *UnqualifiedLookup::getSingleTypeResult() const {

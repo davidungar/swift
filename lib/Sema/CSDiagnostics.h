@@ -646,9 +646,10 @@ class AssignmentFailure final : public FailureDiagnostic {
   SourceLoc Loc;
   Diag<StringRef> DeclDiagnostic;
   Diag<Type> TypeDiagnostic;
+  const char* gazorp;
 
 public:
-  AssignmentFailure(Expr *destExpr, ConstraintSystem &cs,
+  AssignmentFailure(const char* gazorp, Expr *destExpr, ConstraintSystem &cs,
                     SourceLoc diagnosticLoc);
 
   AssignmentFailure(Expr *destExpr, ConstraintSystem &cs,

@@ -638,12 +638,13 @@ Expr *TypeChecker::buildAutoClosureExpr(DeclContext *DC, Expr *expr,
   return closure;
 }
 
-static Type lookupDefaultLiteralType(TypeChecker &TC, const DeclContext *dc,
+static Type lookupDefaultLiteralType(const char* gazorp, TypeChecker &TC, const DeclContext *dc,
                                      StringRef name) {
   auto lookupOptions = defaultUnqualifiedLookupOptions;
   if (isa<AbstractFunctionDecl>(dc))
     lookupOptions |= NameLookupFlags::KnownPrivate;
-  auto lookup = TC.lookupUnqualified(dc->getModuleScopeContext(),
+  auto lookup = TC.lookupUnqualified(gazorp,
+                                     dc->getModuleScopeContext(),
                                      TC.Context.getIdentifier(name),
                                      SourceLoc(),
                                      lookupOptions);
@@ -714,10 +715,10 @@ swift::DefaultTypeRequest::evaluate(Evaluator &evaluator,
 
   Type type;
   if (performLocalLookup)
-    type = lookupDefaultLiteralType(tc, dc, name);
+    type = lookupDefaultLiteralType("gazorp-DefaultTypeRequest", tc, dc, name);
 
   if (!type)
-    type = lookupDefaultLiteralType(tc, tc.getStdlibModule(dc), name);
+    type = lookupDefaultLiteralType("gazorp-DefaultTypeRequest", tc, tc.getStdlibModule(dc), name);
 
   // Strip off one level of sugar; we don't actually want to print
   // the name of the typealias itself anywhere.

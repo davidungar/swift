@@ -408,7 +408,7 @@ public:
 
   /// Entry point into ASTScopeImpl-land for lookups
   static llvm::SmallVector<const ASTScopeImpl *, 0>
-  unqualifiedLookup(SourceFile *, DeclName, SourceLoc,
+  unqualifiedLookup(const char* gazorp, SourceFile *, DeclName, SourceLoc,
                     const DeclContext *startingContext, DeclConsumer);
 
   static Optional<bool>

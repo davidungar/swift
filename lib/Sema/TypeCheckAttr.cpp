@@ -64,9 +64,10 @@ namespace {
 class AttributeChecker : public AttributeVisitor<AttributeChecker> {
   TypeChecker &TC;
   Decl *D;
+  const char* gazorp;
 
 public:
-  AttributeChecker(TypeChecker &TC, Decl *D) : TC(TC), D(D) {}
+  AttributeChecker(const char* gazorp, TypeChecker &TC, Decl *D) : TC(TC), D(D) {}
 
   /// This emits a diagnostic with a fixit to remove the attribute.
   template<typename ...ArgTypes>
@@ -1005,8 +1006,8 @@ void AttributeChecker::visitOptionalAttr(OptionalAttr *attr) {
   }
 }
 
-void TypeChecker::checkDeclAttributes(Decl *D) {
-  AttributeChecker Checker(*this, D);
+void TypeChecker::checkDeclAttributes(const char *gazorp, Decl *D) {
+  AttributeChecker Checker(gazorp, *this, D);
   for (auto attr : D->getAttrs()) {
     if (!attr->isValid()) continue;
 
@@ -2068,7 +2069,7 @@ void AttributeChecker::visitDiscardableResultAttr(DiscardableResultAttr *attr) {
 }
 
 /// Lookup the replaced decl in the replacments scope.
-void lookupReplacedDecl(DeclName replacedDeclName,
+void lookupReplacedDecl(const char *gazorp, DeclName replacedDeclName,
                         const DynamicReplacementAttr *attr,
                         const ValueDecl *replacement,
                         SmallVectorImpl<ValueDecl *> &results) {
@@ -2082,7 +2083,7 @@ void lookupReplacedDecl(DeclName replacedDeclName,
 
   auto *moduleScopeCtxt = declCtxt->getModuleScopeContext();
   if (isa<FileUnit>(declCtxt)) {
-    UnqualifiedLookup lookup(replacedDeclName, moduleScopeCtxt,
+    UnqualifiedLookup lookup(gazorp, replacedDeclName, moduleScopeCtxt,
                              attr->getLocation());
     if (lookup.isSuccess()) {
       for (auto entry : lookup.Results) {
@@ -2124,14 +2125,14 @@ static Type getDynamicComparisonType(ValueDecl *value) {
   return interfaceType->removeArgumentLabels(numArgumentLabels);
 }
 
-static FuncDecl *findReplacedAccessor(DeclName replacedVarName,
+static FuncDecl *findReplacedAccessor(const char *gazorp, DeclName replacedVarName,
                                       AccessorDecl *replacement,
                                       DynamicReplacementAttr *attr,
                                       TypeChecker &TC) {
 
   // Retrieve the replaced abstract storage decl.
   SmallVector<ValueDecl *, 4> results;
-  lookupReplacedDecl(replacedVarName, attr, replacement, results);
+  lookupReplacedDecl(gazorp, replacedVarName, attr, replacement, results);
 
   // Filter out any accessors that won't work.
   if (!results.empty()) {
@@ -2274,12 +2275,12 @@ findReplacedFunction(DeclName replacedFunctionName,
 }
 
 static AbstractStorageDecl *
-findReplacedStorageDecl(DeclName replacedFunctionName,
+findReplacedStorageDecl(const char* gazorp, DeclName replacedFunctionName,
                         const AbstractStorageDecl *replacement,
                         const DynamicReplacementAttr *attr) {
 
   SmallVector<ValueDecl *, 4> results;
-  lookupReplacedDecl(replacedFunctionName, attr, replacement, results);
+  lookupReplacedDecl(gazorp, replacedFunctionName, attr, replacement, results);
 
   for (auto *result : results) {
     // Check for static/instance mismatch.
@@ -2297,7 +2298,7 @@ findReplacedStorageDecl(DeclName replacedFunctionName,
   return nullptr;
 }
 
-ValueDecl *TypeChecker::findReplacedDynamicFunction(const ValueDecl *vd) {
+ValueDecl *TypeChecker::findReplacedDynamicFunction(const char* gazorp, const ValueDecl *vd) {
   assert(isa<AbstractFunctionDecl>(vd) || isa<AbstractStorageDecl>(vd));
   if (isa<AccessorDecl>(vd))
     return nullptr;
@@ -2316,7 +2317,7 @@ ValueDecl *TypeChecker::findReplacedDynamicFunction(const ValueDecl *vd) {
   auto *storageDecl = dyn_cast<AbstractStorageDecl>(vd);
   if (!storageDecl)
     return nullptr;
-  return findReplacedStorageDecl(attr->getReplacedFunctionName(), storageDecl, attr);
+  return findReplacedStorageDecl(gazorp, attr->getReplacedFunctionName(), storageDecl, attr);
 }
 
 void AttributeChecker::visitDynamicReplacementAttr(DynamicReplacementAttr *attr) {
@@ -2354,7 +2355,7 @@ void AttributeChecker::visitDynamicReplacementAttr(DynamicReplacementAttr *attr)
 
       // FIXME(InterfaceTypeRequest): Remove this.
       (void)accessor->getInterfaceType();
-       auto *orig = findReplacedAccessor(attr->getReplacedFunctionName(),
+       auto *orig = findReplacedAccessor(gazorp, attr->getReplacedFunctionName(),
                                          accessor, attr, TC);
        if (!orig)
          return;
@@ -2676,9 +2677,9 @@ AttributeChecker::visitImplementationOnlyAttr(ImplementationOnlyAttr *attr) {
   // it won't necessarily be able to say why.
 }
 
-void TypeChecker::checkParameterAttributes(ParameterList *params) {
+void TypeChecker::checkParameterAttributes(const char *gazorp, ParameterList *params) {
   for (auto param: *params) {
-    checkDeclAttributes(param);
+    checkDeclAttributes(gazorp, param);
   }
 }
 

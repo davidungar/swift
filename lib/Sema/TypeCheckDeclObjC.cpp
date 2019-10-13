@@ -1126,7 +1126,7 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(const ClassDecl *CD) {
 }
 
 /// Figure out if a declaration should be exported to Objective-C.
-Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
+Optional<ObjCReason> shouldMarkAsObjC(const char* gazorp, const ValueDecl *VD, bool allowImplicit) {
   // If Objective-C interoperability is disabled, nothing gets marked as @objc.
   if (!VD->getASTContext().LangOpts.EnableObjCInterop)
     return None;
@@ -1143,7 +1143,7 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
         if (replaced->isObjC())
           return ObjCReason(ObjCReason::ImplicitlyObjC);
       } else if (auto *replaced =
-                     TypeChecker::findReplacedDynamicFunction(VD)) {
+                     TypeChecker::findReplacedDynamicFunction(gazorp, VD)) {
         if (replaced->isObjC())
           return ObjCReason(ObjCReason::ImplicitlyObjC);
       }
@@ -1378,7 +1378,7 @@ static bool isEnumObjC(EnumDecl *enumDecl) {
 }
 
 /// Record that a declaration is @objc.
-static void markAsObjC(ValueDecl *D, ObjCReason reason,
+static void markAsObjC(const char* gazorp, ValueDecl *D, ObjCReason reason,
                        Optional<ForeignErrorConvention> errorConvention);
 
 
@@ -1388,14 +1388,14 @@ IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
   Optional<ObjCReason> isObjC;
   if (dc->getSelfClassDecl() && !isa<TypeDecl>(VD)) {
     // Members of classes can be @objc.
-    isObjC = shouldMarkAsObjC(VD, isa<ConstructorDecl>(VD));
+    isObjC = shouldMarkAsObjC(gazorp, VD, isa<ConstructorDecl>(VD));
   }
   else if (isa<ClassDecl>(VD)) {
     // Classes can be @objc.
 
     // Protocols and enums can also be @objc, but this is covered by the
     // isObjC() check a the beginning.;
-    isObjC = shouldMarkAsObjC(VD, /*allowImplicit=*/false);
+    isObjC = shouldMarkAsObjC(gazorp, VD, /*allowImplicit=*/false);
   } else if (auto enumDecl = dyn_cast<EnumDecl>(VD)) {
     // Enums can be @objc so long as they have a raw type that is representable
     // as an arithmetic type in C.
@@ -1429,7 +1429,7 @@ IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
     }
   } else if (isa<ProtocolDecl>(dc) && cast<ProtocolDecl>(dc)->isObjC()) {
     // Members of @objc protocols are @objc.
-    isObjC = shouldMarkAsObjC(VD, isa<ConstructorDecl>(VD));
+    isObjC = shouldMarkAsObjC(gazorp, VD, isa<ConstructorDecl>(VD));
   } else {
     // Cannot be @objc.
   }
@@ -1488,7 +1488,7 @@ IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
   }
 
   // Note that this declaration is exposed to Objective-C.
-  markAsObjC(VD, *isObjC, errorConvention);
+  markAsObjC("gazorp-IsObjCRequest", VD, *isObjC, errorConvention);
 
   return true;
 }

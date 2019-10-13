@@ -1016,9 +1016,9 @@ public:
   void typeCheckDecl(Decl *D);
 
   static void addImplicitDynamicAttribute(Decl *D);
-  void checkDeclAttributes(Decl *D);
-  void checkParameterAttributes(ParameterList *params);
-  static ValueDecl *findReplacedDynamicFunction(const ValueDecl *d);
+  void checkDeclAttributes(const char* gazorp, Decl *D);
+  void checkParameterAttributes(const char* gazorp, ParameterList *params);
+  static ValueDecl *findReplacedDynamicFunction(const char* gazorp, const ValueDecl *d);
 
   Type checkReferenceOwnershipAttr(VarDecl *D, Type interfaceType,
                                    ReferenceOwnershipAttr *attr);
@@ -1581,7 +1581,7 @@ public:
   /// \param name The name of the entity to look for.
   /// \param loc The source location at which name lookup occurs.
   /// \param options Options that control name lookup.
-  static LookupResult lookupUnqualified(DeclContext *dc, DeclName name,
+  static LookupResult lookupUnqualified(const char *gazorp, DeclContext *dc, DeclName name,
                                         SourceLoc loc,
                                         NameLookupOptions options
                                           = defaultUnqualifiedLookupOptions);
@@ -1594,7 +1594,7 @@ public:
   /// \param loc The source location at which name lookup occurs.
   /// \param options Options that control name lookup.
   LookupResult
-  static lookupUnqualifiedType(DeclContext *dc, DeclName name, SourceLoc loc,
+  static lookupUnqualifiedType(const char* gazorp, DeclContext *dc, DeclName name, SourceLoc loc,
                                NameLookupOptions options
                                  = defaultUnqualifiedLookupOptions);
 

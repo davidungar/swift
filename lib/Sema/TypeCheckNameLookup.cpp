@@ -264,10 +264,10 @@ convertToUnqualifiedLookupOptions(NameLookupOptions options) {
   return newOptions;
 }
 
-LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
+LookupResult TypeChecker::lookupUnqualified(const char *gazorp, DeclContext *dc, DeclName name,
                                             SourceLoc loc,
                                             NameLookupOptions options) {
-  UnqualifiedLookup lookup(name, dc, loc,
+  UnqualifiedLookup lookup(gazorp, name, dc, loc,
                            convertToUnqualifiedLookupOptions(options));
 
   LookupResult result;
@@ -294,14 +294,14 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
 }
 
 LookupResult
-TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
+TypeChecker::lookupUnqualifiedType(const char* gazorp, DeclContext *dc, DeclName name,
                                    SourceLoc loc,
                                    NameLookupOptions options) {
   auto ulOptions = convertToUnqualifiedLookupOptions(options) |
                    UnqualifiedLookup::Flags::TypeLookup;
   {
     // Try lookup without ProtocolMembers first.
-    UnqualifiedLookup lookup(
+    UnqualifiedLookup lookup(gazorp
         name, dc, loc,
         ulOptions - UnqualifiedLookup::Flags::AllowProtocolMembers);
 
@@ -317,7 +317,7 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
     // FIXME: Fix the problem where if NominalTypeDecl::getAllProtocols()
     // is called too early, we start resolving extensions -- even those
     // which do provide not conformances.
-    UnqualifiedLookup lookup(
+    UnqualifiedLookup lookup(gazorp,
         name, dc, loc,
         ulOptions | UnqualifiedLookup::Flags::AllowProtocolMembers);
 

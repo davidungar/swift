@@ -36,7 +36,7 @@ using namespace swift;
 using namespace namelookup;
 using namespace ast_scope;
 
-llvm::SmallVector<const ASTScopeImpl *, 0> ASTScopeImpl::unqualifiedLookup(
+llvm::SmallVector<const ASTScopeImpl *, 0> ASTScopeImpl::unqualifiedLookup(const char* gazorp,
     SourceFile *sourceFile, const DeclName name, const SourceLoc loc,
     const DeclContext *const startingContext, DeclConsumer consumer) {
   SmallVector<const ASTScopeImpl *, 0> history;

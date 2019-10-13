@@ -490,7 +490,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       }
     }
 
-    void checkUnqualifiedAccessUse(const DeclRefExpr *DRE) {
+    void checkUnqualifiedAccessUse(const char* gazorp, const DeclRefExpr *DRE) {
       const Decl *D = DRE->getDecl();
       if (!D->getAttrs().hasAttribute<WarnUnqualifiedAccessAttr>())
         return;
@@ -528,7 +528,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       }
 
       DeclContext *topLevelContext = DC->getModuleScopeContext();
-      UnqualifiedLookup lookup(VD->getBaseName(), topLevelContext,
+      UnqualifiedLookup lookup(gazorp, VD->getBaseName(), topLevelContext,
                                /*Loc=*/SourceLoc(),
                                UnqualifiedLookup::Flags::KnownPrivate);
 

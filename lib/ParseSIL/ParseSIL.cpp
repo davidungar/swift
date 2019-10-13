@@ -428,11 +428,11 @@ namespace {
       SmallVector<ValueDecl *, 4> values;
       return parseSILDottedPath(Decl, values);
     }
-    bool parseSILDottedPathWithoutPound(ValueDecl *&Decl,
+    bool parseSILDottedPathWithoutPound(const char* gazorp, ValueDecl *&Decl,
                                         SmallVectorImpl<ValueDecl *> &values);
-    bool parseSILDottedPathWithoutPound(ValueDecl *&Decl) {
+    bool parseSILDottedPathWithoutPound(const char* gazorp, ValueDecl *&Decl) {
       SmallVector<ValueDecl *, 4> values;
-      return parseSILDottedPathWithoutPound(Decl, values);
+      return parseSILDottedPathWithoutPound(gazorp, Decl, values);
     }
     /// At the time of calling this function, we may not have the type of the
     /// Decl yet. So we return a SILDeclRef on the first lookup result and also
@@ -1183,7 +1183,7 @@ bool SILParser::performTypeLocChecking(TypeLoc &T, bool IsSILType,
 
 /// Find the top-level ValueDecl or Module given a name.
 static llvm::PointerUnion<ValueDecl *, ModuleDecl *>
-lookupTopDecl(Parser &P, DeclBaseName Name, bool typeLookup) {
+lookupTopDecl(const char* gazorp, Parser &P, DeclBaseName Name, bool typeLookup) {
   // Use UnqualifiedLookup to look through all of the imports.
   // We have to lie and say we're done with parsing to make this happen.
   assert(P.SF.ASTStage == SourceFile::Parsing &&
@@ -1195,7 +1195,7 @@ lookupTopDecl(Parser &P, DeclBaseName Name, bool typeLookup) {
   if (typeLookup)
     options |= UnqualifiedLookup::Flags::TypeLookup;
 
-  UnqualifiedLookup DeclLookup(Name, &P.SF, SourceLoc(), options);
+  UnqualifiedLookup DeclLookup(gazorp, Name, &P.SF, SourceLoc(), options);
   assert(DeclLookup.isSuccess() && DeclLookup.Results.size() == 1);
   ValueDecl *VD = DeclLookup.Results.back().getValueDecl();
   return VD;
@@ -1346,7 +1346,7 @@ bool SILParser::parseSILDottedPath(ValueDecl *&Decl,
   return parseSILDottedPathWithoutPound(Decl, values);
 }
 
-bool SILParser::parseSILDottedPathWithoutPound(ValueDecl *&Decl,
+bool SILParser::parseSILDottedPathWithoutPound(const char* gazorp, ValueDecl *&Decl,
                                    SmallVectorImpl<ValueDecl *> &values) {
   // Handle sil-dotted-path.
   Identifier Id;
@@ -1379,6 +1379,7 @@ bool SILParser::parseSILDottedPathWithoutPound(ValueDecl *&Decl,
   // the first one must be a type declaration.
   ValueDecl *VD;
   llvm::PointerUnion<ValueDecl*, ModuleDecl *> Res = lookupTopDecl(
+  gazorp,
     P, FullName[0], /*typeLookup=*/FullName.size() > 1);
   // It is possible that the last member lookup can return multiple lookup
   // results. One example is the overloaded member functions.
@@ -5773,7 +5774,7 @@ bool SILParserTUState::parseSILProperty(Parser &P) {
 ///   '{' sil-vtable-entry* '}'
 /// sil-vtable-entry:
 ///   SILDeclRef ':' SILFunctionName
-bool SILParserTUState::parseSILVTable(Parser &P) {
+bool SILParser::parseSILDottedPathWithoutPound(const char* gazorp, Parser &P) {
   P.consumeToken(tok::kw_sil_vtable);
   SILParser VTableState(P);
 
@@ -5794,7 +5795,7 @@ bool SILParserTUState::parseSILVTable(Parser &P) {
 
   // Find the class decl.
   llvm::PointerUnion<ValueDecl*, ModuleDecl *> Res =
-    lookupTopDecl(P, Name, /*typeLookup=*/true);
+    lookupTopDecl(gazorp, P, Name, /*typeLookup=*/true);
   assert(Res.is<ValueDecl*>() && "Class look-up should return a Decl");
   ValueDecl *VD = Res.get<ValueDecl*>();
   if (!VD) {
@@ -5882,7 +5883,7 @@ static ProtocolDecl *parseProtocolDecl(Parser &P, SILParser &SP) {
 
   // Find the protocol decl. The protocol can be imported.
   llvm::PointerUnion<ValueDecl*, ModuleDecl *> Res =
-    lookupTopDecl(P, DeclName, /*typeLookup=*/true);
+    lookupTopDecl(gazorp, P, DeclName, /*typeLookup=*/true);
   assert(Res.is<ValueDecl*>() && "Protocol look-up should return a Decl");
   ValueDecl *VD = Res.get<ValueDecl*>();
   if (!VD) {

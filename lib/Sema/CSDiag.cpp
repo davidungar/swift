@@ -109,9 +109,10 @@ class FailureDiagnosis :public ASTVisitor<FailureDiagnosis, /*exprresult*/bool>{
   
   Expr *expr = nullptr;
   ConstraintSystem &CS;
+  const char* gazorp;
 
 public:
-  FailureDiagnosis(Expr *expr, ConstraintSystem &cs) : expr(expr), CS(cs) {
+  FailureDiagnosis(const char* gazorp, Expr *expr, ConstraintSystem &cs) : expr(expr), CS(cs) {
     assert(expr);
   }
 
@@ -1896,7 +1897,7 @@ static void emitFixItForExplicitlyQualifiedReference(
 
 void ConstraintSystem::diagnoseDeprecatedConditionalConformanceOuterAccess(
     UnresolvedDotExpr *UDE, ValueDecl *choice) {
-  auto result = TC.lookupUnqualified(DC, UDE->getName(), UDE->getLoc());
+  auto result = TC.lookupUnqualified("gazorp-diagnoseDeprecatedConditionalConformanceOuterAccess", DC, UDE->getName(), UDE->getLoc());
   assert(result && "names can't just disappear");
   // These should all come from the same place.
   auto exampleInner = result.front();
@@ -3496,7 +3497,7 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
     if (!isa<MemberRefExpr>(destExpr) || CS.getType(destExpr)
                                              ->lookThroughAllOptionalTypes()
                                              ->getAnyPointerElementType(ptk)) {
-      AssignmentFailure failure(destExpr, CS, assignExpr->getLoc());
+      AssignmentFailure failure(gazorp, destExpr, CS, assignExpr->getLoc());
       if (failure.diagnoseAsError())
         return true;
     }

@@ -1092,7 +1092,7 @@ public:
           ASTContext &ctx = CI.getASTContext();
           SourceFile &SF =
               MostRecentModule->getMainSourceFile(SourceFileKind::REPL);
-          UnqualifiedLookup lookup(ctx.getIdentifier(Tok.getText()), &SF);
+          UnqualifiedLookup lookup("gazorp-handleREPLInput", ctx.getIdentifier(Tok.getText()), &SF);
           for (auto result : lookup.Results) {
             printOrDumpDecl(result.getValueDecl(), doPrint);
               
