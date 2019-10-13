@@ -2096,7 +2096,7 @@ bool FailureDiagnosis::diagnoseImplicitSelfErrors(
   // For each of the parent contexts, let's try to find any candidates
   // which have the same name and the same number of arguments as callee.
   while (context->getParent()) {
-    auto result = TC.lookupUnqualified(context, UDE->getName(), UDE->getLoc());
+    auto result = TC.lookupUnqualified("gazorp-CSDiag::diagnoseImplicitWob", context, UDE->getName(), UDE->getLoc());
     context = context->getParent();
 
     if (!result || result.empty())

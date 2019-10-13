@@ -221,6 +221,7 @@ namespace {
   class SILParser {
     friend SILParserTUState;
   public:
+    const char* gazorp;
     Parser &P;
     SILModule &SILMod;
     SILParserTUState &TUState;
@@ -256,7 +257,7 @@ namespace {
                                    ConformanceContext context,
                                    ProtocolDecl *defaultForProto);
   public:
-    SILParser(Parser &P)
+    SILParser(const char* gazorp, Parser &P)
         : P(P), SILMod(static_cast<SILParserTUState *>(P.SIL)->M),
           TUState(*static_cast<SILParserTUState *>(P.SIL)),
           ParsedTypeCallback([](Type ty) {}) {}
@@ -428,11 +429,11 @@ namespace {
       SmallVector<ValueDecl *, 4> values;
       return parseSILDottedPath(Decl, values);
     }
-    bool parseSILDottedPathWithoutPound(const char* gazorp, ValueDecl *&Decl,
+    bool parseSILDottedPathWithoutPound(cValueDecl *&Decl,
                                         SmallVectorImpl<ValueDecl *> &values);
-    bool parseSILDottedPathWithoutPound(const char* gazorp, ValueDecl *&Decl) {
+    bool parseSILDottedPathWithoutPound(ValueDecl *&Decl) {
       SmallVector<ValueDecl *, 4> values;
-      return parseSILDottedPathWithoutPound(gazorp, Decl, values);
+      return parseSILDottedPathWithoutPound(Decl, values);
     }
     /// At the time of calling this function, we may not have the type of the
     /// Decl yet. So we return a SILDeclRef on the first lookup result and also
@@ -1346,7 +1347,7 @@ bool SILParser::parseSILDottedPath(ValueDecl *&Decl,
   return parseSILDottedPathWithoutPound(Decl, values);
 }
 
-bool SILParser::parseSILDottedPathWithoutPound(const char* gazorp, ValueDecl *&Decl,
+bool SILParser::parseSILDottedPathWithoutPound(ValueDecl *&Decl,
                                    SmallVectorImpl<ValueDecl *> &values) {
   // Handle sil-dotted-path.
   Identifier Id;
@@ -5774,9 +5775,9 @@ bool SILParserTUState::parseSILProperty(Parser &P) {
 ///   '{' sil-vtable-entry* '}'
 /// sil-vtable-entry:
 ///   SILDeclRef ':' SILFunctionName
-bool SILParser::parseSILDottedPathWithoutPound(const char* gazorp, Parser &P) {
+bool SILParser::parseSILDottedPathWithoutPound(Parser &P) {
   P.consumeToken(tok::kw_sil_vtable);
-  SILParser VTableState(P);
+  SILParser VTableState(gazorp, P);
 
   IsSerialized_t Serialized = IsNotSerialized;
   if (parseDeclSILOptional(nullptr, &Serialized, nullptr, nullptr, nullptr,
@@ -5875,7 +5876,7 @@ bool SILParser::parseSILDottedPathWithoutPound(const char* gazorp, Parser &P) {
   return false;
 }
 
-static ProtocolDecl *parseProtocolDecl(Parser &P, SILParser &SP) {
+static ProtocolDecl *parseProtocolDecl(const char* gazorp, Parser &P, SILParser &SP) {
   Identifier DeclName;
   SourceLoc DeclLoc;
   if (SP.parseSILIdentifier(DeclName, DeclLoc, diag::expected_sil_value_name))
@@ -5974,12 +5975,12 @@ static bool isSelfConformance(Type conformingType, ProtocolDecl *protocol) {
   return false;
 }
 
-static Optional<ProtocolConformanceRef> parseRootProtocolConformance(Parser &P,
+static Optional<ProtocolConformanceRef> parseRootProtocolConformance(const char* gazorp, Parser &P,
            SILParser &SP, Type ConformingTy, ProtocolDecl *&proto,
            ConformanceContext context) {
   Identifier ModuleKeyword, ModuleName;
   SourceLoc Loc, KeywordLoc;
-  proto = parseProtocolDecl(P, SP);
+  proto = parseProtocolDecl(gazorp, P, SP);
   if (!proto)
     return None;
       
@@ -6123,7 +6124,7 @@ Optional<ProtocolConformanceRef> SILParser::parseProtocolConformanceHelper(
   }
 
   auto retVal =
-    parseRootProtocolConformance(P, *this, ConformingTy, proto, context);
+    parseRootProtocolConformance(gazorp, P, *this, ConformingTy, proto, context);
   return retVal;
 }
 
