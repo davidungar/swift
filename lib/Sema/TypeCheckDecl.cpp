@@ -486,13 +486,13 @@ static void checkInheritanceClause(
 
 /// Check the inheritance clauses generic parameters along with any
 /// requirements stored within the generic parameter list.
-static void checkGenericParams(GenericParamList *genericParams,
+static void checkGenericParams(const char* gazorp, GenericParamList *genericParams,
                                DeclContext *owningDC, TypeChecker &tc) {
   if (!genericParams)
     return;
 
   for (auto gp : *genericParams) {
-    tc.checkDeclAttributes(gp);
+    tc.checkDeclAttributes(gazorp, gp);
     checkInheritanceClause(gp);
   }
 
@@ -2199,10 +2199,11 @@ static void checkDynamicSelfType(ValueDecl *decl, Type type) {
 
 namespace {
 class DeclChecker : public DeclVisitor<DeclChecker> {
+const char* gazorp;
 public:
   TypeChecker &TC;
 
-  explicit DeclChecker(TypeChecker &TC) : TC(TC) {}
+  explicit DeclChecker(const char* gazorp, TypeChecker &TC) : TC(TC) {}
 
   void visit(Decl *decl) {
     if (TC.Context.Stats)
@@ -2259,11 +2260,11 @@ public:
   }
   
   void visitImportDecl(ImportDecl *ID) {
-    TC.checkDeclAttributes(ID);
+    TC.checkDeclAttributes(gazorp, ID);
   }
 
   void visitOperatorDecl(OperatorDecl *OD) {
-    TC.checkDeclAttributes(OD);
+    TC.checkDeclAttributes(gazorp, OD);
     auto &Ctx = OD->getASTContext();
     if (auto *IOD = dyn_cast<InfixOperatorDecl>(OD)) {
       (void)IOD->getPrecedenceGroup();
@@ -2281,7 +2282,7 @@ public:
   }
 
   void visitPrecedenceGroupDecl(PrecedenceGroupDecl *PGD) {
-    TC.checkDeclAttributes(PGD);
+    TC.checkDeclAttributes(gazorp, PGD);
     validatePrecedenceGroup(PGD);
     checkAccessControl(TC, PGD);
   }
@@ -2347,7 +2348,7 @@ public:
       }
     }
 
-    TC.checkDeclAttributes(VD);
+    TC.checkDeclAttributes(gazorp, VD);
 
     if (!checkOverrides(VD)) {
       // If a property has an override attribute but does not override
@@ -2407,7 +2408,7 @@ public:
     // Check all the pattern/init pairs in the PBD.
     validatePatternBindingEntries(TC, PBD);
 
-    TC.checkDeclAttributes(PBD);
+    TC.checkDeclAttributes(gazorp, PBD);
 
     for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
       // Type check each VarDecl that this PatternBinding handles.
@@ -2523,7 +2524,7 @@ public:
       });
     }
 
-    TC.checkDeclAttributes(PBD);
+    TC.checkDeclAttributes(gazorp, PBD);
 
     checkAccessControl(TC, PBD);
 
@@ -2574,11 +2575,11 @@ public:
 
     if (!SD->isInvalid()) {
       TC.checkReferencedGenericParams(SD);
-      checkGenericParams(SD->getGenericParams(), SD, TC);
+      checkGenericParams(gazorp, SD->getGenericParams(), SD, TC);
       TC.checkProtocolSelfRequirements(SD);
     }
 
-    TC.checkDeclAttributes(SD);
+    TC.checkDeclAttributes(gazorp, SD);
 
     checkAccessControl(TC, SD);
 
@@ -2599,7 +2600,7 @@ public:
     (void) SD->isSetterMutating();
     (void) SD->getImplInfo();
 
-    TC.checkParameterAttributes(SD->getIndices());
+    TC.checkParameterAttributes(gazorp, SD->getIndices());
     checkDefaultArguments(TC, SD->getIndices(), SD);
 
     if (SD->getDeclContext()->getSelfClassDecl()) {
@@ -2622,7 +2623,7 @@ public:
     (void) TAD->getGenericSignature();
     (void) TAD->getUnderlyingType();
 
-    TC.checkDeclAttributes(TAD);
+    TC.checkDeclAttributes(gazorp, TAD);
     checkAccessControl(TC, TAD);
 
   }
@@ -2631,12 +2632,12 @@ public:
     // Force requests that can emit diagnostics.
     (void) OTD->getGenericSignature();
 
-    TC.checkDeclAttributes(OTD);
+    TC.checkDeclAttributes(gazorp, OTD);
     checkAccessControl(TC, OTD);
   }
   
   void visitAssociatedTypeDecl(AssociatedTypeDecl *AT) {
-    TC.checkDeclAttributes(AT);
+    TC.checkDeclAttributes(gazorp, AT);
 
     checkInheritanceClause(AT);
     auto *proto = AT->getProtocol();
@@ -2727,7 +2728,7 @@ public:
     // FIXME: Remove this once we clean up the mess involving raw values.
     (void) ED->getInterfaceType();
 
-    checkGenericParams(ED->getGenericParams(), ED, TC);
+    checkGenericParams(gazorp, ED->getGenericParams(), ED, TC);
 
     {
       // Check for circular inheritance of the raw type.
@@ -2740,7 +2741,7 @@ public:
     for (Decl *member : ED->getMembers())
       visit(member);
 
-    TC.checkDeclAttributes(ED);
+    TC.checkDeclAttributes(gazorp, ED);
 
     checkInheritanceClause(ED);
 
@@ -2773,7 +2774,7 @@ public:
   void visitStructDecl(StructDecl *SD) {
     checkUnsupportedNestedType(SD);
 
-    checkGenericParams(SD->getGenericParams(), SD, TC);
+    checkGenericParams(gazorp, SD->getGenericParams(), SD, TC);
 
     // Force lowering of stored properties.
     (void) SD->getStoredProperties();
@@ -2785,7 +2786,7 @@ public:
 
     TC.checkPatternBindingCaptures(SD);
 
-    TC.checkDeclAttributes(SD);
+    TC.checkDeclAttributes(gazorp, SD);
 
     checkInheritanceClause(SD);
 
@@ -2896,7 +2897,7 @@ public:
     // Force creation of the generic signature.
     (void) CD->getGenericSignature();
 
-    checkGenericParams(CD->getGenericParams(), CD, TC);
+    checkGenericParams(gazorp, CD->getGenericParams(), CD, TC);
 
     {
       // Check for circular inheritance.
@@ -3033,7 +3034,7 @@ public:
       }
     }
 
-    TC.checkDeclAttributes(CD);
+    TC.checkDeclAttributes(gazorp, CD);
 
     checkInheritanceClause(CD);
 
@@ -3070,7 +3071,7 @@ public:
     for (auto Member : PD->getMembers())
       visit(Member);
 
-    TC.checkDeclAttributes(PD);
+    TC.checkDeclAttributes(gazorp, PD);
 
     checkAccessControl(TC, PD);
 
@@ -3181,15 +3182,15 @@ public:
     (void) FD->getOperatorDecl();
 
     if (!FD->isInvalid()) {
-      checkGenericParams(FD->getGenericParams(), FD, TC);
+      checkGenericParams(gazorp, FD->getGenericParams(), FD, TC);
       TC.checkReferencedGenericParams(FD);
       TC.checkProtocolSelfRequirements(FD);
     }
 
     checkAccessControl(TC, FD);
 
-    TC.checkParameterAttributes(FD->getParameters());
-    TC.checkDeclAttributes(FD);
+    TC.checkParameterAttributes(gazorp, FD->getParameters());
+    TC.checkDeclAttributes(gazorp, FD);
 
     if (!checkOverrides(FD)) {
       // If a method has an 'override' keyword but does not
@@ -3275,10 +3276,10 @@ public:
     (void) EED->getInterfaceType();
     auto *ED = EED->getParentEnum();
 
-    TC.checkDeclAttributes(EED);
+    TC.checkDeclAttributes(gazorp, EED);
 
     if (auto *PL = EED->getParameterList()) {
-      TC.checkParameterAttributes(PL);
+      TC.checkParameterAttributes(gazorp, PL);
       checkDefaultArguments(TC, PL, EED);
     }
 
@@ -3382,14 +3383,14 @@ public:
       }
     }
 
-    checkGenericParams(ED->getGenericParams(), ED, TC);
+    checkGenericParams(gazorp, ED->getGenericParams(), ED, TC);
 
     for (Decl *Member : ED->getMembers())
       visit(Member);
 
     TC.ConformanceContexts.push_back(ED);
 
-    TC.checkDeclAttributes(ED);
+    TC.checkDeclAttributes(gazorp, ED);
     checkAccessControl(TC, ED);
 
     checkExplicitAvailability(ED);
@@ -3403,7 +3404,7 @@ public:
   void visitIfConfigDecl(IfConfigDecl *ICD) {
     // The active members of the #if block will be type checked along with
     // their enclosing declaration.
-    TC.checkDeclAttributes(ICD);
+    TC.checkDeclAttributes(gazorp, ICD);
   }
 
   void visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
@@ -3422,13 +3423,13 @@ public:
     (void) CD->getInitKind();
 
     if (!CD->isInvalid()) {
-      checkGenericParams(CD->getGenericParams(), CD, TC);
+      checkGenericParams(gazorp, CD->getGenericParams(), CD, TC);
       TC.checkReferencedGenericParams(CD);
       TC.checkProtocolSelfRequirements(CD);
     }
 
-    TC.checkDeclAttributes(CD);
-    TC.checkParameterAttributes(CD->getParameters());
+    TC.checkDeclAttributes(gazorp, CD);
+    TC.checkParameterAttributes(gazorp, CD->getParameters());
 
     // Check whether this initializer overrides an initializer in its
     // superclass.
@@ -3543,7 +3544,7 @@ public:
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
-    TC.checkDeclAttributes(DD);
+    TC.checkDeclAttributes(gazorp, DD);
 
     if (DD->getDeclContext()->isLocalContext()) {
       // Check local function bodies right away.
@@ -3600,9 +3601,9 @@ bool TypeChecker::isAvailabilitySafeForConformance(
   return requirementInfo.isContainedIn(witnessInfo);
 }
 
-void TypeChecker::typeCheckDecl(Decl *D) {
+void TypeChecker::typeCheckDecl(const char* gazorp, Decl *D) {
   checkForForbiddenPrefix(D);
-  DeclChecker(*this).visit(D);
+  DeclChecker(gazorp, *this).visit(D);
 }
 
 // Returns 'nullptr' if this is the setter's 'newValue' parameter;

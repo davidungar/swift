@@ -999,7 +999,7 @@ public:
   BraceStmt *applyFunctionBuilderBodyTransform(FuncDecl *FD,
                                                BraceStmt *body,
                                                Type builderType);
-  bool typeCheckClosureBody(ClosureExpr *closure);
+  bool typeCheckClosureBody(const char* gazorp, ClosureExpr *closure);
 
   bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
 
@@ -1013,7 +1013,7 @@ public:
                            unsigned StartElem);
   Identifier getNextResponseVariableName(DeclContext *DC);
 
-  void typeCheckDecl(Decl *D);
+  void typeCheckDecl(const char* gazorp, Decl *D);
 
   static void addImplicitDynamicAttribute(Decl *D);
   void checkDeclAttributes(const char* gazorp, Decl *D);

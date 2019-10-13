@@ -5031,7 +5031,7 @@ void ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
   if (auto *RB = dyn_cast<RebindSelfInConstructorExpr>(expr))
     expr = RB->getSubExpr();
 
-  FailureDiagnosis diagnosis(expr, *this);
+  FailureDiagnosis diagnosis("gazorp-diagnoseFailureForExpr", expr, *this);
 
   // Now, attempt to diagnose the failure from the info we've collected.
   if (diagnosis.diagnoseExprFailure())

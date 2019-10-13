@@ -164,7 +164,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
                            SourceLoc componentNameLoc,
                            Type &lookupType) -> LookupResult {
     if (state == Beginning)
-      return lookupUnqualified(dc, componentName, componentNameLoc);
+      return lookupUnqualified(gazorp, dc, componentName, componentNameLoc);
 
     assert(currentType && "Non-beginning state must have a type");
     if (!currentType->mayHaveMembers())

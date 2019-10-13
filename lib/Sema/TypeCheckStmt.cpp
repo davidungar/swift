@@ -2148,8 +2148,8 @@ bool TypeChecker::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
              true);
 }
 
-bool TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
-  checkParameterAttributes(closure->getParameters());
+bool TypeChecker::typeCheckClosureBody(const char* gazorp, ClosureExpr *closure) {
+  checkParameterAttributes(gazorp, closure->getParameters());
 
   BraceStmt *body = closure->getBody();
 

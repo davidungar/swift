@@ -6131,6 +6131,7 @@ Optional<ProtocolConformanceRef> SILParser::parseProtocolConformanceHelper(
 /// Parser a single SIL vtable entry and add it to either \p witnessEntries
 /// or \c conditionalConformances.
 static bool parseSILVTableEntry(
+const char* gazorp,
          Parser &P,
          SILModule &M,
          ProtocolDecl *proto,
@@ -6155,7 +6156,7 @@ static bool parseSILVTableEntry(
   }
 
   if (EntryKeyword.str() == "base_protocol") {
-    ProtocolDecl *proto = parseProtocolDecl(P, witnessState);
+    ProtocolDecl *proto = parseProtocolDecl(gazorp, P, witnessState);
     if (!proto)
       return true;
     if (P.parseToken(tok::colon, diag::expected_sil_witness_colon))

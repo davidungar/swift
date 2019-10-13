@@ -7637,7 +7637,8 @@ bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
 
 /// Apply a given solution to the expression, producing a fully
 /// type-checked expression.
-Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
+Expr *ConstraintSystem::applySolution(const char *gazorp,
+Solution &solution, Expr *expr,
                                       Type convertType,
                                       bool discardedExpr,
                                       bool skipClosures) {
@@ -7683,7 +7684,7 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
     auto &tc = getTypeChecker();
     bool hadError = false;
     for (auto *closure : walker.getClosuresToTypeCheck())
-      hadError |= tc.typeCheckClosureBody(closure);
+      hadError |= tc.typeCheckClosureBody(gazorp, closure);
 
     // Tap expressions too; they should or should not be
     // type-checked under the same conditions as closure bodies.
