@@ -1808,6 +1808,7 @@ static int compareAssociatedTypes(AssociatedTypeDecl *assocType1,
 }
 
 TypeDecl *EquivalenceClass::lookupNestedType(
+const char* gazorp,
                              GenericSignatureBuilder &builder,
                              Identifier name,
                              SmallVectorImpl<TypeDecl *> *otherConcreteTypes) {
@@ -1883,6 +1884,7 @@ TypeDecl *EquivalenceClass::lookupNestedType(
     if (decl) {
       SmallVector<ValueDecl *, 2> foundMembers;
       decl->getParentModule()->lookupQualified(
+          gazorp,
           decl, name,
           NL_QualifiedDefault | NL_OnlyTypes | NL_ProtocolMembers,
           foundMembers);

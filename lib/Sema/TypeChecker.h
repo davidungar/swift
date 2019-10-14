@@ -1606,7 +1606,7 @@ public:
   /// \param options Options that control name lookup.
   ///
   /// \returns The result of name lookup.
-  static LookupResult lookupMember(DeclContext *dc, Type type, DeclName name,
+  static LookupResult lookupMember(const char* gazorp, DeclContext *dc, Type type, DeclName name,
                                    NameLookupOptions options
                                      = defaultMemberLookupOptions);
 
@@ -1625,7 +1625,8 @@ public:
   /// \param options Options that control name lookup.
   ///
   /// \returns The result of name lookup.
-  static LookupTypeResult lookupMemberType(DeclContext *dc, Type type,
+  static LookupTypeResult lookupMemberType(const char* gazorp,
+  DeclContext *dc, Type type,
                                            Identifier name,
                                            NameLookupOptions options
                                              = defaultMemberTypeLookupOptions);

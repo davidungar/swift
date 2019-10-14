@@ -2698,7 +2698,7 @@ public:
 
     assert(CurrDeclContext);
     SmallVector<ValueDecl *, 16> initializers;
-    if (CurrDeclContext->lookupQualified(type, DeclBaseName::createConstructor(),
+    if (CurrDeclContext->lookupQualified("gazorp-CompletionLookup", type, DeclBaseName::createConstructor(),
                                          NL_QualifiedDefault,
                                          initializers)) {
       for (auto *init : initializers) {

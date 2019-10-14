@@ -259,12 +259,13 @@ public:
 
 /// Collect function (or subscript) members with the given \p name on \p baseTy.
 static void collectPossibleCalleesByQualifiedLookup(
+const char* gazorp,
     DeclContext &DC, Type baseTy, DeclBaseName name,
     SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
   bool isOnMetaType = baseTy->is<AnyMetatypeType>();
 
   SmallVector<ValueDecl *, 2> decls;
-  if (!DC.lookupQualified(baseTy->getMetatypeInstanceType(), name,
+  if (!DC.lookupQualified(gazorp, baseTy->getMetatypeInstanceType(), name,
                           NL_QualifiedDefault | NL_ProtocolMembers,
                           decls))
     return;

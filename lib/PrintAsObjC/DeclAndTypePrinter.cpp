@@ -897,7 +897,7 @@ private:
         return nullptr;
       }
       SmallVector<ValueDecl *, 1> decls;
-      declContext->lookupQualified(declContext->getParentModule(),
+      declContext->lookupQualified("gazorp-DeclAndTypePrinter::Implementation"[0], declContext->getParentModule(),
                                    renamedDeclName.getBaseIdentifier(),
                                    NL_OnlyTypes,
                                    decls);
@@ -910,7 +910,9 @@ private:
 
     const ValueDecl *renamedDecl = nullptr;
     SmallVector<ValueDecl *, 4> lookupResults;
-    declContext->lookupQualified(typeDecl->getDeclaredInterfaceType(),
+    declContext->lookupQualified(
+    "gazorp-DeclAndTypePrinter::Implementation",
+    typeDecl->getDeclaredInterfaceType(),
                                  renamedDeclName, NL_QualifiedDefault,
                                  lookupResults);
 

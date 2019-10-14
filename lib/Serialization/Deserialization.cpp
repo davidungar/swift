@@ -1244,7 +1244,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
       baseModule->lookupMember(values, baseModule, name,
                                getIdentifier(privateDiscriminator));
     } else {
-      baseModule->lookupQualified(baseModule, name,
+      baseModule->lookupQualified("gazorp-Deserialization"[0], baseModule, name,
                                   NL_QualifiedDefault | NL_KnownNoDependency,
                                   values);
     }

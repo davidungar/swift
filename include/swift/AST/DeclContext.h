@@ -499,7 +499,7 @@ public:
   /// lookup.
   ///
   /// \returns true if anything was found.
-  bool lookupQualified(Type type, DeclName member, NLOptions options,
+  bool lookupQualified(const char* gazorp, Type type, DeclName member, NLOptions options,
                        SmallVectorImpl<ValueDecl *> &decls) const;
 
   /// Look for the set of declarations with the given name within the
@@ -516,12 +516,12 @@ public:
   /// lookup.
   ///
   /// \returns true if anything was found.
-  bool lookupQualified(ArrayRef<NominalTypeDecl *> types, DeclName member,
+  bool lookupQualified(const char* gazorp, ArrayRef<NominalTypeDecl *> types, DeclName member,
                        NLOptions options,
                        SmallVectorImpl<ValueDecl *> &decls) const;
 
   /// Perform qualified lookup for the given member in the given module.
-  bool lookupQualified(ModuleDecl *module, DeclName member, NLOptions options,
+  bool lookupQualified(const char gazorpm, ModuleDecl *module, DeclName member, NLOptions options,
                        SmallVectorImpl<ValueDecl *> &decls) const;
 
   /// Perform \c AnyObject lookup for the given member.

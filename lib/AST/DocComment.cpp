@@ -404,7 +404,7 @@ const ValueDecl *findOverriddenDeclWithDocComment(const ValueDecl *VD) {
   return nullptr;
 }
 
-const ValueDecl *findDefaultProvidedDeclWithDocComment(const ValueDecl *VD) {
+const ValueDecl *findDefaultProvidedDeclWithDocComment(const char* gazorp, const ValueDecl *VD) {
   auto protocol = VD->getDeclContext()->getExtendedProtocolDecl();
   // Only applies to protocol extension member.
   if (!protocol)
@@ -413,7 +413,7 @@ const ValueDecl *findDefaultProvidedDeclWithDocComment(const ValueDecl *VD) {
   ValueDecl *requirement = nullptr;
 
   SmallVector<ValueDecl *, 2> members;
-  protocol->lookupQualified(const_cast<ProtocolDecl *>(protocol),
+  protocol->lookupQualified(gazorp, const_cast<ProtocolDecl *>(protocol),
                             VD->getFullName(), NLOptions::NL_ProtocolMembers,
                             members);
 

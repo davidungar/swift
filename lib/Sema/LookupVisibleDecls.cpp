@@ -940,6 +940,7 @@ static void lookupVisibleMemberAndDynamicMemberDecls(
 /// dynamic member subscripts and looks up the members of the keypath's root
 /// type.
 static void lookupVisibleDynamicMemberLookupDecls(
+const char* gazorp,
     Type baseType, KeyPathDynamicMemberConsumer &consumer,
     const DeclContext *dc, LookupState LS, DeclVisibilityKind reason,
     GenericSignatureBuilder *GSB, VisitedSet &visited,
@@ -958,7 +959,7 @@ static void lookupVisibleDynamicMemberLookupDecls(
       DeclName(ctx, DeclBaseName::createSubscript(), ctx.Id_dynamicMember);
 
   SmallVector<ValueDecl *, 2> subscripts;
-  dc->lookupQualified(baseType, subscriptName, NL_QualifiedDefault,
+  dc->lookupQualified(gazorp, baseType, subscriptName, NL_QualifiedDefault,
                       subscripts);
 
   for (ValueDecl *VD : subscripts) {

@@ -739,7 +739,7 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
   if (members.empty() || name != membersName) {
     membersName = name;
     members.clear();
-    dc->lookupQualified(superContexts, membersName,
+    dc->lookupQualified("gazorp-OverrideMatcher", superContexts, membersName,
                         NL_QualifiedDefault, members);
   }
 

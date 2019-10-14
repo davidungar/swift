@@ -2094,10 +2094,10 @@ static VarDecl *synthesizePropertyWrapperStorageWrapperProperty(
     auto projectionName = attr->ProjectionPropertyName;
     auto dc = var->getDeclContext();
     if (dc->isTypeContext()) {
-      dc->lookupQualified(dc->getSelfNominalTypeDecl(), projectionName,
+      dc->lookupQualified("gazorp-TypeCheckStorage::syntesizePropertyWrapperStorageWrapperProperty", dc->getSelfNominalTypeDecl(), projectionName,
                           NL_QualifiedDefault, declsFound);
     } else if (dc->isModuleScopeContext()) {
-      dc->lookupQualified(dc->getParentModule(), projectionName,
+      dc->lookupQualified("gazorp-TypeCheckStorage::syntesizePropertyWrapperStorageWrapperProperty"[0], dc->getParentModule(), projectionName,
                           NL_QualifiedDefault, declsFound);
     } else {
       llvm_unreachable("Property wrappers don't work in local contexts");

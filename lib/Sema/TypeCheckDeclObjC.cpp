@@ -944,7 +944,8 @@ bool swift::canBeRepresentedInObjC(const ValueDecl *decl) {
   return false;
 }
 
-static Type getObjectiveCNominalType(Type &cache,
+static Type getObjectiveCNominalType(const char* gazorp,
+Type &cache,
                                      Identifier ModuleName,
                                      Identifier TypeName,
                                      DeclContext *dc) {
@@ -959,7 +960,7 @@ static Type getObjectiveCNominalType(Type &cache,
 
   SmallVector<ValueDecl *, 4> decls;
   NLOptions options = NL_QualifiedDefault | NL_OnlyTypes;
-  dc->lookupQualified(module, TypeName, options, decls);
+  dc->lookupQualified(gazorp[0], module, TypeName, options, decls);
   for (auto decl : decls) {
     if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
       cache = nominal->getDeclaredType();
@@ -973,14 +974,14 @@ static Type getObjectiveCNominalType(Type &cache,
 #pragma mark Objective-C-specific types
 
 Type TypeChecker::getNSObjectType(DeclContext *dc) {
-  return getObjectiveCNominalType(NSObjectType, Context.Id_ObjectiveC,
+  return getObjectiveCNominalType("gazorp-getNSObjectType", NSObjectType, Context.Id_ObjectiveC,
                                 Context.getSwiftId(
                                   KnownFoundationEntity::NSObject),
                                 dc);
 }
 
 Type TypeChecker::getObjCSelectorType(DeclContext *dc) {
-  return getObjectiveCNominalType(ObjCSelectorType,
+  return getObjectiveCNominalType("gazorp-getObjCSelector", ObjCSelectorType,
                                   Context.Id_ObjectiveC,
                                   Context.Id_Selector,
                                   dc);

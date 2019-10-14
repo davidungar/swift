@@ -862,7 +862,7 @@ DECLTYPE *ASTContext::get##NAME##Decl() const { \
       /* Note: lookupQualified() will search both the Foundation module \
        * and the Clang Foundation module it imports. */ \
       SmallVector<ValueDecl *, 1> decls; \
-      M->lookupQualified(M, getIdentifier(#NAME), NL_OnlyTypes, decls); \
+      M->lookupQualified("gazorpm-GET_FOUNDATION_DECL", M, getIdentifier(#NAME), NL_OnlyTypes, decls); \
       if (decls.size() == 1 && isa<DECLTYPE>(decls[0])) { \
         auto decl = cast<DECLTYPE>(decls[0]); \
         if (isa<ProtocolDecl>(decl) || decl->getGenericParams() == nullptr) { \

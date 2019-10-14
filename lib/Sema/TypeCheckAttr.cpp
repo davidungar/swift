@@ -2068,7 +2068,8 @@ void AttributeChecker::visitDiscardableResultAttr(DiscardableResultAttr *attr) {
 }
 
 /// Lookup the replaced decl in the replacments scope.
-void lookupReplacedDecl(DeclName replacedDeclName,
+void lookupReplacedDecl(const char* gazorp,
+DeclName replacedDeclName,
                         const DynamicReplacementAttr *attr,
                         const ValueDecl *replacement,
                         SmallVectorImpl<ValueDecl *> &results) {
@@ -2098,7 +2099,7 @@ void lookupReplacedDecl(DeclName replacedDeclName,
     typeCtx = cast<ExtensionDecl>(declCtxt->getAsDecl())->getExtendedNominal();
 
   if (typeCtx)
-    moduleScopeCtxt->lookupQualified({typeCtx}, replacedDeclName,
+    moduleScopeCtxt->lookupQualified(gazorp, {typeCtx}, replacedDeclName,
                                      NL_QualifiedDefault, results);
 }
 

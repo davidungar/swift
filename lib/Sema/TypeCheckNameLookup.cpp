@@ -325,7 +325,8 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
   }
 }
 
-LookupResult TypeChecker::lookupMember(DeclContext *dc,
+LookupResult TypeChecker::lookupMember(const char* gazorp,
+DeclContext *dc,
                                        Type type, DeclName name,
                                        NameLookupOptions options) {
   assert(type->mayHaveMembers());
@@ -349,7 +350,7 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
 
   LookupResultBuilder builder(result, dc, options);
   SmallVector<ValueDecl *, 4> lookupResults;
-  dc->lookupQualified(type, name, subOptions, lookupResults);
+  dc->lookupQualified(gazorp, type, name, subOptions, lookupResults);
 
   for (auto found : lookupResults)
     builder.add(found, nullptr, type, /*isOuter=*/false);
@@ -405,7 +406,7 @@ bool TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl) {
   return false;
 }
 
-LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
+LookupTypeResult TypeChecker::lookupMemberType(const char* gazorp, DeclContext *dc,
                                                Type type, Identifier name,
                                                NameLookupOptions options) {
   LookupTypeResult result;
@@ -421,7 +422,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
   if (options.contains(NameLookupFlags::IgnoreAccessControl))
     subOptions |= NL_IgnoreAccessControl;
 
-  if (!dc->lookupQualified(type, name, subOptions, decls))
+  if (!dc->lookupQualified(gazorp, type, name, subOptions, decls))
     return result;
 
   // Look through the declarations, keeping only the unique type declarations.

@@ -134,7 +134,7 @@ namespace {
       
     public:
       /// Do the lookups and add matches to results.
-      void findResults(const DeclName &Name, bool isCascadingUse,
+      void findResults(const char* gazorp, const DeclName &Name, bool isCascadingUse,
                        NLOptions baseNLOptions, DeclContext *contextForLookup,
                        SmallVectorImpl<LookupResultEntry> &results) const;
     };
@@ -917,6 +917,7 @@ void UnqualifiedLookupFactory::addGenericParametersForFunction(
 }
 
 void UnqualifiedLookupFactory::ResultFinderForTypeContext::findResults(
+const char* gazorp,
     const DeclName &Name, bool isCascadingUse, NLOptions baseNLOptions,
     DeclContext *contextForLookup,
     SmallVectorImpl<LookupResultEntry> &results) const {
@@ -928,7 +929,7 @@ void UnqualifiedLookupFactory::ResultFinderForTypeContext::findResults(
                                       : NL_KnownNonCascadingDependency);
 
   SmallVector<ValueDecl *, 4> Lookup;
-  contextForLookup->lookupQualified(selfBounds, Name, options, Lookup);
+  contextForLookup->lookupQualified(gazorp, selfBounds, Name, options, Lookup);
   for (auto Result : Lookup) {
     results.push_back(LookupResultEntry(whereValueIsMember(Result), Result));
 #ifndef NDEBUG

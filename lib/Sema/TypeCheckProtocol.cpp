@@ -5431,6 +5431,7 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
     if (assocType->getProtocol() != proto) {
       SmallVector<ValueDecl *, 2> found;
       proto->getModuleContext()->lookupQualified(
+      "gazorp-TypeCheckProtocol::TypeChecker::inferDefaultWitnesses",
                            proto, assocType->getFullName(),
                            NL_QualifiedDefault|NL_ProtocolMembers|NL_OnlyTypes,
                            found);

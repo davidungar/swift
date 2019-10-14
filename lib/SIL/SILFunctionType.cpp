@@ -113,7 +113,7 @@ SILFunctionType::getWitnessMethodClass() const {
   return nullptr;
 }
 
-static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
+static CanType getKnownType(const char* gazorp, Optional<CanType> &cacheSlot, ASTContext &C,
                             StringRef moduleName, StringRef typeName) {
   if (!cacheSlot) {
     cacheSlot = ([&] {
@@ -126,7 +126,7 @@ static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
       // lookupValue would only give us types actually declared in the overlays
       // themselves.
       SmallVector<ValueDecl *, 2> decls;
-      mod->lookupQualified(mod, C.getIdentifier(typeName),
+      mod->lookupQualified(gazorp[0], mod, C.getIdentifier(typeName),
                            NL_QualifiedDefault | NL_KnownNonCascadingDependency,
                            decls);
       if (decls.size() != 1)
@@ -157,7 +157,7 @@ static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
 
 #define BRIDGING_KNOWN_TYPE(BridgedModule,BridgedType) \
   CanType TypeConverter::get##BridgedType##Type() {         \
-    return getKnownType(BridgedType##Ty, Context, \
+    return getKnownType("gazorp-BridgingKnownType", BridgedType##Ty, Context, \
                         #BridgedModule, #BridgedType);      \
   }
 #include "swift/SIL/BridgedTypes.def"

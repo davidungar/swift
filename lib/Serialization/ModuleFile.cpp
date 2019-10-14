@@ -1979,7 +1979,7 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
             TopLevelModule = Ctx.getLoadedModule(AccessPath.front().first);
 
           SmallVector<ValueDecl *, 8> Decls;
-          TopLevelModule->lookupQualified(
+          TopLevelModule->lookupQualified("gazorp-getImportDecls"[0],
               TopLevelModule, ScopeID,
               NL_QualifiedDefault | NL_KnownNoDependency, Decls);
           Optional<ImportKind> FoundKind = ImportDecl::findBestImportKind(Decls);

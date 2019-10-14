@@ -4969,7 +4969,7 @@ namespace {
 
         if (lookupContext) {
           SmallVector<ValueDecl *, 2> lookup;
-          dc->lookupQualified(lookupContext, name,
+          dc->lookupQualified("gazorp-SwiftDeclConverter", lookupContext, name,
                               NL_QualifiedDefault | NL_KnownNoDependency,
                               lookup);
           bool foundMethod = false;

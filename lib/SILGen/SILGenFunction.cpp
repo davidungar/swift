@@ -519,7 +519,8 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
       ->loadModule(SourceLoc(), UIKitName);
     assert(UIKit && "couldn't find UIKit objc module?!");
     SmallVector<ValueDecl *, 1> results;
-    UIKit->lookupQualified(UIKit,
+    UIKit->lookupQualified("gazorp-FindUIApplicationMain"[0],
+                           UIKit,
                            ctx.getIdentifier("UIApplicationMain"),
                            NL_QualifiedDefault,
                            results);

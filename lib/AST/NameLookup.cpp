@@ -1495,7 +1495,7 @@ static void extractDirectlyReferencedNominalTypes(
   llvm_unreachable("Not a type containing nominal types?");
 }
 
-bool DeclContext::lookupQualified(Type type,
+bool DeclContext::lookupQualified(const char* gazorp, Type type,
                                   DeclName member,
                                   NLOptions options,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
@@ -1508,16 +1508,17 @@ bool DeclContext::lookupQualified(Type type,
 
   // Handle lookup in a module.
   if (auto moduleTy = type->getAs<ModuleType>())
-    return lookupQualified(moduleTy->getModule(), member, options, decls);
+    return lookupQualified(gazorp[0], moduleTy->getModule(), member, options, decls);
 
   // Figure out which nominal types we will look into.
   SmallVector<NominalTypeDecl *, 4> nominalTypesToLookInto;
   extractDirectlyReferencedNominalTypes(type, nominalTypesToLookInto);
 
-  return lookupQualified(nominalTypesToLookInto, member, options, decls);
+  return lookupQualified(gazorp, nominalTypesToLookInto, member, options, decls);
 }
 
-bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
+bool DeclContext::lookupQualified(const char *gazorp,
+                                  ArrayRef<NominalTypeDecl *> typeDecls,
                                   DeclName member,
                                   NLOptions options,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
@@ -1659,7 +1660,7 @@ bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
   return !decls.empty();
 }
 
-bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
+bool DeclContext::lookupQualified(const char gazorpm, ModuleDecl *module, DeclName member,
                                   NLOptions options,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
   using namespace namelookup;
@@ -1905,7 +1906,7 @@ directReferencesForUnqualifiedTypeLookup(DeclName name,
 
 /// Perform qualified name lookup for types.
 static DirectlyReferencedTypeDecls
-directReferencesForQualifiedTypeLookup(Evaluator &evaluator,
+directReferencesForQualifiedTypeLookup(const char* gazorp, Evaluator &evaluator,
                                        ASTContext &ctx,
                                        ArrayRef<TypeDecl *> baseTypes,
                                        DeclName name,
@@ -1932,14 +1933,14 @@ directReferencesForQualifiedTypeLookup(Evaluator &evaluator,
       resolveTypeDeclsToNominal(ctx.evaluator, ctx, baseTypes, moduleDecls,
                                 anyObject);
 
-    dc->lookupQualified(nominalTypeDecls, name, options, members);
+    dc->lookupQualified(gazorp, nominalTypeDecls, name, options, members);
 
     // Search all of the modules.
     for (auto module : moduleDecls) {
       auto innerOptions = options;
       innerOptions &= ~NL_RemoveOverridden;
       innerOptions &= ~NL_RemoveNonVisible;
-      dc->lookupQualified(module, name, innerOptions, members);
+      dc->lookupQualified(gazorp[0], module, name, innerOptions, members);
     }
 
     addResults(members);
@@ -1950,7 +1951,7 @@ directReferencesForQualifiedTypeLookup(Evaluator &evaluator,
 
 /// Determine the types directly referenced by the given identifier type.
 static DirectlyReferencedTypeDecls
-directReferencesForIdentTypeRepr(Evaluator &evaluator,
+directReferencesForIdentTypeRepr(const char* gazorp, Evaluator &evaluator,
                                  ASTContext &ctx, IdentTypeRepr *ident,
                                  DeclContext *dc) {
   DirectlyReferencedTypeDecls current;
@@ -1981,7 +1982,7 @@ directReferencesForIdentTypeRepr(Evaluator &evaluator,
 
     // For subsequent components, perform qualified name lookup.
     current =
-        directReferencesForQualifiedTypeLookup(evaluator, ctx, current,
+        directReferencesForQualifiedTypeLookup(gazorp, evaluator, ctx, current,
                                                component->getIdentifier(), dc);
     if (current.empty())
       return current;
@@ -1991,7 +1992,7 @@ directReferencesForIdentTypeRepr(Evaluator &evaluator,
 }
 
 static DirectlyReferencedTypeDecls
-directReferencesForTypeRepr(Evaluator &evaluator,
+directReferencesForTypeRepr(const char* gazorp, Evaluator &evaluator,
                             ASTContext &ctx, TypeRepr *typeRepr,
                             DeclContext *dc) {
   switch (typeRepr->getKind()) {
@@ -2000,7 +2001,7 @@ directReferencesForTypeRepr(Evaluator &evaluator,
 
   case TypeReprKind::Attributed: {
     auto attributed = cast<AttributedTypeRepr>(typeRepr);
-    return directReferencesForTypeRepr(evaluator, ctx,
+    return directReferencesForTypeRepr(gazorp, evaluator, ctx,
                                        attributed->getTypeRepr(), dc);
   }
 
@@ -2009,7 +2010,7 @@ directReferencesForTypeRepr(Evaluator &evaluator,
     auto composition = cast<CompositionTypeRepr>(typeRepr);
     for (auto component : composition->getTypes()) {
       auto componentResult =
-          directReferencesForTypeRepr(evaluator, ctx, component, dc);
+          directReferencesForTypeRepr(gazorp, evaluator, ctx, component, dc);
       result.insert(result.end(),
                     componentResult.begin(),
                     componentResult.end());
@@ -2020,7 +2021,7 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   case TypeReprKind::CompoundIdent:
   case TypeReprKind::GenericIdent:
   case TypeReprKind::SimpleIdent:
-    return directReferencesForIdentTypeRepr(evaluator, ctx,
+    return directReferencesForIdentTypeRepr(gazorp, evaluator, ctx,
                                             cast<IdentTypeRepr>(typeRepr), dc);
 
   case TypeReprKind::Dictionary:
@@ -2029,7 +2030,7 @@ directReferencesForTypeRepr(Evaluator &evaluator,
   case TypeReprKind::Tuple: {
     auto tupleRepr = cast<TupleTypeRepr>(typeRepr);
     if (tupleRepr->isParenType()) {
-      return directReferencesForTypeRepr(evaluator, ctx,
+      return directReferencesForTypeRepr(gazorp, evaluator, ctx,
                                          tupleRepr->getElementType(0), dc);
     }
     return { };
@@ -2102,7 +2103,7 @@ DirectlyReferencedTypeDecls InheritedDeclsReferencedRequest::evaluate(
     else
       dc = decl.get<ExtensionDecl *>();
 
-    return directReferencesForTypeRepr(evaluator, dc->getASTContext(), typeRepr,
+    return directReferencesForTypeRepr("gazorp-InheritedDeclsReferencedRequest", evaluator, dc->getASTContext(), typeRepr,
                                        dc);
   }
 
