@@ -117,6 +117,8 @@ bool ArgsToFrontendOptionsConverter::convert(
     Opts.VerifyGenericSignaturesInModule = A->getValue();
   }
 
+  Opts.DumpDelayedParseRanges |= Args.hasArg(OPT_dump_delayed_parse_ranges);
+
   computeDumpScopeMapLocations();
 
   Optional<FrontendInputsAndOutputs> inputsAndOutputs =
@@ -350,6 +352,8 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
   }
   Option Opt = A->getOption();
   if (Opt.matches(OPT_emit_object))
+    return FrontendOptions::ActionType::EmitObject;
+  if (Opt.matches(OPT_dump_delayed_parse_ranges))
     return FrontendOptions::ActionType::EmitObject;
   if (Opt.matches(OPT_emit_assembly))
     return FrontendOptions::ActionType::EmitAssembly;

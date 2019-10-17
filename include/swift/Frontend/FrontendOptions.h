@@ -248,6 +248,9 @@ public:
   /// termination.
   bool PrintClangStats = false;
 
+  /// For incremental compilation experimentation.
+  bool DumpDelayedParseRanges = false;
+
   /// Indicates whether the playground transformation should be applied.
   bool PlaygroundTransform = false;
   

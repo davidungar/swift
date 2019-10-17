@@ -1436,6 +1436,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     case options::OPT_print_ast:
     case options::OPT_dump_type_refinement_contexts:
     case options::OPT_dump_scope_maps:
+    case options::OPT_dump_delayed_parse_ranges:
     case options::OPT_dump_interface_hash:
     case options::OPT_dump_type_info:
     case options::OPT_verify_debug_info:
