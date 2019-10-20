@@ -19,6 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/FileSystem.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/SourceManager.h"
@@ -98,6 +99,11 @@ std::string CompilerInvocation::getReferenceDependenciesFilePathForPrimary(
     StringRef filename) const {
   return getPrimarySpecificPathsForPrimary(filename)
       .SupplementaryOutputs.ReferenceDependenciesFilePath;
+}
+std::string CompilerInvocation::getUnparsedRangesFilePathForPrimary(
+    StringRef filename) const {
+  return getPrimarySpecificPathsForPrimary(filename)
+      .SupplementaryOutputs.UnparsedRangesFilePath;
 }
 std::string
 CompilerInvocation::getSerializedDiagnosticsPathForAtMostOnePrimary() const {
@@ -1234,4 +1240,32 @@ const PrimarySpecificPaths &
 CompilerInstance::getPrimarySpecificPathsForSourceFile(
     const SourceFile &SF) const {
   return Invocation.getPrimarySpecificPathsForSourceFile(SF);
+}
+
+static bool emitDelayedParseRanges(const PersistentParserState &persistentState,
+                                   const SourceFile *primaryFile,
+                                   const SourceManager &SM,
+                                   llvm::raw_ostream &out) {
+  out << "### Delayed parser source ranges file v0 ###:\n";
+  persistentState.forEachDelayedSourceRange(
+      primaryFile, [&](const SourceRange sr) {
+        const auto filename =
+            SM.getIdentifierForBuffer(SM.findBufferContainingLoc(sr.Start));
+        const auto startLC = SM.getLineAndColumn(sr.Start);
+        const auto endLC = SM.getLineAndColumn(sr.End);
+        out << "\"" << llvm::yaml::escape(filename) << "\": ";
+        out << "[" << startLC.first << ", " << startLC.second << ", ";
+        out << endLC.first << ", " << endLC.second << "]\n";
+      });
+  out << "...\n";
+  return false;
+}
+
+void CompilerInstance::emitUnparsedRanges(DiagnosticEngine &diags,
+                                          const SourceFile *primaryFile,
+                                          StringRef outputPath) const {
+  withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out) -> bool {
+    return emitDelayedParseRanges(*PersistentState.get(), primaryFile,
+                                  SourceMgr, out);
+  });
 }

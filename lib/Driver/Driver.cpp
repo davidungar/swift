@@ -1436,7 +1436,6 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     case options::OPT_print_ast:
     case options::OPT_dump_type_refinement_contexts:
     case options::OPT_dump_scope_maps:
-    case options::OPT_dump_delayed_parse_ranges:
     case options::OPT_dump_interface_hash:
     case options::OPT_dump_type_info:
     case options::OPT_verify_debug_info:
@@ -1819,6 +1818,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_ObjCHeader:
       case file_types::TY_ClangModuleFile:
       case file_types::TY_SwiftDeps:
+      case file_types::TY_UnparsedRanges:
       case file_types::TY_Remapping:
       case file_types::TY_IndexData:
       case file_types::TY_PCH:

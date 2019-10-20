@@ -248,9 +248,6 @@ public:
   /// termination.
   bool PrintClangStats = false;
 
-  /// For incremental compilation experimentation.
-  bool DumpDelayedParseRanges = false;
-
   /// Indicates whether the playground transformation should be applied.
   bool PlaygroundTransform = false;
   
@@ -339,6 +336,7 @@ public:
 private:
   static bool canActionEmitDependencies(ActionType);
   static bool canActionEmitReferenceDependencies(ActionType);
+  static bool canActionEmitUnparsedRanges(ActionType);
   static bool canActionEmitObjCHeader(ActionType);
   static bool canActionEmitLoadedModuleTrace(ActionType);
   static bool canActionEmitModule(ActionType);

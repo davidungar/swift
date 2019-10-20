@@ -789,11 +789,6 @@ def dump_type_info : Flag<["-"], "dump-type-info">,
   ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
-def dump_delayed_parse_ranges : Flag<["-"], "dump-delayed-parse-ranges">,
-  HelpText<"Dump delayed and non-delayed parse ranges">,
-  ModeOpt,
-  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
-
 def print_ast : Flag<["-"], "print-ast">,
   HelpText<"Parse and type-check input file(s) and pretty print AST(s)">,
   ModeOpt,

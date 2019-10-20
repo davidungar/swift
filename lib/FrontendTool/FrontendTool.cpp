@@ -946,12 +946,6 @@ static Optional<bool> dumpASTIfNeeded(CompilerInvocation &Invocation,
   return Context.hadError();
 }
 
-static void dumpDelayedParseRanges(CompilerInvocation &Invocation,
-                                   CompilerInstance &Instance) {
-  llvm::errs() << "dumpDelayedParseRanges HERE\n";
-//  Instance.PersistentState;
-}
-
 static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
     CompilerInvocation &Invocation, CompilerInstance &Instance) {
   if (Invocation.getFrontendOptions()
@@ -974,6 +968,26 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
         (void)emitReferenceDependencies(Instance.getASTContext().Diags, SF,
                                         *Instance.getDependencyTracker(),
                                         referenceDependenciesFilePath);
+    }
+  }
+}
+
+static void
+emitUnparsedRangesForAllPrimaryInputsIfNeeded(CompilerInvocation &Invocation,
+                                              CompilerInstance &Instance) {
+  if (Invocation.getFrontendOptions()
+          .InputsAndOutputs.hasUnparsedRangesPath() &&
+      Instance.getPrimarySourceFiles().empty()) {
+    Instance.getASTContext().Diags.diagnose(
+        SourceLoc(), diag::emit_unparsed_ranges_without_primary_file);
+    return;
+  }
+  for (auto *SF : Instance.getPrimarySourceFiles()) {
+    const std::string &unparsedRangesFilePath =
+        Invocation.getUnparsedRangesFilePathForPrimary(SF->getFilename());
+    if (!unparsedRangesFilePath.empty()) {
+      Instance.emitUnparsedRanges(Instance.getASTContext().Diags, SF,
+                                  unparsedRangesFilePath);
     }
   }
 }
@@ -1203,9 +1217,6 @@ static bool performCompile(CompilerInstance &Instance,
 
   if (auto r = dumpASTIfNeeded(Invocation, Instance))
     return *r;
-
-  if (opts.DumpDelayedParseRanges)
-    dumpDelayedParseRanges(Invocation, Instance);
 
   // If we were asked to print Clang stats, do so.
   if (opts.PrintClangStats && Context.getClangModuleLoader())

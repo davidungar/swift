@@ -117,8 +117,6 @@ bool ArgsToFrontendOptionsConverter::convert(
     Opts.VerifyGenericSignaturesInModule = A->getValue();
   }
 
-  Opts.DumpDelayedParseRanges |= Args.hasArg(OPT_dump_delayed_parse_ranges);
-
   computeDumpScopeMapLocations();
 
   Optional<FrontendInputsAndOutputs> inputsAndOutputs =
@@ -353,8 +351,6 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
   Option Opt = A->getOption();
   if (Opt.matches(OPT_emit_object))
     return FrontendOptions::ActionType::EmitObject;
-  if (Opt.matches(OPT_dump_delayed_parse_ranges))
-    return FrontendOptions::ActionType::EmitObject;
   if (Opt.matches(OPT_emit_assembly))
     return FrontendOptions::ActionType::EmitAssembly;
   if (Opt.matches(OPT_emit_ir))
@@ -531,6 +527,11 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
       && Opts.InputsAndOutputs.hasReferenceDependenciesPath()) {
     Diags.diagnose(SourceLoc(),
                    diag::error_mode_cannot_emit_reference_dependencies);
+    return true;
+  }
+  if (!FrontendOptions::canActionEmitUnparsedRanges(Opts.RequestedAction) &&
+      Opts.InputsAndOutputs.hasUnparsedRangesPath()) {
+    Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_unparsed_ranges);
     return true;
   }
   if (!FrontendOptions::canActionEmitObjCHeader(Opts.RequestedAction) &&
