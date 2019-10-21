@@ -1259,9 +1259,11 @@ static bool emitDelayedParseRanges(const PersistentParserState &persistentState,
     for (auto &sr: iter.second) {
       const auto startLC = SM.getLineAndColumn(sr.Start);
       const auto endLC = SM.getLineAndColumn(sr.End);
-      out << "  ";
-      out << "{ start: { line: " << startLC.first << ", column: " << startLC.second << " }, ";
-      out << "{ end: {line: " << endLC.first << ", column: " << endLC.second << " } }\n";
+      out << "  - { ";
+      out << "start: { line: " << startLC.first << ", column: " << startLC.second << " }"
+          << ", ";
+      out << "end: {line: " << endLC.first << ", column: " << endLC.second << " }"
+          << " }\n";
     }
   }
 
