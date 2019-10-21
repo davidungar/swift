@@ -1246,7 +1246,7 @@ static bool emitDelayedParseRanges(const PersistentParserState &persistentState,
                                    const SourceFile *primaryFile,
                                    const SourceManager &SM,
                                    llvm::raw_ostream &out) {
-  out << "### Delayed parser source ranges file v0 ###:\n";
+  out << "### Unparsed source ranges file v0 ###\n";
   persistentState.forEachDelayedSourceRange(
       primaryFile, [&](const SourceRange sr) {
         const auto filename =
@@ -1254,8 +1254,10 @@ static bool emitDelayedParseRanges(const PersistentParserState &persistentState,
         const auto startLC = SM.getLineAndColumn(sr.Start);
         const auto endLC = SM.getLineAndColumn(sr.End);
         out << "\"" << llvm::yaml::escape(filename) << "\": ";
-        out << "[" << startLC.first << ", " << startLC.second << ", ";
-        out << endLC.first << ", " << endLC.second << "]\n";
+        out << "{ start: { line: " << startLC.first
+            << ", column: " << startLC.second << "} , ";
+        out << "{ end: { line: " << endLC.first << ", column: " << endLC.second
+            << " } } \n";
       });
   out << "...\n";
   return false;

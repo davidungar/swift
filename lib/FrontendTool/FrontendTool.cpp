@@ -1224,6 +1224,8 @@ static bool performCompile(CompilerInstance &Instance,
 
   emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Invocation, Instance);
 
+  emitUnparsedRangesForAllPrimaryInputsIfNeeded(Invocation, Instance);
+
   if (Context.hadError()) {
     //  Emit the index store data even if there were compiler errors.
     (void)emitIndexData(Invocation, Instance);
