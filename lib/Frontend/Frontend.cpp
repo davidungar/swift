@@ -1246,19 +1246,25 @@ static bool emitDelayedParseRanges(const PersistentParserState &persistentState,
                                    const SourceFile *primaryFile,
                                    const SourceManager &SM,
                                    llvm::raw_ostream &out) {
-  out << "### Unparsed source ranges file v0 ###\n";
+  llvm::StringMap<std::vector<SourceRange>> rangesByFile;
   persistentState.forEachDelayedSourceRange(
-      primaryFile, [&](const SourceRange sr) {
-        const auto filename =
-            SM.getIdentifierForBuffer(SM.findBufferContainingLoc(sr.Start));
-        const auto startLC = SM.getLineAndColumn(sr.Start);
-        const auto endLC = SM.getLineAndColumn(sr.End);
-        out << "\"" << llvm::yaml::escape(filename) << "\": ";
-        out << "{ start: { line: " << startLC.first
-            << ", column: " << startLC.second << "} , ";
-        out << "{ end: { line: " << endLC.first << ", column: " << endLC.second
-            << " } } \n";
-      });
+                                            primaryFile, [&](const SourceRange sr) {
+    const auto filename =
+    SM.getIdentifierForBuffer(SM.findBufferContainingLoc(sr.Start));
+    rangesByFile[filename].push_back(sr);
+  });
+  out << "### Unparsed source ranges file v0 ###\n";
+  for (auto &iter: rangesByFile) {
+    out << "\"" << llvm::yaml::escape(iter.first()) << "\":\n";
+    for (auto &sr: iter.second) {
+      const auto startLC = SM.getLineAndColumn(sr.Start);
+      const auto endLC = SM.getLineAndColumn(sr.End);
+      out << "  ";
+      out << "{ start: { line: " << startLC.first << ", column: " << startLC.second << " }, ";
+      out << "{ end: {line: " << endLC.first << ", column: " << endLC.second << " } }\n";
+    }
+  }
+
   out << "...\n";
   return false;
 }
