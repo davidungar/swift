@@ -2944,6 +2944,8 @@ void Driver::chooseDependenciesOutputPaths(Compilation &C,
   if (C.getIncrementalBuildEnabled()) {
     addAuxiliaryOutput(C, *Output, file_types::TY_SwiftDeps, OutputMap,
                        workingDirectory);
+    addAuxiliaryOutput(C, *Output, file_types::TY_UnparsedRanges, OutputMap,
+                       workingDirectory);
   }
   chooseLoadedModuleTracePath(C, workingDirectory, Buf, Output);
 }

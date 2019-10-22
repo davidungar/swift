@@ -21,6 +21,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/UnparsedRanges.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
@@ -1243,59 +1244,10 @@ CompilerInstance::getPrimarySpecificPathsForSourceFile(
   return Invocation.getPrimarySpecificPathsForSourceFile(SF);
 }
 
-static bool emitDelayedParseRanges(const PersistentParserState &persistentState,
-                                   const SourceFile *primaryFile,
-                                   const SourceManager &SM,
-                                   llvm::raw_ostream &out) {
-  llvm::StringMap<std::vector<SourceRange>> rangesByFile;
-  persistentState.forEachDelayedSourceRange(
-                                            primaryFile, [&](const SourceRange sr) {
-    const auto filename =
-    SM.getIdentifierForBuffer(SM.findBufferContainingLoc(sr.Start));
-    rangesByFile[filename].push_back(sr);
-  });
-  out << "### Unparsed source ranges file v0 ###\n";
-
-  for (auto &iter: rangesByFile) {
-    out << "\"" << llvm::yaml::escape(iter.first()) << "\":\n";
-    auto ranges = iter.second;
-    
-    // sort and coalesce
-    std::sort(ranges.begin(), ranges.end(),
-    [&SM](const SourceRange &lhs, const SourceRange &rhs) {
-      return SM.isBeforeInBuffer(lhs.Start, rhs.Start);
-    });
-
-    assert(!ranges.empty() && "Must have found at least one range");
-    auto rangeToCoalesce = ranges.begin();
-    auto nextRange = rangeToCoalesce + 1;
-    while (nextRange < ranges.end()) {
-      if (!SM.isBeforeInBuffer(rangeToCoalesce->End, nextRange->Start))
-        rangeToCoalesce->widen(*nextRange++);
-      else if (++rangeToCoalesce == nextRange)
-        ++nextRange;
-    }
-
-    std::for_each(ranges.begin(), nextRange,
-      [&out, &SM](const auto &sr) {
-      const auto startLC = SM.getLineAndColumn(sr.Start);
-      const auto endLC = SM.getLineAndColumn(sr.End);
-      out << "  - { ";
-      out << "start: { line: " << startLC.first << ", column: " << startLC.second << " }"
-      << ", ";
-      out << "end: {line: " << endLC.first << ", column: " << endLC.second << " }"
-      << " }\n";
-      });
-  }
-  out << "...\n";
-  return false;
-}
-
 void CompilerInstance::emitUnparsedRanges(DiagnosticEngine &diags,
                                           const SourceFile *primaryFile,
                                           StringRef outputPath) const {
-  withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out) -> bool {
-    return emitDelayedParseRanges(*PersistentState.get(), primaryFile,
-                                  SourceMgr, out);
-  });
+  if (const auto *ps = PersistentState.get())
+    unparsed_ranges::Emitter(outputPath, primaryFile, *ps, SourceMgr, diags)
+        .emit();
 }
