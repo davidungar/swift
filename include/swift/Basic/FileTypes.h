@@ -63,6 +63,15 @@ static inline void forAllTypes(llvm::function_ref<void(file_types::ID)> fn) {
     fn(static_cast<ID>(i));
 }
 
+static inline void forEachIncrementalOutputType(
+                                                llvm::function_ref<void(file_types::ID)> fn) {
+  constexpr static const std::Array<file_types::ID> incrementalOutputTypes = {
+    file_types::TY_SwiftDeps, file_types::TY_UnparsedRanges, file_types::TY_CompileSource
+  };
+  for (auto type: incrementalOutputTypes)
+    fn(type);
+}
+
 } // end namespace file_types
 } // end namespace swift
 

@@ -360,6 +360,7 @@ public:
   std::string
   getReferenceDependenciesFilePathForPrimary(StringRef filename) const;
   std::string getUnparsedRangesFilePathForPrimary(StringRef filename) const;
+  std::string getCompiledSourcesFilePathForPrimary(StringRef filename) const;
   std::string getSerializedDiagnosticsPathForAtMostOnePrimary() const;
 
   /// TBDPath only makes sense in whole module compilation mode,
@@ -672,6 +673,11 @@ public:
   void emitUnparsedRanges(DiagnosticEngine &diags,
                           const SourceFile *primaryFile,
                           StringRef outputPath) const;
+
+  void emitCompiledSource(DiagnosticEngine &diags,
+                           const SourceFile *primaryFile,
+                           StringRef outputPath) const;
+
 };
 
 } // namespace swift

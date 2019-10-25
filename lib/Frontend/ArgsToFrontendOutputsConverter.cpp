@@ -289,6 +289,8 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
       options::OPT_emit_reference_dependencies_path);
   auto unparsedRangesFile = getSupplementaryFilenamesFromArguments(
       options::OPT_emit_unparsed_ranges_path);
+  auto compiledSourceFile = getSupplementaryFilenamesFromArguments(
+      options::OPT_emit_compiled_source_path);
   auto serializedDiagnostics = getSupplementaryFilenamesFromArguments(
       options::OPT_serialize_diagnostics_path);
   auto fixItsOutput = getSupplementaryFilenamesFromArguments(
@@ -319,6 +321,7 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
     sop.DependenciesFilePath = (*dependenciesFile)[i];
     sop.ReferenceDependenciesFilePath = (*referenceDependenciesFile)[i];
     sop.UnparsedRangesFilePath = (*unparsedRangesFile)[i];
+    sop.CompiledSourcesFilePath = (*compiledSourcesFile)[i];
     sop.SerializedDiagnosticsPath = (*serializedDiagnostics)[i];
     sop.FixItsOutputPath = (*fixItsOutput)[i];
     sop.LoadedModuleTracePath = (*loadedModuleTrace)[i];
@@ -377,6 +380,11 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
       file_types::TY_UnparsedRanges, "",
       defaultSupplementaryOutputPathExcludingExtension);
 
+  auto compiledSourceFilePath = determineSupplementaryOutputFilename(
+      OPT_emit_compiled_source, pathsFromArguments.CompiledSourceFilePath,
+      file_types::TY_CompiledSource, "",
+      defaultSupplementaryOutputPathExcludingExtension);
+
   auto serializedDiagnosticsPath = determineSupplementaryOutputFilename(
       OPT_serialize_diagnostics, pathsFromArguments.SerializedDiagnosticsPath,
       file_types::TY_SerializedDiagnostics, "",
@@ -431,6 +439,7 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   sop.DependenciesFilePath = dependenciesFilePath;
   sop.ReferenceDependenciesFilePath = referenceDependenciesFilePath;
   sop.UnparsedRangesFilePath = unparsedRangesFilePath;
+  sop.CompiledSourcesFilePath = compilesSourcesFilePath;
   sop.SerializedDiagnosticsPath = serializedDiagnosticsPath;
   sop.FixItsOutputPath = fixItsOutputPath;
   sop.LoadedModuleTracePath = loadedModuleTracePath;
@@ -510,6 +519,7 @@ createFromTypeToPathMap(const TypeToPathMap *map) {
       {file_types::TY_Dependencies, paths.DependenciesFilePath},
       {file_types::TY_SwiftDeps, paths.ReferenceDependenciesFilePath},
       {file_types::TY_UnparsedRanges, paths.UnparsedRangesFilePath},
+      {file_types::TY_CompiledSource, paths.CompiledSourceFilePath},
       {file_types::TY_SerializedDiagnostics, paths.SerializedDiagnosticsPath},
       {file_types::TY_ModuleTrace, paths.LoadedModuleTracePath},
       {file_types::TY_TBD, paths.TBDPath},

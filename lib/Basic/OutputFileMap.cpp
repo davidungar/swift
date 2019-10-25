@@ -226,16 +226,19 @@ OutputFileMap::parse(std::unique_ptr<llvm::MemoryBuffer> Buffer,
       OutputMap.insert(std::pair<file_types::ID, std::string>(
           Kind, resolvePath(Path, PathStorage)));
 
-      // HACK: fake up an UnparsedRanges output filename
+      // HACK: fake up an UnparsedRanges & CompiledSource output filenames
       if (Kind == file_types::TY_SwiftDeps) {
         // Not for the master-swiftdeps
         llvm::SmallString<128> Storage;
         if (!InputPath->getValue(Storage).empty()) {
-          std::string name = OutputMap[Kind];
-          name.resize(name.size() -
-                      getExtension(file_types::TY_SwiftDeps).size());
-          name += getExtension(file_types::TY_UnparsedRanges);
-          OutputMap.insert({file_types::TY_UnparsedRanges, name});
+          std::string baseName = OutputMap[Kind];
+          baseName.resize(name.size() -
+                          getExtension(file_types::TY_SwiftDeps).size());
+          auto insertFilename = [&](file_types type) {
+            OutputMap.insert({type, name + getExtension(type)});
+          };
+          insertFilename(file_types::TY_UnparsedRanges);
+          insertFilename(file_types::TY_CompiledSource);
         }
       }
     }

@@ -95,6 +95,10 @@ struct SupplementaryOutputPaths {
   /// \sa swift::emitUnparsedRanges
   std::string UnparsedRangesFilePath;
 
+  /// The path to which we should save the source code of a primary source file to be compiled.
+  /// Used to diff sources of primary inputs.
+  std::string CompiledSourcesFilePath;
+
   /// Path to a file which should contain serialized diagnostics for this
   /// frontend invocation.
   ///

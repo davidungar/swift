@@ -1819,6 +1819,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_ClangModuleFile:
       case file_types::TY_SwiftDeps:
       case file_types::TY_UnparsedRanges:
+      case file_types::TY_CompiledSource:
       case file_types::TY_Remapping:
       case file_types::TY_IndexData:
       case file_types::TY_PCH:
@@ -2942,10 +2943,10 @@ void Driver::chooseDependenciesOutputPaths(Compilation &C,
                        workingDirectory);
   }
   if (C.getIncrementalBuildEnabled()) {
-    addAuxiliaryOutput(C, *Output, file_types::TY_SwiftDeps, OutputMap,
-                       workingDirectory);
-    addAuxiliaryOutput(C, *Output, file_types::TY_UnparsedRanges, OutputMap,
-                       workingDirectory);
+    file_types::forEachIncrementalOutputType(
+      [&](file_types::ID type) {
+      addAuxiliaryOutput(C, *Output, type, OutputMap, workingDirectory);
+      });
   }
   chooseLoadedModuleTracePath(C, workingDirectory, Buf, Output);
 }

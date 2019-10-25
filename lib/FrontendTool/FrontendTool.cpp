@@ -952,7 +952,7 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
           .InputsAndOutputs.hasReferenceDependenciesPath() &&
       Instance.getPrimarySourceFiles().empty()) {
     Instance.getASTContext().Diags.diagnose(
-        SourceLoc(), diag::emit_reference_dependencies_without_primary_file);
+        SourceLoc(), diag::emit_without_primary_file("-emit-reference-dependencies"));
     return;
   }
   for (auto *SF : Instance.getPrimarySourceFiles()) {
@@ -971,7 +971,7 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
     }
   }
 }
-
+#warning "factor next two and prev "
 static void
 emitUnparsedRangesForAllPrimaryInputsIfNeeded(CompilerInvocation &Invocation,
                                               CompilerInstance &Instance) {
@@ -984,13 +984,33 @@ emitUnparsedRangesForAllPrimaryInputsIfNeeded(CompilerInvocation &Invocation,
   }
   for (auto *SF : Instance.getPrimarySourceFiles()) {
     const std::string &unparsedRangesFilePath =
-        Invocation.getUnparsedRangesFilePathForPrimary(SF->getFilename());
+    Invocation.getUnparsedRangesFilePathForPrimary(SF->getFilename());
     if (!unparsedRangesFilePath.empty()) {
-      Instance.emitUnparsedRanges(Instance.getASTContext().Diags, SF,
-                                  unparsedRangesFilePath);
+      Instance.emitUnparsedRanges)(Instance.getASTContext().Diags, SF,
+                                   unparsedRangesFilePath);
     }
   }
 }
+static void
+emitCompiledSourceForAllPrimaryInputsIfNeeded(CompilerInvocation &Invocation,
+                                              CompilerInstance &Instance) {
+  if (Invocation.getFrontendOptions()
+          .InputsAndOutputs.hasCompiledSourcePath() &&
+      Instance.getPrimarySourceFiles().empty()) {
+    Instance.getASTContext().Diags.diagnose(
+        SourceLoc(), diag::emit_compiled_source_without_primary_file);
+    return;
+  }
+  for (auto *SF : Instance.getPrimarySourceFiles()) {
+    const std::string &compiledSourcesFilePath =
+    Invocation.getCompiledSourcesFilePathForPrimary(SF->getFilename());
+    if (!compiledSourcesFilePath.empty()) {
+      Instance.emitCompiledSources(Instance.getASTContext().Diags, SF,
+                                   compiledSourcesFilePath);
+    }
+  }
+}
+
 
 static bool writeTBDIfNeeded(CompilerInvocation &Invocation,
                              CompilerInstance &Instance) {
@@ -1223,8 +1243,8 @@ static bool performCompile(CompilerInstance &Instance,
     Context.getClangModuleLoader()->printStatistics();
 
   emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Invocation, Instance);
-
   emitUnparsedRangesForAllPrimaryInputsIfNeeded(Invocation, Instance);
+  emitCompiledSourceForAllPrimaryInputsIfNeeded(Invocation, Instance);
 
   if (Context.hadError()) {
     //  Emit the index store data even if there were compiler errors.

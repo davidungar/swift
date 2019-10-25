@@ -106,6 +106,11 @@ std::string CompilerInvocation::getUnparsedRangesFilePathForPrimary(
   return getPrimarySpecificPathsForPrimary(filename)
       .SupplementaryOutputs.UnparsedRangesFilePath;
 }
+std::string CompilerInvocation::getCompiledSourcesFilePathForPrimary(
+    StringRef filename) const {
+  return getPrimarySpecificPathsForPrimary(filename)
+      .SupplementaryOutputs.CompiledSourcesFilePath;
+}
 std::string
 CompilerInvocation::getSerializedDiagnosticsPathForAtMostOnePrimary() const {
   return getPrimarySpecificPathsForAtMostOnePrimary()
@@ -1249,5 +1254,14 @@ void CompilerInstance::emitUnparsedRanges(DiagnosticEngine &diags,
                                           StringRef outputPath) const {
   if (const auto *ps = PersistentState.get())
     unparsed_ranges::Emitter(outputPath, primaryFile, *ps, SourceMgr, diags)
+        .emit();
+}
+
+
+void CompilerInstance::emitCompiledSource(DiagnosticEngine &diags,
+                                          const SourceFile *primaryFile,
+                                          StringRef outputPath) const {
+  if (const auto *ps = PersistentState.get())
+    compiled_source::Emitter(outputPath, primaryFile, *ps, SourceMgr, diags)
         .emit();
 }

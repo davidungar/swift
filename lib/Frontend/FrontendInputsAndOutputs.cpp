@@ -418,6 +418,12 @@ bool FrontendInputsAndOutputs::hasUnparsedRangesPath() const {
         return outs.UnparsedRangesFilePath;
       });
 }
+bool FrontendInputsAndOutputs::hasCompiledSourcesPath() const {
+  return hasSupplementaryOutputPath(
+      [](const SupplementaryOutputPaths &outs) -> const std::string & {
+        return outs.CompiledSourcesFilePath;
+      });
+}
 bool FrontendInputsAndOutputs::hasObjCHeaderOutputPath() const {
   return hasSupplementaryOutputPath(
       [](const SupplementaryOutputPaths &outs) -> const std::string & {

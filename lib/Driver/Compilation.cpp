@@ -238,6 +238,8 @@ namespace driver {
     /// Used for experimental incremental work
     unparsed_ranges::UnparsedRangesForAllFiles PriorUnparsedRanges;
 
+    #warning "put diffs here"
+
   private:
     /// Helper for tracing the propagation of marks in the graph.
     DependencyGraph::MarkTracer ActualIncrementalTracer;
@@ -748,6 +750,8 @@ namespace driver {
         }
         if (Comp.getArgs().hasArg(options::OPT_driver_dump_unparsed_ranges))
           PriorUnparsedRanges.dump();
+        if (Comp.getArgs().hasArg(options::OPT_driver_dump_compiled_source_diffs))
+          CompiledSourceDiffs.dump();
         scheduleAdditionalJobsForIncrementalCompilation(DepGraph);
       }
       formBatchJobsAndAddPendingJobsToTaskQueue();
@@ -766,6 +770,7 @@ namespace driver {
     void scheduleInitiallyNeededJobForIncrementalCompilation(
         const Job *Cmd, DependencyGraphT &DepGraph) {
       loadUnparsedRanges(Cmd);
+      loadCompiledSource(Cmd);
       const auto conditionAndHasDependenciesFile =
           loadDependenciesAndComputeCondition(Cmd, DepGraph);
       scheduleJobAccordingToCondition(
@@ -775,15 +780,28 @@ namespace driver {
         assert(ExpDepGraph.getValue().emitDotFileAndVerify(Comp.getDiags()));
     }
 
-    void loadUnparsedRanges(const Job *const Cmd) {
-      const StringRef PrimaryFile = Cmd->getOutput().getBaseInput(0);
-      std::string UnparsedRangesFile =
-          Cmd->getOutput().getAdditionalOutputForType(
-              file_types::TY_UnparsedRanges);
-      if (UnparsedRangesFile.empty())
+    std::pair<StringRef, StringRef> processIncrementalFile(const Job* const Cmd, file_types::ID type,
+      function_ref<void(StringRef primary, StringRef output, DiagnosticEngine&)> andThen) {
+      const StringRef primary = Cmd->getOutput().getBaseInput(0);
+      std::string file = Cmd->getOutput().getAdditionalOutputForType(type);
+      if (file.empty())
         return;
-      PriorUnparsedRanges.addRangesFromPath(PrimaryFile, UnparsedRangesFile,
-                                            Comp.getDiags());
+      andThen(primary, file, Comp.getDiags());
+    }
+
+    void loadUnparsedRanges(const Job *const Cmd) {
+      processIncrementalFile(Cmd, file_types::TY_UnparsedRanges,
+                             [&](StringRef primary, StringRef output, DiagnosticEngine &diags) {
+        PriorUnparsedRanges.addRangesFromPath(primary, output, diags);
+      });
+    }
+
+    void loadCompiledSource(const Job *const Cmd) {
+      processIncrementalFile(Cmd, file_types::TY_CompiledSource,
+                             [&](StringRef primary, StringRef output, DiagnosticEngine &diags) {
+       #error "unimp"
+        assert(false && "do something with these");
+      });
     }
 
     template <typename DependencyGraphT>
@@ -1236,6 +1254,7 @@ namespace driver {
           if (DependenciesFile.empty())
             continue;
 
+#error is this right and CompileSourcesFile use same type array incrementalOutputTypes in Driver.cpp
           StringRef UnparsedRangesFile =
               Cmd->getOutput().getAdditionalOutputForType(
                   file_types::TY_UnparsedRanges);

@@ -107,6 +107,9 @@ def driver_show_job_lifecycle : Flag<["-"], "driver-show-job-lifecycle">,
 def driver_dump_unparsed_ranges : Flag<["-"], "driver-dump-unparsed-ranges">,
   InternalDebugOpt,
   HelpText<"Show the unparsed ranges read upon startup">;
+def driver_dump_compiled_source_diffs : Flag<["-"], "driver-dump-compiled-source-diffs">,
+InternalDebugOpt,
+HelpText<"Show the compiled source diffs read upon startup">;
 def driver_use_filelists : Flag<["-"], "driver-use-filelists">,
   InternalDebugOpt, HelpText<"Pass input files as filelists whenever possible">;
 def driver_filelist_threshold : Separate<["-"], "driver-filelist-threshold">,
