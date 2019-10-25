@@ -22,10 +22,13 @@ using namespace unparsed_ranges;
 void UnparsedRangesForAllFiles::addRangesFromPath(
     const StringRef primaryPath, const StringRef unparsedRangesPath,
     DiagnosticEngine &diags) {
-  auto buffer = llvm::MemoryBuffer::getFile(unparsedRangesPath);
-  if (!buffer)
-    return; // empty is same
-  if (addRangesFromBuffer(primaryPath, *buffer->get()))
+  auto errorOrBuffer = llvm::MemoryBuffer::getFile(unparsedRangesPath);
+  if (std::error_code ec = errorOrBuffer.getError()) {
+    llvm::errs() << "WARNING could not read: " << unparsedRangesPath
+                 << " error " << ec.message() << "\n";
+    return;
+  }
+  if (addRangesFromBuffer(primaryPath, *errorOrBuffer->get()))
     llvm::errs() << "WARNING could not read: " << unparsedRangesPath;
 }
 
@@ -48,4 +51,9 @@ void UnparsedRangesForAllFiles::addNonprimaryRangesForPrimary(
   const auto inserted = rangesByNonprimaryByPrimary.insert(
       {primaryPath.str(), std::move(rangesByNonprimaryFile)});
   assert(inserted.second && "Should not have duplicate primaries.");
+}
+
+void UnparsedRangesForAllFiles::dump() {
+  llvm::yaml::Output dumper(llvm::errs());
+  dumper << rangesByNonprimaryByPrimary;
 }

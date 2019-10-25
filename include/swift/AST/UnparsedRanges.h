@@ -45,7 +45,7 @@ struct SerializableSourceRange {
 
 typedef std::vector<SerializableSourceRange> Ranges;
 typedef std::map<std::string, Ranges> RangesByNonprimary;
-typedef llvm::StringMap<RangesByNonprimary> RangesByNonprimaryByPrimary;
+typedef std::map<std::string, RangesByNonprimary> RangesByNonprimaryByPrimary;
 
 static constexpr const char *unparsedRangesFileHeader =
     "### Unparsed source ranges file v0 ###\n";
@@ -74,8 +74,8 @@ struct llvm::yaml::MappingTraits<
 };
 
 LLVM_YAML_IS_SEQUENCE_VECTOR(swift::unparsed_ranges::SerializableSourceRange)
-LLVM_YAML_IS_STRING_MAP(
-    std::vector<swift::unparsed_ranges::SerializableSourceRange>)
+LLVM_YAML_IS_STRING_MAP(swift::unparsed_ranges::Ranges)
+LLVM_YAML_IS_STRING_MAP(swift::unparsed_ranges::RangesByNonprimary)
 
 namespace swift {
 namespace unparsed_ranges {

@@ -746,6 +746,8 @@ namespace driver {
         for (const Job *Cmd : Comp.getJobs()) {
           scheduleInitiallyNeededJobForIncrementalCompilation(Cmd, DepGraph);
         }
+        if (Comp.getArgs().hasArg(options::OPT_driver_dump_unparsed_ranges))
+          PriorUnparsedRanges.dump();
         scheduleAdditionalJobsForIncrementalCompilation(DepGraph);
       }
       formBatchJobsAndAddPendingJobsToTaskQueue();

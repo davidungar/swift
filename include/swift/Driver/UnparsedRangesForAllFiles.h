@@ -25,6 +25,8 @@ public:
   void addRangesFromPath(StringRef primaryPath, StringRef unparsedRangesPath,
                          DiagnosticEngine &);
 
+  void dump();
+
 private:
   /// Return true if error
   bool addRangesFromBuffer(const StringRef primaryPath,
