@@ -97,7 +97,7 @@ struct SupplementaryOutputPaths {
 
   /// The path to which we should save the source code of a primary source file to be compiled.
   /// Used to diff sources of primary inputs.
-  std::string CompiledSourcesFilePath;
+  std::string CompiledSourceFilePath;
 
   /// Path to a file which should contain serialized diagnostics for this
   /// frontend invocation.

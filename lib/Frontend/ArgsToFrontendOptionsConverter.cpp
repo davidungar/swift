@@ -535,7 +535,7 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
     return true;
   }
   if (!FrontendOptions::canActionEmitCompiledSource(Opts.RequestedAction) &&
-      Opts.InputsAndOutputs.hasCompiledSourcesPath()) {
+      Opts.InputsAndOutputs.hasCompiledSourcePath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_compiled_source);
     return true;
   }

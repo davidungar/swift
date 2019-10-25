@@ -238,7 +238,7 @@ namespace driver {
     /// Used for experimental incremental work
     unparsed_ranges::UnparsedRangesForAllFiles PriorUnparsedRanges;
 
-    #warning "put diffs here"
+    llvm::StringMap<Ranges> ChangedRangesByPrimary;
 
   private:
     /// Helper for tracing the propagation of marks in the graph.
@@ -751,7 +751,7 @@ namespace driver {
         if (Comp.getArgs().hasArg(options::OPT_driver_dump_unparsed_ranges))
           PriorUnparsedRanges.dump();
         if (Comp.getArgs().hasArg(options::OPT_driver_dump_compiled_source_diffs))
-          CompiledSourceDiffs.dump();
+          ChangedRangesByPrimary.dump();
         scheduleAdditionalJobsForIncrementalCompilation(DepGraph);
       }
       formBatchJobsAndAddPendingJobsToTaskQueue();
@@ -780,7 +780,7 @@ namespace driver {
         assert(ExpDepGraph.getValue().emitDotFileAndVerify(Comp.getDiags()));
     }
 
-    std::pair<StringRef, StringRef> processIncrementalFile(const Job* const Cmd, file_types::ID type,
+    void processIncrementalFile(const Job* const Cmd, file_types::ID type,
       function_ref<void(StringRef primary, StringRef output, DiagnosticEngine&)> andThen) {
       const StringRef primary = Cmd->getOutput().getBaseInput(0);
       std::string file = Cmd->getOutput().getAdditionalOutputForType(type);

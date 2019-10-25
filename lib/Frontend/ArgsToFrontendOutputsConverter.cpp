@@ -321,7 +321,7 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
     sop.DependenciesFilePath = (*dependenciesFile)[i];
     sop.ReferenceDependenciesFilePath = (*referenceDependenciesFile)[i];
     sop.UnparsedRangesFilePath = (*unparsedRangesFile)[i];
-    sop.CompiledSourcesFilePath = (*compiledSourcesFile)[i];
+    sop.CompiledSourceFilePath = (*compiledSourceFile)[i];
     sop.SerializedDiagnosticsPath = (*serializedDiagnostics)[i];
     sop.FixItsOutputPath = (*fixItsOutput)[i];
     sop.LoadedModuleTracePath = (*loadedModuleTrace)[i];
@@ -439,7 +439,7 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   sop.DependenciesFilePath = dependenciesFilePath;
   sop.ReferenceDependenciesFilePath = referenceDependenciesFilePath;
   sop.UnparsedRangesFilePath = unparsedRangesFilePath;
-  sop.CompiledSourcesFilePath = compilesSourcesFilePath;
+  sop.CompiledSourceFilePath = compiledSourceFilePath;
   sop.SerializedDiagnosticsPath = serializedDiagnosticsPath;
   sop.FixItsOutputPath = fixItsOutputPath;
   sop.LoadedModuleTracePath = loadedModuleTracePath;

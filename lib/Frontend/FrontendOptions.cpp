@@ -273,7 +273,7 @@ bool FrontendOptions::canActionEmitUnparsedRanges(ActionType action) {
   return canActionEmitReferenceDependencies(action);
 }
 
-bool FrontendOptions::canActionEmitCompiledSources(ActionType action) {
+bool FrontendOptions::canActionEmitCompiledSource(ActionType action) {
   return canActionEmitReferenceDependencies(action);
 }
 

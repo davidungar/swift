@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/OutputFileMap.h"
+#include "swift/Basic/FileTypes.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Path.h"
@@ -232,10 +233,12 @@ OutputFileMap::parse(std::unique_ptr<llvm::MemoryBuffer> Buffer,
         llvm::SmallString<128> Storage;
         if (!InputPath->getValue(Storage).empty()) {
           std::string baseName = OutputMap[Kind];
-          baseName.resize(name.size() -
+          baseName.resize(baseName.size() -
                           getExtension(file_types::TY_SwiftDeps).size());
-          auto insertFilename = [&](file_types type) {
-            OutputMap.insert({type, name + getExtension(type)});
+          auto insertFilename = [&](file_types::ID type) {
+            std::string s = baseName;
+            s += getExtension(type);
+            OutputMap.insert({type, s});
           };
           insertFilename(file_types::TY_UnparsedRanges);
           insertFilename(file_types::TY_CompiledSource);

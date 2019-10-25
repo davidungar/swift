@@ -952,7 +952,7 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
           .InputsAndOutputs.hasReferenceDependenciesPath() &&
       Instance.getPrimarySourceFiles().empty()) {
     Instance.getASTContext().Diags.diagnose(
-        SourceLoc(), diag::emit_without_primary_file("-emit-reference-dependencies"));
+        SourceLoc(), diag::emit_reference_dependencies_without_primary_file);
     return;
   }
   for (auto *SF : Instance.getPrimarySourceFiles()) {
@@ -986,7 +986,7 @@ emitUnparsedRangesForAllPrimaryInputsIfNeeded(CompilerInvocation &Invocation,
     const std::string &unparsedRangesFilePath =
     Invocation.getUnparsedRangesFilePathForPrimary(SF->getFilename());
     if (!unparsedRangesFilePath.empty()) {
-      Instance.emitUnparsedRanges)(Instance.getASTContext().Diags, SF,
+      Instance.emitUnparsedRanges(Instance.getASTContext().Diags, SF,
                                    unparsedRangesFilePath);
     }
   }
@@ -1002,11 +1002,11 @@ emitCompiledSourceForAllPrimaryInputsIfNeeded(CompilerInvocation &Invocation,
     return;
   }
   for (auto *SF : Instance.getPrimarySourceFiles()) {
-    const std::string &compiledSourcesFilePath =
-    Invocation.getCompiledSourcesFilePathForPrimary(SF->getFilename());
-    if (!compiledSourcesFilePath.empty()) {
-      Instance.emitCompiledSources(Instance.getASTContext().Diags, SF,
-                                   compiledSourcesFilePath);
+    const std::string &compiledSourceFilePath =
+    Invocation.getCompiledSourceFilePathForPrimary(SF->getFilename());
+    if (!compiledSourceFilePath.empty()) {
+      Instance.emitCompiledSource(Instance.getASTContext().Diags, SF,
+                                   compiledSourceFilePath);
     }
   }
 }

@@ -136,8 +136,12 @@ ERROR(cannot_emit_ir_skipping_function_bodies,none,
       "-experimental-skip-non-inlinable-function-bodies does not support "
       "emitting IR", ())
 
-WARNING(emit_without_primary_file, (StringRef),
-  "ignoring '%0' (requires -primary-file)", ())
+WARNING(emit_reference_dependencies_without_primary_file,none,
+  "ignoring -emit-reference-dependencies (requires -primary-file)", ())
+WARNING(emit_unparsed_ranges_without_primary_file,none,
+"ignoring -emit-unparsed-ranges (requires -primary-file)", ())
+WARNING(emit_compiled_source_without_primary_file,none,
+"ignoring -emit-compiled-source (requires -primary-file)", ())
 
 ERROR(error_bad_module_name,none,
       "module name \"%0\" is not a valid identifier"

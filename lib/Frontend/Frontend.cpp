@@ -106,10 +106,10 @@ std::string CompilerInvocation::getUnparsedRangesFilePathForPrimary(
   return getPrimarySpecificPathsForPrimary(filename)
       .SupplementaryOutputs.UnparsedRangesFilePath;
 }
-std::string CompilerInvocation::getCompiledSourcesFilePathForPrimary(
+std::string CompilerInvocation::getCompiledSourceFilePathForPrimary(
     StringRef filename) const {
   return getPrimarySpecificPathsForPrimary(filename)
-      .SupplementaryOutputs.CompiledSourcesFilePath;
+      .SupplementaryOutputs.CompiledSourceFilePath;
 }
 std::string
 CompilerInvocation::getSerializedDiagnosticsPathForAtMostOnePrimary() const {
