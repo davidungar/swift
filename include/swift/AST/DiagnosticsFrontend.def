@@ -278,6 +278,14 @@ ERROR(error_invalid_debug_prefix_map, none,
       "invalid argument '%0' to -debug-prefix-map; it must be of the form "
       "'original=remapped'", (StringRef))
 
+
+ERROR(error_unable_to_write_unparsed_ranges_file, none,
+"unable to write unparsed ranges file '$0': %1", (StringRef, StringRef))
+
+ERROR(error_unable_to_write_compiled_source_file, none,
+"unable to write compiled source file: '$0': %1", (StringRef, StringRef))
+
+
 ERROR(invalid_vfs_overlay_file,none,
       "invalid virtual overlay file '%0'", (StringRef))
 

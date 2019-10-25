@@ -21,7 +21,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/UnparsedRanges.h"
+#include "swift/AST/IncrementalRanges.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
@@ -1249,19 +1249,20 @@ CompilerInstance::getPrimarySpecificPathsForSourceFile(
   return Invocation.getPrimarySpecificPathsForSourceFile(SF);
 }
 
-void CompilerInstance::emitUnparsedRanges(DiagnosticEngine &diags,
+
+bool CompilerInstance::emitUnparsedRanges(DiagnosticEngine &diags,
                                           const SourceFile *primaryFile,
                                           StringRef outputPath) const {
   if (const auto *ps = PersistentState.get())
-    unparsed_ranges::Emitter(outputPath, primaryFile, *ps, SourceMgr, diags)
+    return incremental_ranges::UnparsedRangeEmitter(outputPath, primaryFile, *ps, SourceMgr, diags)
         .emit();
+  return false;
 }
 
 
-void CompilerInstance::emitCompiledSource(DiagnosticEngine &diags,
+bool CompilerInstance::emitCompiledSource(DiagnosticEngine &diags,
                                           const SourceFile *primaryFile,
                                           StringRef outputPath) const {
-  if (const auto *ps = PersistentState.get())
-    compiled_source::Emitter(outputPath, primaryFile, *ps, SourceMgr, diags)
-        .emit();
+  return incremental_ranges::CompiledSourceEmitter(outputPath, primaryFile, SourceMgr, diags)
+  .emit();
 }

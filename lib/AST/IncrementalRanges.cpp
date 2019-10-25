@@ -1,4 +1,4 @@
-//===------------- UnparsedRanges.cpp - Generates swiftdeps files ---------===//
+//===------------- IncrementalRanges.cpp - Generates swiftdeps files ---------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -12,17 +12,18 @@
 
 // TBD
 
-#include "swift/AST/UnparsedRanges.h"
+#include "swift/AST/IncrementalRanges.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/FileSystem.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "llvm/Support/YAMLParser.h"
 
 using namespace swift;
-using namespace unparsed_ranges;
+using namespace incremental_ranges;
 
 SerializableSourceLocation::SerializableSourceLocation(
     const SourceLoc loc, const SourceManager &SM) {
@@ -36,15 +37,23 @@ SerializableSourceRange::SerializableSourceRange(const SourceRange r,
     : start(SerializableSourceLocation(r.Start, SM)),
       end(SerializableSourceLocation(r.End, SM)) {}
 
-void Emitter::emit() const {
-  withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out) {
+bool UnparsedRangeEmitter::emit() const {
+  return withOutputFile(diags, outputPath, [&](llvm::raw_fd_ostream &out) {
     out << unparsedRangesFileHeader;
-    emitRanges(out);
-    return false;
+    if (!out.has_error()) {
+      emitRanges(out);
+      if (!out.has_error())
+        return false;
+    }
+    diags.diagnose(diag::error_unable_to_write_unparsed_ranges_file,
+    outputPath,
+                   out.error().message());
+    out.clear_error();
+    return true;
   });
 }
 
-void Emitter::emitRanges(llvm::raw_ostream &out) const {
+void UnparsedRangeEmitter::emitRanges(llvm::raw_ostream &out) const {
   llvm::yaml::Output yamlWriter(out);
   auto rangesByNonprimary = collectRanges();
   std::map<std::string, std::vector<SerializableSourceRange>>
@@ -56,7 +65,7 @@ void Emitter::emitRanges(llvm::raw_ostream &out) const {
   yamlWriter << serializedRangesByNonprimary;
 }
 
-std::map<std::string, std::vector<SourceRange>> Emitter::collectRanges() const {
+std::map<std::string, std::vector<SourceRange>> UnparsedRangeEmitter::collectRanges() const {
   std::map<std::string, std::vector<SourceRange>> rangesByNonprimaryFile;
   persistentState.forEachDelayedSourceRange(
       primaryFile, [&](const SourceRange sr) {
@@ -68,7 +77,7 @@ std::map<std::string, std::vector<SourceRange>> Emitter::collectRanges() const {
 }
 
 std::vector<SourceRange>
-Emitter::sortRanges(std::vector<SourceRange> ranges) const {
+UnparsedRangeEmitter::sortRanges(std::vector<SourceRange> ranges) const {
   std::sort(ranges.begin(), ranges.end(),
             [&](const SourceRange &lhs, const SourceRange &rhs) {
               return sourceMgr.isBeforeInBuffer(lhs.Start, rhs.Start);
@@ -77,7 +86,7 @@ Emitter::sortRanges(std::vector<SourceRange> ranges) const {
 }
 
 std::vector<SourceRange>
-Emitter::coalesceSortedRanges(std::vector<SourceRange> ranges) const {
+UnparsedRangeEmitter::coalesceSortedRanges(std::vector<SourceRange> ranges) const {
   auto toBeWidened = ranges.begin();
   auto candidate = toBeWidened + 1;
   while (candidate < ranges.end()) {
@@ -91,16 +100,36 @@ Emitter::coalesceSortedRanges(std::vector<SourceRange> ranges) const {
 }
 
 std::vector<SerializableSourceRange>
-Emitter::serializeRanges(std::vector<SourceRange> ranges) const {
+UnparsedRangeEmitter::serializeRanges(std::vector<SourceRange> ranges) const {
   std::vector<SerializableSourceRange> result;
   for (const auto r : ranges)
     result.push_back(SerializableSourceRange(r, sourceMgr));
   return result;
 }
 
-bool Emitter::isImmediatelyBeforeOrOverlapping(SourceRange prev,
+bool UnparsedRangeEmitter::isImmediatelyBeforeOrOverlapping(SourceRange prev,
                                                SourceRange next) const {
   // TODO: investigate returning true if only white space intervenes.
   // Would be more work here, but less work downstream.
   return !sourceMgr.isBeforeInBuffer(prev.End, next.Start);
+}
+
+//==============================================================================
+// MARK: CompiledSource
+//==============================================================================
+
+bool CompiledSourceEmitter::emit() {
+  auto const bufID = primaryFile->getBufferID();
+  if (bufID == -1)
+    return;
+  return withOutputFile(diags, outputPath,
+    [&](llvm::raw_fd_ostream &out) {
+    out << sourceMgr.getEntireTextForBuffer(bufID);
+    if (!out.has_error())
+      return false;
+    diags.diagnose(diag::error_unable_to_write_compiled_source_file,
+                   outputPath, out.error().message());
+    out.clear_error();
+    return true;
+  });
 }

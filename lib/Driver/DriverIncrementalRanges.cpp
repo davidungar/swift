@@ -1,4 +1,4 @@
-//===-- UnparsedRangesForAllFiles.cpp ------------------------------------==//
+//===------ DriverIncrementalRanges.cpp ------------------------------------==//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,16 +10,21 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Driver/UnparsedRangesForAllFiles.h"
+#include "swift/Driver/DriverIncrementalRanges.h"
 
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
-using namespace unparsed_ranges;
+using namespace incremental_ranges;
 
-void UnparsedRangesForAllFiles::addRangesFromPath(
+//==============================================================================
+// MARK: UnparsedRangesForEachPrimary
+//==============================================================================
+
+
+void UnparsedRangesForEachPrimary::addRangesFromPath(
     const StringRef primaryPath, const StringRef unparsedRangesPath,
     DiagnosticEngine &diags) {
   auto errorOrBuffer = llvm::MemoryBuffer::getFile(unparsedRangesPath);
@@ -32,7 +37,7 @@ void UnparsedRangesForAllFiles::addRangesFromPath(
     llvm::errs() << "WARNING could not read: " << unparsedRangesPath;
 }
 
-bool UnparsedRangesForAllFiles::addRangesFromBuffer(
+bool UnparsedRangesForEachPrimary::addRangesFromBuffer(
     const StringRef primaryPath, const llvm::MemoryBuffer &buffer) {
   RangesByNonprimary rangesByNonprimaryFile;
   if (!buffer.getBuffer().startswith(unparsedRangesFileHeader))
@@ -46,14 +51,26 @@ bool UnparsedRangesForAllFiles::addRangesFromBuffer(
   return false;
 }
 
-void UnparsedRangesForAllFiles::addNonprimaryRangesForPrimary(
+void UnparsedRangesForEachPrimary::addNonprimaryRangesForPrimary(
     const StringRef primaryPath, RangesByNonprimary rangesByNonprimaryFile) {
   const auto inserted = rangesByNonprimaryByPrimary.insert(
       {primaryPath.str(), std::move(rangesByNonprimaryFile)});
   assert(inserted.second && "Should not have duplicate primaries.");
 }
 
-void UnparsedRangesForAllFiles::dump() {
+void UnparsedRangesForEachPrimary::dump() {
   llvm::yaml::Output dumper(llvm::errs());
   dumper << rangesByNonprimaryByPrimary;
+}
+
+//==============================================================================
+// MARK: ChangedSourceRangesForEachPrimary
+//==============================================================================
+
+void ChangedSourceRangesForEachPrimary::addChanges(StringRef primaryPath, StringRef compiledSourcePath, DiagnosticEngine& diags) {
+  #error unimp
+}
+
+void ChangedSourceRangesForEachPrimary::dump() const {
+#error unimp
 }

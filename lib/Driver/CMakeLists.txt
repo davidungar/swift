@@ -4,6 +4,7 @@ set(swiftDriver_sources
   DarwinToolChains.cpp
   DependencyGraph.cpp
   Driver.cpp
+  DriverIncrementalRanges.cpp
   ExperimentalDependencyDriverGraph.cpp
   FrontendUtil.cpp
   Job.cpp
@@ -12,7 +13,6 @@ set(swiftDriver_sources
   ToolChain.cpp
   ToolChains.cpp
   UnixToolChains.cpp
-  UnparsedRangesForAllFiles.cpp
   WindowsToolChains.cpp
   )
 

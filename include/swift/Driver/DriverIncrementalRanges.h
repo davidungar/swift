@@ -1,4 +1,4 @@
-//===--- UnparsedRangesForAllFiles.h ------------------*- C++-*-===//
+//===---------------- DriverIncrementalRanges.h ------------------*- C++-*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,15 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_DRIVER_UNPARSEDRANGESFORALLFILES_H
-#define SWIFT_DRIVER_UNPARSEDRANGESFORALLFILES_H
+#ifndef SWIFT_DRIVER_DRIVERINCREMENTALRANGES_H
+#define SWIFT_DRIVER_DRIVERINCREMENTALRANGES_H
 
-#include "swift/AST/UnparsedRanges.h"
+#include "swift/AST/IncrementalRanges.h"
 #include "llvm/Support/MemoryBuffer.h"
 
 namespace swift {
-namespace unparsed_ranges {
-class UnparsedRangesForAllFiles {
+namespace incremental_ranges {
+class UnparsedRangesForEachPrimary {
   RangesByNonprimaryByPrimary rangesByNonprimaryByPrimary;
 
 public:
@@ -32,11 +32,17 @@ private:
   bool addRangesFromBuffer(const StringRef primaryPath,
                            const llvm::MemoryBuffer &buffer);
 
-  void addNonprimaryRangesForPrimary(const StringRef primaryPath,
+  void addNonprimaryRangesForPrimary(StringRef primaryPath,
                                      RangesByNonprimary rangesByNonprimaryFile);
 };
 
-} // namespace unparsed_ranges
+class ChangedSourceRangesForEachPrimary {
+public:
+ void addChanges(StringRef primaryPath, StringRef compiledSourcePath, DiagnosticEngine& );
+ void dump() const;
+};
+
+} // namespace incremental_ranges
 } // namespace swift
 
-#endif /* SWIFT_DRIVER_UNPARSEDRANGESFORALLFILES_H */
+#endif /* SWIFT_DRIVER_DRIVERINCREMENTALRANGES_H */

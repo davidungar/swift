@@ -29,7 +29,7 @@
 #include "swift/Driver/Job.h"
 #include "swift/Driver/ParseableOutput.h"
 #include "swift/Driver/ToolChain.h"
-#include "swift/Driver/UnparsedRangesForAllFiles.h"
+#include "swift/Driver/DriverIncrementalRanges.h"
 #include "swift/Option/Options.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/MapVector.h"
@@ -236,9 +236,11 @@ namespace driver {
 
     /// For each primary, the unparsed ranges in each non-primary
     /// Used for experimental incremental work
-    unparsed_ranges::UnparsedRangesForAllFiles PriorUnparsedRanges;
+    incremental_ranges::UnparsedRangesForEachPrimary PriorUnparsedRanges;
 
-    llvm::StringMap<Ranges> ChangedRangesByPrimary;
+    /// For each primary, the source ranges that changed
+    /// If absent, unknown.
+    incremental_ranges::ChangedSourceRangesForEachPrimary ChangedRanges;
 
   private:
     /// Helper for tracing the propagation of marks in the graph.
@@ -751,7 +753,7 @@ namespace driver {
         if (Comp.getArgs().hasArg(options::OPT_driver_dump_unparsed_ranges))
           PriorUnparsedRanges.dump();
         if (Comp.getArgs().hasArg(options::OPT_driver_dump_compiled_source_diffs))
-          ChangedRangesByPrimary.dump();
+          ChangedRanges.dump();
         scheduleAdditionalJobsForIncrementalCompilation(DepGraph);
       }
       formBatchJobsAndAddPendingJobsToTaskQueue();
@@ -799,8 +801,7 @@ namespace driver {
     void loadCompiledSource(const Job *const Cmd) {
       processIncrementalFile(Cmd, file_types::TY_CompiledSource,
                              [&](StringRef primary, StringRef output, DiagnosticEngine &diags) {
-       #error "unimp"
-        assert(false && "do something with these");
+       ChangedRanges.addChanges(primary, output, diags);
       });
     }
 
@@ -1248,17 +1249,12 @@ namespace driver {
         // Make sure we record any files that still need to be rebuilt.
         for (const Job *Cmd : Comp.getJobs()) {
           // Skip files that don't use dependency analysis.
-          StringRef DependenciesFile =
-              Cmd->getOutput().getAdditionalOutputForType(
-                  file_types::TY_SwiftDeps);
-          if (DependenciesFile.empty())
-            continue;
-
-#error is this right and CompileSourcesFile use same type array incrementalOutputTypes in Driver.cpp
-          StringRef UnparsedRangesFile =
-              Cmd->getOutput().getAdditionalOutputForType(
-                  file_types::TY_UnparsedRanges);
-          if (UnparsedRangesFile.empty())
+          bool shouldHaveOutput = false;
+          file_types::forEachIncrementalOutputType(
+                                                   [&](const file_types::ID type) {
+            shouldHaveOutput |= !Cmd->getOutput().getAdditionalOutputForType(type).empty();
+          });
+          if (!shouldHaveOutput)
             continue;
 
           // Don't worry about commands that finished or weren't going to run.

@@ -1,4 +1,4 @@
-//===------------- UnparsedRanges.h -----------------------------*- C++ -*-===//
+//===------------- IncrementalRanges.h -----------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_AST_UNPARSED_RANGES_H
-#define SWIFT_AST_UNPARSED_RANGES_H
+#ifndef SWIFT_AST_INCREMENTALRANGES_H
+#define SWIFT_AST_INCREMENTALRANGES_H
 
 // Summary: TBD
 
@@ -27,7 +27,7 @@ class SourceManager;
 class DiagnosticEngine;
 class SourceFile;
 
-namespace unparsed_ranges {
+namespace incremental_ranges {
 
 struct SerializableSourceLocation {
   uint64_t line = 0;
@@ -46,44 +46,45 @@ struct SerializableSourceRange {
 typedef std::vector<SerializableSourceRange> Ranges;
 typedef std::map<std::string, Ranges> RangesByNonprimary;
 typedef std::map<std::string, RangesByNonprimary> RangesByNonprimaryByPrimary;
+typedef llvm::StringMap<Ranges> RangesByPrimary;
 
 static constexpr const char *unparsedRangesFileHeader =
     "### Unparsed source ranges file v0 ###\n";
 
-} // namespace unparsed_ranges
+} // namespace incremental_ranges
 } // namespace swift
 
 template <>
 struct llvm::yaml::MappingTraits<
-    swift::unparsed_ranges::SerializableSourceLocation> {
+    swift::incremental_ranges::SerializableSourceLocation> {
   static const bool flow = true;
   static void mapping(llvm::yaml::IO &io,
-                      swift::unparsed_ranges::SerializableSourceLocation &loc) {
+                      swift::incremental_ranges::SerializableSourceLocation &loc) {
     io.mapRequired("line", loc.line), io.mapRequired("column", loc.column);
   }
 };
 
 template <>
 struct llvm::yaml::MappingTraits<
-    swift::unparsed_ranges::SerializableSourceRange> {
+    swift::incremental_ranges::SerializableSourceRange> {
   static const bool flow = true;
   static void mapping(llvm::yaml::IO &io,
-                      swift::unparsed_ranges::SerializableSourceRange &sr) {
+                      swift::incremental_ranges::SerializableSourceRange &sr) {
     io.mapRequired("start", sr.start), io.mapRequired("end", sr.end);
   }
 };
 
-LLVM_YAML_IS_SEQUENCE_VECTOR(swift::unparsed_ranges::SerializableSourceRange)
-LLVM_YAML_IS_STRING_MAP(swift::unparsed_ranges::Ranges)
-LLVM_YAML_IS_STRING_MAP(swift::unparsed_ranges::RangesByNonprimary)
+LLVM_YAML_IS_SEQUENCE_VECTOR(swift::incremental_ranges::SerializableSourceRange)
+LLVM_YAML_IS_STRING_MAP(swift::incremental_ranges::Ranges)
+LLVM_YAML_IS_STRING_MAP(swift::incremental_ranges::RangesByNonprimary)
 
 namespace swift {
-namespace unparsed_ranges {
+namespace incremental_ranges {
 //==============================================================================
-// MARK: Emitter
+// MARK: UnparsedRangeEmitter
 //==============================================================================
 
-class Emitter {
+class UnparsedRangeEmitter {
   const StringRef outputPath;
   const SourceFile *const primaryFile;
   const PersistentParserState &persistentState;
@@ -91,13 +92,14 @@ class Emitter {
   DiagnosticEngine &diags;
 
 public:
-  Emitter(StringRef outputPath, const SourceFile *primaryFile,
+  UnparsedRangeEmitter(StringRef outputPath, const SourceFile *primaryFile,
           const PersistentParserState &persistentState,
           const SourceManager &sourceMgr, DiagnosticEngine &diags)
       : outputPath(outputPath), primaryFile(primaryFile),
         persistentState(persistentState), sourceMgr(sourceMgr), diags(diags) {}
 
-  void emit() const;
+  /// True for error
+  bool emit() const;
 
 public:
   void emitRanges(llvm::raw_ostream &out) const;
@@ -118,7 +120,25 @@ private:
                                         SourceRange next) const;
 };
 
-} // namespace unparsed_ranges
+//==============================================================================
+// MARK: CompiledSourceEmitter
+//==============================================================================
+
+class CompiledSourceEmitter {
+  const StringRef outputPath;
+  const SourceFile *const primaryFile;
+  const SourceManager &sourceMgr;
+  DiagnosticEngine &diags;
+
+  public:
+CompiledSourceEmitter(StringRef outputPath, const SourceFile* primaryFile, const SourceManager &sourceMgr, DiagnosticEngine &diags) :
+outputPath(outputPath), primaryFile(primaryFile), sourceMgr(sourceMgr), diags(diags) {}
+
+  /// True for error
+  bool emit();
+};
+
+} // namespace incremental_ranges
 } // namespace swift
 
-#endif // SWIFT_AST_UNPARSED_RANGES_H
+#endif // SWIFT_AST_INCREMENTALRANGES_H

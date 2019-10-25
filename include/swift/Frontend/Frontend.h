@@ -670,11 +670,13 @@ public:
   getPrimarySpecificPathsForSourceFile(const SourceFile &SF) const;
 
   /// Write out the unparsed (delayed) source ranges
-  void emitUnparsedRanges(DiagnosticEngine &diags,
+  /// Return true for error
+  bool emitUnparsedRanges(DiagnosticEngine &diags,
                           const SourceFile *primaryFile,
                           StringRef outputPath) const;
 
-  void emitCompiledSource(DiagnosticEngine &diags,
+  /// Return true for error
+  bool emitCompiledSource(DiagnosticEngine &diags,
                            const SourceFile *primaryFile,
                            StringRef outputPath) const;
 

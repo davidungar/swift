@@ -971,7 +971,6 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
     }
   }
 }
-#warning "factor next two and prev "
 static void
 emitUnparsedRangesForAllPrimaryInputsIfNeeded(CompilerInvocation &Invocation,
                                               CompilerInstance &Instance) {
@@ -986,7 +985,7 @@ emitUnparsedRangesForAllPrimaryInputsIfNeeded(CompilerInvocation &Invocation,
     const std::string &unparsedRangesFilePath =
     Invocation.getUnparsedRangesFilePathForPrimary(SF->getFilename());
     if (!unparsedRangesFilePath.empty()) {
-      Instance.emitUnparsedRanges(Instance.getASTContext().Diags, SF,
+      (void)Instance.emitUnparsedRanges(Instance.getASTContext().Diags, SF,
                                    unparsedRangesFilePath);
     }
   }
@@ -1005,7 +1004,7 @@ emitCompiledSourceForAllPrimaryInputsIfNeeded(CompilerInvocation &Invocation,
     const std::string &compiledSourceFilePath =
     Invocation.getCompiledSourceFilePathForPrimary(SF->getFilename());
     if (!compiledSourceFilePath.empty()) {
-      Instance.emitCompiledSource(Instance.getASTContext().Diags, SF,
+      (void)Instance.emitCompiledSource(Instance.getASTContext().Diags, SF,
                                    compiledSourceFilePath);
     }
   }
