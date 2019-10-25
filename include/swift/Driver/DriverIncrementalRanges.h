@@ -33,10 +33,11 @@ private:
                            const llvm::MemoryBuffer &buffer);
 
   void addNonprimaryRangesForPrimary(StringRef primaryPath,
-                                     RangesByNonprimary rangesByNonprimaryFile);
+                                     RangesByFilename rangesByNonprimaryFile);
 };
 
 class ChangedSourceRangesForEachPrimary {
+  RangesByFilename rangesByPrimary;
 public:
  void addChanges(StringRef primaryPath, StringRef compiledSourcePath, DiagnosticEngine& );
  void dump() const;

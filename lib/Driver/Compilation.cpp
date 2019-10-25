@@ -770,11 +770,20 @@ namespace driver {
     /// Schedule all jobs we can from the initial list provided by Compilation.
     template <typename DependencyGraphT>
     void scheduleInitiallyNeededJobForIncrementalCompilation(
-        const Job *Cmd, DependencyGraphT &DepGraph) {
+                                                             const Job *Cmd, DependencyGraphT &DepGraph) {
       loadUnparsedRanges(Cmd);
-      loadCompiledSource(Cmd);
       const auto conditionAndHasDependenciesFile =
-          loadDependenciesAndComputeCondition(Cmd, DepGraph);
+      loadDependenciesAndComputeCondition(Cmd, DepGraph);
+      switch (conditionAndHasDependenciesFile.first) {
+      case Job::Condition::Always:
+      case Job::Condition::NewlyAdded:
+        break; // don't bother computing diff
+      case Job::Condition::RunWithoutCascading:
+      case Job::Condition::CheckDependencies:
+        loadCompiledSource(Cmd);
+        break;
+      }
+
       scheduleJobAccordingToCondition(
           Cmd, conditionAndHasDependenciesFile.first,
           conditionAndHasDependenciesFile.second, DepGraph);

@@ -39,7 +39,7 @@ void UnparsedRangesForEachPrimary::addRangesFromPath(
 
 bool UnparsedRangesForEachPrimary::addRangesFromBuffer(
     const StringRef primaryPath, const llvm::MemoryBuffer &buffer) {
-  RangesByNonprimary rangesByNonprimaryFile;
+  RangesByFilename rangesByNonprimaryFile;
   if (!buffer.getBuffer().startswith(unparsedRangesFileHeader))
     return true;
 
@@ -52,13 +52,14 @@ bool UnparsedRangesForEachPrimary::addRangesFromBuffer(
 }
 
 void UnparsedRangesForEachPrimary::addNonprimaryRangesForPrimary(
-    const StringRef primaryPath, RangesByNonprimary rangesByNonprimaryFile) {
+    const StringRef primaryPath, RangesByFilename rangesByNonprimaryFile) {
   const auto inserted = rangesByNonprimaryByPrimary.insert(
       {primaryPath.str(), std::move(rangesByNonprimaryFile)});
   assert(inserted.second && "Should not have duplicate primaries.");
 }
 
 void UnparsedRangesForEachPrimary::dump() {
+  llvm::errs() << "\n*** unparsed ranges: ***\n";
   llvm::yaml::Output dumper(llvm::errs());
   dumper << rangesByNonprimaryByPrimary;
 }
@@ -72,5 +73,8 @@ void ChangedSourceRangesForEachPrimary::addChanges(StringRef primaryPath, String
 }
 
 void ChangedSourceRangesForEachPrimary::dump() const {
-#error unimp
+  llvm::errs() << "\n*** changed source ranges: ***\n";
+  llvm::yaml::Output dumper(llvm::errs());
+  auto *mutableThis = const_cast<ChangedSourceRangesForEachPrimary*>(this);
+  dumper << mutableThis->rangesByPrimary;
 }
