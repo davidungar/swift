@@ -16,6 +16,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsCommon.h"
+#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/SourceManager.h"
@@ -38,19 +39,16 @@ SerializableSourceRange::SerializableSourceRange(const SourceRange r,
       end(SerializableSourceLocation(r.End, SM)) {}
 
 bool UnparsedRangeEmitter::emit() const {
-  return withOutputFile(diags, outputPath, [&](llvm::raw_fd_ostream &out) {
+  const bool hadError = withOutputFile(diags, outputPath, [&](llvm::raw_pwrite_stream &out) {
     out << unparsedRangesFileHeader;
-    if (!out.has_error()) {
-      emitRanges(out);
-      if (!out.has_error())
-        return false;
-    }
-    diags.diagnose(diag::error_unable_to_write_unparsed_ranges_file,
-    outputPath,
-                   out.error().message());
-    out.clear_error();
-    return true;
+    emitRanges(out);
+    return false;
   });
+  if (!hadError)
+    return false;
+  diags.diagnose(SourceLoc(), diag::error_unable_to_write_unparsed_ranges_file,
+                 outputPath, "Output error");
+  return true;
 }
 
 void UnparsedRangeEmitter::emitRanges(llvm::raw_ostream &out) const {
@@ -84,6 +82,7 @@ UnparsedRangeEmitter::sortRanges(std::vector<SourceRange> ranges) const {
             });
   return ranges;
 }
+
 
 std::vector<SourceRange>
 UnparsedRangeEmitter::coalesceSortedRanges(std::vector<SourceRange> ranges) const {
@@ -120,16 +119,18 @@ bool UnparsedRangeEmitter::isImmediatelyBeforeOrOverlapping(SourceRange prev,
 
 bool CompiledSourceEmitter::emit() {
   auto const bufID = primaryFile->getBufferID();
-  if (bufID == -1)
-    return;
-  return withOutputFile(diags, outputPath,
-    [&](llvm::raw_fd_ostream &out) {
-    out << sourceMgr.getEntireTextForBuffer(bufID);
-    if (!out.has_error())
-      return false;
-    diags.diagnose(diag::error_unable_to_write_compiled_source_file,
-                   outputPath, out.error().message());
-    out.clear_error();
+  if (!bufID.hasValue()) {
+    diags.diagnose(SourceLoc(), diag::error_unable_to_write_compiled_source_file,
+    outputPath, "No buffer");
     return true;
-  });
+  }
+  const bool hadError = withOutputFile(diags, outputPath,
+    [&](llvm::raw_pwrite_stream &out) {
+    out << sourceMgr.getEntireTextForBuffer(bufID.getValue());
+    return false;
+   });
+   if (!hadError)
+    return false;
+  diags.diagnose(SourceLoc(), diag::error_unable_to_write_compiled_source_file, outputPath, "Output error");
+  return true;
 }
