@@ -41,6 +41,9 @@ class ChangedSourceRangesForEachPrimary {
 public:
  void addChanges(StringRef primaryPath, StringRef compiledSourcePath, DiagnosticEngine& );
  void dump() const;
+
+ private:
+ static Ranges diff(const llvm::MemoryBuffer &old, const llvm::MemoryBuffer &nnew);
 };
 
 } // namespace incremental_ranges
