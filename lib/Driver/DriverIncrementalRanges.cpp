@@ -13,7 +13,7 @@
 #include "swift/Driver/DriverIncrementalRanges.h"
 
 #include "swift/AST/DiagnosticEngine.h"
-#include "swift/Driver/SourceComparator.h"
+#include "swift/Basic/Diff.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/raw_ostream.h"
@@ -100,6 +100,11 @@ void ChangedSourceRangesForEachPrimary::dump() const {
 }
 
 Ranges ChangedSourceRangesForEachPrimary::diff(const llvm::MemoryBuffer &old, const llvm::MemoryBuffer &nnew) {
+  diff_match_patch<StringRef> differ;
+  differ.Diff_Timeout = 0; // infinity
+  differ.Diff_EditCost = 0;
+  differ.Match_Threshold = 0; // perfection
+  differ.Match_Distance = 1000000;
   auto comp = SourceComparator(old.getBuffer(), nnew.getBuffer());
   comp.compare();
   comp.dump();
