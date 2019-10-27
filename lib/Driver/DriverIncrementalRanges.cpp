@@ -312,7 +312,9 @@ void ChangedSourceRangesForEachPrimary::addChanges(StringRef primaryPath, String
     << " error " << ec.message();
     return;
   }
+  llvm::errs() << "HERE changed in " << primaryPath << "\n";
   auto changedRanges = diff(*errorOrPreviousBuffer->get(), *errorOrCurrentBuffer->get());
+
   auto inserted = rangesByPrimary.insert({primaryPath, changedRanges});
   assert(inserted.second && "Should not insert same primary twice.");
 }

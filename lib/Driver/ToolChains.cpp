@@ -668,7 +668,7 @@ void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
                    "-emit-unparsed-ranges-path");
 #warning add this option
   addOutputsOfType(arguments, Output, Args, file_types::TY_CompiledSource,
-                   "-emit-compiled_source-path");
+                   "-emit-compiled-source-path");
   addOutputsOfType(arguments, Output, Args, file_types::TY_ModuleTrace,
                    "-emit-loaded-module-trace-path");
   addOutputsOfType(arguments, Output, Args, file_types::TY_TBD,
