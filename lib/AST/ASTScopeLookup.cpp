@@ -82,14 +82,14 @@ const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
   // Someday, just use the assertion below. For now, print out lots of info for
   // debugging.
   if (!startingScope) {
-    llvm::errs() << "ASTScopeImpl: resorting to startingScope hack, file: "
-                 << sourceFile->getFilename() << "\n";
     // The check is costly, and inactive lookups will end up here, so don't
     // do the check unless we can't find the startingScope.
     const bool isInInactiveClause =
         isLocWithinAnInactiveClause(loc, sourceFile);
     if (isInInactiveClause)
-      llvm::errs() << "  because location is within an inactive clause\n";
+      return nullptr;
+    llvm::errs() << "ASTScopeImpl: resorting to startingScope hack, file: "
+                 << sourceFile->getFilename() << "\n";
     llvm::errs() << "'";
     name.print(llvm::errs());
     llvm::errs() << "' ";
@@ -106,11 +106,6 @@ const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
     // Might distort things
     //    if (fileScope->crossCheckWithAST())
     //      llvm::errs() << "Tree creation missed some DeclContexts.\n";
-
-    // Crash compilation even if NDEBUG
-    if (isInInactiveClause)
-      llvm::report_fatal_error(
-          "A lookup was attempted into an inactive clause");
   }
 
   ASTScopeAssert(startingScope, "ASTScopeImpl: could not find startingScope");
