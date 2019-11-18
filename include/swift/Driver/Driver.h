@@ -20,6 +20,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/OutputFileMap.h"
 #include "swift/Basic/Sanitizers.h"
@@ -49,6 +50,7 @@ namespace swift {
   class DiagnosticEngine;
 namespace driver {
   class Action;
+  class AutolinkExtractJobAction;
   class CommandOutput;
   class Compilation;
   class Job;
@@ -294,6 +296,30 @@ public:
                     const InputInfoMap *OutOfDateMap,
                     Compilation &C) const;
 
+private:
+  NullablePtr<const AutolinkExtractJobAction> buildAutolinkExtractAction(
+      Compilation &C, const ToolChain &TC,
+      const ArrayRef<const Action *> AllLinkerInputs) const;
+
+  /// Construct a LinkAction to perform for the given arguments,
+  /// which are only done for a single architecture.
+  ///
+  /// \param OI The OutputInfo for which Actions should be generated.
+  /// \param C The Compilation to which Actions should be added.
+  /// \param TC The current tool chain.
+  /// \param MergeModuleAction The merge module step if any
+  void buildLinkActions(SmallVectorImpl<const Action *> &TopLevelActions,
+                        Compilation &C, const OutputInfo &OI,
+
+                        const ArrayRef<const Action *> AllLinkerInputs,
+                        const ToolChain &TC,
+                        const JobAction *MergeModuleAction) const;
+
+  void buildDebugInfoActions(SmallVectorImpl<const Action *> &TopLevelActions,
+                             Compilation &C,
+                             const Action *const LinkAction) const;
+
+public:
   /// Construct the OutputFileMap for the driver from the given arguments.
   Optional<OutputFileMap>
   buildOutputFileMap(const llvm::opt::DerivedArgList &Args,

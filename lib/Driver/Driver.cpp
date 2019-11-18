@@ -21,6 +21,7 @@
 #include "swift/AST/DiagnosticsDriver.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/OutputFileMap.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/Statistic.h"
@@ -1968,60 +1969,8 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
   }
 
   if (OI.shouldLink() && !AllLinkerInputs.empty()) {
-    JobAction *LinkAction = nullptr;
-
-    if (OI.LinkAction == LinkKind::StaticLibrary) {
-      LinkAction = C.createAction<StaticLinkJobAction>(AllLinkerInputs,
-                                                    OI.LinkAction);
-    } else {
-      LinkAction = C.createAction<DynamicLinkJobAction>(AllLinkerInputs,
-                                                 OI.LinkAction);
-    }
-
-    // On ELF platforms there's no built in autolinking mechanism, so we
-    // pull the info we need from the .o files directly and pass them as an
-    // argument input file to the linker.
-    SmallVector<const Action *, 2> AutolinkExtractInputs;
-    for (const Action *A : AllLinkerInputs)
-      if (A->getType() == file_types::TY_Object)
-        AutolinkExtractInputs.push_back(A);
-    if (!AutolinkExtractInputs.empty() &&
-        (TC.getTriple().getObjectFormat() == llvm::Triple::ELF ||
-         TC.getTriple().isOSCygMing())) {
-      auto *AutolinkExtractAction =
-          C.createAction<AutolinkExtractJobAction>(AutolinkExtractInputs);
-      // Takes the same inputs as the linker...
-      // ...and gives its output to the linker.
-      LinkAction->addInput(AutolinkExtractAction);
-    }
-
-    if (MergeModuleAction) {
-      if (OI.DebugInfoLevel == IRGenDebugInfoLevel::Normal) {
-        if (TC.getTriple().getObjectFormat() == llvm::Triple::ELF ||
-            TC.getTriple().getObjectFormat() == llvm::Triple::COFF) {
-          auto *ModuleWrapAction =
-              C.createAction<ModuleWrapJobAction>(MergeModuleAction);
-          LinkAction->addInput(ModuleWrapAction);
-        } else {
-          LinkAction->addInput(MergeModuleAction);
-        }
-        // FIXME: Adding the MergeModuleAction as top-level regardless would
-        // allow us to get rid of the special case flag for that.
-      } else {
-        TopLevelActions.push_back(MergeModuleAction);
-      }
-    }
-    TopLevelActions.push_back(LinkAction);
-
-    if (TC.getTriple().isOSDarwin() &&
-        OI.DebugInfoLevel > IRGenDebugInfoLevel::None) {
-      auto *dSYMAction = C.createAction<GenerateDSYMJobAction>(LinkAction);
-      TopLevelActions.push_back(dSYMAction);
-      if (Args.hasArg(options::OPT_verify_debug_info)) {
-        TopLevelActions.push_back(
-            C.createAction<VerifyDebugInfoJobAction>(dSYMAction));
-      }
-    }
+    buildLinkActions(TopLevelActions, C, OI, AllLinkerInputs, TC,
+                     MergeModuleAction);
   } else {
     // We can't rely on the merge module action being the only top-level
     // action that needs to run. There may be other actions (e.g.
@@ -2030,6 +1979,80 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
     if (MergeModuleAction)
       TopLevelActions.push_back(MergeModuleAction);
     TopLevelActions.append(AllLinkerInputs.begin(), AllLinkerInputs.end());
+  }
+}
+
+NullablePtr<const AutolinkExtractJobAction> Driver::buildAutolinkExtractAction(
+    Compilation &C, const ToolChain &TC,
+    const ArrayRef<const Action *> AllLinkerInputs) const {
+  // On ELF platforms there's no built in autolinking mechanism, so we
+  // pull the info we need from the .o files directly and pass them as an
+  // argument input file to the linker.
+  SmallVector<const Action *, 2> AutolinkExtractInputs;
+  for (const Action *A : AllLinkerInputs)
+    if (A->getType() == file_types::TY_Object)
+      AutolinkExtractInputs.push_back(A);
+
+  if (!AutolinkExtractInputs.empty() &&
+      (TC.getTriple().getObjectFormat() == llvm::Triple::ELF ||
+       TC.getTriple().isOSCygMing())) {
+    return C.createAction<AutolinkExtractJobAction>(AutolinkExtractInputs);
+    // Takes the same inputs as the linker...
+    // ...and gives its output to the linker.
+  }
+  return nullptr;
+}
+
+void Driver::buildLinkActions(SmallVectorImpl<const Action *> &TopLevelActions,
+                              Compilation &C, const OutputInfo &OI,
+                              const ArrayRef<const Action *> AllLinkerInputs,
+                              const ToolChain &TC,
+                              const JobAction *const MergeModuleAction) const {
+  JobAction *LinkAction = nullptr;
+
+  if (OI.LinkAction == LinkKind::StaticLibrary) {
+    LinkAction =
+        C.createAction<StaticLinkJobAction>(AllLinkerInputs, OI.LinkAction);
+  } else {
+    LinkAction =
+        C.createAction<DynamicLinkJobAction>(AllLinkerInputs, OI.LinkAction);
+  }
+  if (const auto AutolinkExtractAction =
+          buildAutolinkExtractAction(C, TC, AllLinkerInputs))
+    LinkAction->addInput(AutolinkExtractAction.get());
+
+  if (MergeModuleAction) {
+    if (OI.DebugInfoLevel == IRGenDebugInfoLevel::Normal) {
+      if (TC.getTriple().getObjectFormat() == llvm::Triple::ELF ||
+          TC.getTriple().getObjectFormat() == llvm::Triple::COFF) {
+        auto *ModuleWrapAction =
+            C.createAction<ModuleWrapJobAction>(MergeModuleAction);
+        LinkAction->addInput(ModuleWrapAction);
+      } else {
+        LinkAction->addInput(MergeModuleAction);
+      }
+      // FIXME: Adding the MergeModuleAction as top-level regardless would
+      // allow us to get rid of the special case flag for that.
+    } else {
+      TopLevelActions.push_back(MergeModuleAction);
+    }
+  }
+  TopLevelActions.push_back(LinkAction);
+
+  if (TC.getTriple().isOSDarwin() &&
+      OI.DebugInfoLevel > IRGenDebugInfoLevel::None)
+    buildDebugInfoActions(TopLevelActions, C, LinkAction);
+}
+
+void Driver::buildDebugInfoActions(
+    SmallVectorImpl<const Action *> &TopLevelActions, Compilation &C,
+    const Action *const LinkAction) const {
+  auto *dSYMAction = C.createAction<GenerateDSYMJobAction>(LinkAction);
+  TopLevelActions.push_back(dSYMAction);
+  const DerivedArgList &Args = C.getArgs();
+  if (Args.hasArg(options::OPT_verify_debug_info)) {
+    TopLevelActions.push_back(
+        C.createAction<VerifyDebugInfoJobAction>(dSYMAction));
   }
 }
 
