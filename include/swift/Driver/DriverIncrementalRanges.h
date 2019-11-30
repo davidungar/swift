@@ -51,9 +51,10 @@ class SourceRangeBasedInfo {
   //==============================================================================
 
 public:
-  ///  return hadError and info
-  static llvm::StringMap<SourceRangeBasedInfo>
-  loadAllInfo(const driver::Compilation &);
+  static Optional<SourceRangeBasedInfo>
+  loadInfoForOneJob(const driver::Job *cmd,
+                    const bool showIncrementalBuildDecisions,
+                    DiagnosticEngine &diags);
 
   SourceRangeBasedInfo(SourceRangeBasedInfo &&);
 
@@ -61,8 +62,6 @@ private:
   SourceRangeBasedInfo(SwiftRangesFileContents &&,
                        SourceComparator::LRRanges &&changedRanges,
                        Ranges &&nonlocalChangedRanges);
-
-  static Optional<SourceRangeBasedInfo> wholeFileChanged();
 
   /// Using supplied paths, interrogate the supplementary outputs and update the
   /// two references. Return None if a file was missing or corrupted.
@@ -93,26 +92,18 @@ private:
   //==============================================================================
   // MARK: scheduling jobs
   //==============================================================================
-
 public:
-  static bool shouldScheduleCompileJob(
-      const llvm::StringMap<SourceRangeBasedInfo> &allInfos,
-      const driver::Job *, function_ref<void(bool, Twine)>);
+  bool
+  didInputChangeAtAll(DiagnosticEngine &,
+                      function_ref<void(bool, StringRef)> noteBuilding) const;
+  bool didInputChangeNonlocally(
+      DiagnosticEngine &,
+      function_ref<void(bool, StringRef)> noteInitiallyCascading) const;
 
 private:
   static Optional<bool> isFileNewerThan(StringRef lhs, StringRef rhs,
                                         DiagnosticEngine&);
 
-private:
-  /// Return hadError
-
-  bool didPrimaryParseAnyNonlocalNonprimaryChanges(
-      StringRef primary, const llvm::StringMap<SourceRangeBasedInfo> &,
-      function_ref<void(bool, Twine)>) const;
-
-  bool wasEveryNonprimaryNonlocalChangeUnparsed(
-      StringRef primary, const llvm::StringMap<SourceRangeBasedInfo> &,
-      function_ref<void(bool, Twine)>) const;
 
   //==============================================================================
   // MARK: printing

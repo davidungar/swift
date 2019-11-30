@@ -194,24 +194,9 @@ bool SwiftRangesEmitter::emit() const {
 
 void SwiftRangesEmitter::emitRanges(llvm::raw_ostream &out) const {
   SwiftRangesFileContents wholeFileContents(
-      collectSerializedUnparsedRangesByNonPrimary(),
       collectSortedSerializedNoninlinableFunctionBodies());
   llvm::yaml::Output yamlWriter(out);
   yamlWriter << wholeFileContents;
-}
-
-RangesByFilename
-SwiftRangesEmitter::collectSerializedUnparsedRangesByNonPrimary() const {
-  auto rangesByNonprimary = collectUnparsedRanges();
-  std::map<std::string, std::vector<SerializableSourceRange>>
-      serializedRangesByNonprimary;
-  // The driver counts on getting coalescedSortedRanges because it
-  // does binary chop searches
-  for (auto &nonPriAndRanges : rangesByNonprimary)
-    serializedRangesByNonprimary.insert(
-        {nonPriAndRanges.first, serializeRanges(coalesceSortedRanges(sortRanges(
-                                    std::move(nonPriAndRanges.second))))});
-  return serializedRangesByNonprimary;
 }
 
 Ranges
@@ -247,20 +232,6 @@ SwiftRangesEmitter::collectNoninlinableFunctionBodies() const {
   FnBodyCollector collector(sourceMgr);
   primaryFile->walk(collector);
   return collector.ranges;
-}
-
-std::map<std::string, std::vector<CharSourceRange>>
-SwiftRangesEmitter::collectUnparsedRanges() const {
-  std::map<std::string, std::vector<CharSourceRange>> rangesByNonprimaryFile;
-  persistentState.forEachDelayedSourceRange(
-      primaryFile, [&](const SourceRange sr) {
-        const auto filename = sourceMgr.getIdentifierForBuffer(
-            sourceMgr.findBufferContainingLoc(sr.Start));
-        const auto csr =
-            Lexer::getCharSourceRangeFromSourceRange(sourceMgr, sr);
-        rangesByNonprimaryFile[filename].push_back(csr);
-      });
-  return rangesByNonprimaryFile;
 }
 
 std::vector<CharSourceRange>
