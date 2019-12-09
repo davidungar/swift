@@ -268,12 +268,17 @@ public:
     assert(verify() && "ModuleDepGraph should be fine when created");
   }
 
+  ModuleDepGraph() : ModuleDepGraph(false, false, false, nullptr) {}
+
   /// Unlike the standard \c CoarseGrainedDependencyGraph, returns \c
   /// CoarseGrainedDependencyGraphImpl::LoadResult::AffectsDownstream when
   /// loading a new file, i.e. when determining the initial set. Caller
   /// compensates.
   CoarseGrainedDependencyGraphImpl::LoadResult
   loadFromPath(const driver::Job *, StringRef, DiagnosticEngine &);
+
+  CoarseGrainedDependencyGraphImpl::LoadResult
+  loadFromString(const driver::Job *cmd, StringRef data);
 
   /// For the dot file.
   std::string getGraphID() const { return "driver"; }

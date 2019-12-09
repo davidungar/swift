@@ -66,6 +66,11 @@ LoadResult ModuleDepGraph::loadFromPath(const Job *Cmd, StringRef path,
   return r;
 }
 
+LoadResult ModuleDepGraph::loadFromString(const Job *cmd, StringRef data) {
+  auto buffer = llvm::MemoryBuffer::getMemBuffer(data);
+  return loadFromBuffer(cmd, *buffer.get());
+}
+
 LoadResult ModuleDepGraph::loadFromBuffer(const Job *job,
                                           llvm::MemoryBuffer &buffer) {
 

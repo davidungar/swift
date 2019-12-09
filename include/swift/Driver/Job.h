@@ -314,6 +314,12 @@ public:
         ExtraEnvironment(std::move(ExtraEnvironment)),
         FilelistFileInfos(std::move(Infos)), ResponseFile(ResponseFile) {}
 
+  /// For testing
+  Job()
+      : Job(CompileJobAction(file_types::TY_Object),
+            SmallVector<const Job *, 4>(), std::unique_ptr<CommandOutput>(),
+            nullptr, {}) {}
+
   virtual ~Job();
 
   const JobAction &getSource() const {
