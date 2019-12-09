@@ -10,29 +10,34 @@ using namespace reference_dependency_keys;
 using namespace fine_grained_dependencies;
 using Job = driver::Job;
 
-static LoadResult loadFromString(ModuleDepGraph &dg, const Job *node,
+static LoadResult loadFromString(ModuleDepGraph &dg, const Job *cmd,
                                  StringRef key, StringRef data) {
-  return dg.loadFromString(node, key.str() + ": [" + data.str() + "]");
+  return dg.loadFromString(cmd, key.str() + ": [" + data.str() + "]");
 }
 
-static LoadResult loadFromString(ModuleDepGraph &dg, const Job *node,
+static LoadResult loadFromString(ModuleDepGraph &dg, const Job *cmd,
                                  StringRef key1, StringRef data1,
                                  StringRef key2, StringRef data2) {
-  return dg.loadFromString(node, key1.str() + ": [" + data1.str() + "]\n" +
-                                     key2.str() + ": [" + data2.str() + "]");
+  return dg.loadFromString(cmd, key1.str() + ": [" + data1.str() + "]\n" +
+                                    key2.str() + ": [" + data2.str() + "]");
 }
 
-static LoadResult loadFromString(ModuleDepGraph &dg, const Job *node,
+static LoadResult loadFromString(ModuleDepGraph &dg, const Job *cmd,
                                  StringRef key1, StringRef data1,
                                  StringRef key2, StringRef data2,
                                  StringRef key3, StringRef data3,
                                  StringRef key4, StringRef data4) {
-  return dg.loadFromString(node, key1.str() + ": [" + data1.str() + "]\n" +
-                                     key2.str() + ": [" + data2.str() + "]\n" +
-                                     key3.str() + ": [" + data3.str() + "]\n" +
-                                     key4.str() + ": [" + data4.str() + "]\n");
+  return dg.loadFromString(cmd, key1.str() + ": [" + data1.str() + "]\n" +
+                                    key2.str() + ": [" + data2.str() + "]\n" +
+                                    key3.str() + ": [" + data3.str() + "]\n" +
+                                    key4.str() + ": [" + data4.str() + "]\n");
 }
 
+static LoadResult simulateLoad(ModuleDepGraph &dg, const Job *cmd,
+                               StringRef key, std::vector<StringRef> names) {
+  auto g = SourceFileDepGraph();
+  return dg.loadFromString(cmd, key.str() + ": [" + data.str() + "]");
+}
 
 static OutputFileMap OFM;
 static Job
@@ -53,17 +58,17 @@ static Job
 TEST(ModuleDepGraph, BasicLoad) {
   ModuleDepGraph graph;
 
-  EXPECT_EQ(loadFromString(graph, &job0, dependsTopLevel, "a, b"),
+  EXPECT_EQ(simulateLoad(graph, &job0, dependsTopLevel, {"a", "b"}),
             LoadResult::UpToDate);
-  EXPECT_EQ(loadFromString(graph, &job1, dependsNominal, "c, d"),
+  EXPECT_EQ(simulateLoad(graph, &job1, dependsNominal, {"c", "d"}),
             LoadResult::UpToDate);
-  EXPECT_EQ(loadFromString(graph, &job2, providesTopLevel, "e, f"),
+  EXPECT_EQ(simulateLoad(graph, &job2, providesTopLevel, {"e", "f"}),
             LoadResult::UpToDate);
-  EXPECT_EQ(loadFromString(graph, &job3, providesNominal, "g, h"),
+  EXPECT_EQ(simulateLoad(graph, &job3, providesNominal, {"g", "h"}),
             LoadResult::UpToDate);
-  EXPECT_EQ(loadFromString(graph, &job4, providesDynamicLookup, "i, j"),
+  EXPECT_EQ(simulateLoad(graph, &job4, providesDynamicLookup, {"i", "j"}),
             LoadResult::UpToDate);
-  EXPECT_EQ(loadFromString(graph, &job5, dependsDynamicLookup, "k, l"),
+  EXPECT_EQ(simulateLoad(graph, &job5, dependsDynamicLookup, {"k", "l"}),
             LoadResult::UpToDate);
   EXPECT_EQ(loadFromString(graph, &job6, providesMember, "[m, mm], [n, nn]"),
             LoadResult::UpToDate);
