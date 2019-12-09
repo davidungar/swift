@@ -424,38 +424,36 @@ std::string DependencyKey::computeNameForProvidedEntity<
 
 template <>
 DependencyKey
-DependencyKey::createDependedUponKey<NodeKind::topLevel, DeclBaseName>(
-    const DeclBaseName &dbn) {
-  return DependencyKey(NodeKind::topLevel, DeclAspect::interface, "",
-                       dbn.userFacingName());
+DependencyKey::createDependedUponKey<NodeKind::topLevel, StringRef>(
+    const StringRef &name) {
+  return DependencyKey(NodeKind::topLevel, DeclAspect::interface, "", name);
 }
 
 template <>
 DependencyKey
-DependencyKey::createDependedUponKey<NodeKind::dynamicLookup, DeclBaseName>(
-    const DeclBaseName &dbn) {
+DependencyKey::createDependedUponKey<NodeKind::dynamicLookup, StringRef>(
+    const StringRef &name) {
   return DependencyKey(NodeKind::dynamicLookup, DeclAspect::interface, "",
-                       dbn.userFacingName());
+                       name);
+}
+template <>
+DependencyKey
+DependencyKey::createDependedUponKey<NodeKind::nominal,
+                                     std::pair<StringRef, StringRef>>(
+    const std::pair<StringRef, StringRef> &p) {
+  return DependencyKey(NodeKind::nominal, DeclAspect::interface, p.first, "");
 }
 
 template <>
-DependencyKey DependencyKey::createDependedUponKey<
-    NodeKind::nominal, std::pair<const NominalTypeDecl *, DeclBaseName>>(
-    const std::pair<const NominalTypeDecl *, DeclBaseName> &p) {
-  return DependencyKey(NodeKind::nominal, DeclAspect::interface,
-                       mangleTypeAsContext(p.first), "");
-}
-
-template <>
-DependencyKey DependencyKey::createDependedUponKey<
-    NodeKind::member, std::pair<const NominalTypeDecl *, DeclBaseName>>(
-    const std::pair<const NominalTypeDecl *, DeclBaseName> &p) {
+DependencyKey
+DependencyKey::createDependedUponKey<NodeKind::member,
+                                     std::pair<StringRef, StringRef>>(
+    const std::pair<StringRef, StringRef> &p) {
   const bool isMemberBlank = p.second.empty();
   const auto kind =
       isMemberBlank ? NodeKind::potentialMember : NodeKind::member;
-  return DependencyKey(kind, DeclAspect::interface,
-                       mangleTypeAsContext(p.first),
-                       isMemberBlank ? "" : p.second.userFacingName());
+  return DependencyKey(kind, DeclAspect::interface, p.first,
+                       isMemberBlank ? "" : p.second);
 }
 
 template <>
@@ -487,11 +485,13 @@ class SourceFileDepGraphConstructor {
 
   const std::string interfaceHash;
 
-  const llvm::DenseMap<DeclBaseName, bool> topLevelNames;
-  const llvm::DenseMap<std::pair<const NominalTypeDecl *, DeclBaseName>, bool>
+  const std::vector<std::pair<std::string, bool>> topLevelNames;
+  /// The mangled nominal name and the member base name and is the member
+  /// private?
+  const std::vector<std::pair<std::tuple<std::string, std::string, bool>, bool>>
       usedMembers;
-  const llvm::DenseMap<DeclBaseName, bool> dynamicLookupNames;
-  const llvm::SmallVector<std::string, 16> externalDependencies;
+  const std::vector<std::pair<std::string, bool>> dynamicLookupNames;
+  const std::vector<std::string> externalDependencies;
 
   ConstPtrVec<PrecedenceGroupDecl> precedenceGroups;
   ConstPtrVec<FuncDecl> memberOperatorDecls;
@@ -513,10 +513,11 @@ public:
                                 bool includePrivateDeps,
                                 bool hadCompilationError,
                                 const std::string &interfaceHash,
-                                const llvm::DenseMap<DeclBaseName, bool> &topLevelNames,
-                                const llvm::DenseMap<std::pair<const NominalTypeDecl*, DeclBaseName>, bool> &usedMembers,
-                                const llvm::DenseMap<DeclBaseName, bool> &dynamicLookupNames,
+                                ArrayRef<std::pair<std::string, bool>> topLevelNames,
+                                ArrayRef<std::pair<std::tuple<std::string, std::string, bool>, bool>> usedMembers,
+                                ArrayRef<std::pair<std::string, bool>> dynamicLookupNames,
                                 ArrayRef<std::string> externalDependencies,
+
                                 ConstPtrVec<PrecedenceGroupDecl> &precedenceGroups,
                                 ConstPtrVec<FuncDecl> &memberOperatorDecls,
                                 ConstPtrVec<OperatorDecl> &operators,
@@ -535,7 +536,7 @@ public:
                                 topLevelNames(topLevelNames),
                                 usedMembers(usedMembers),
                                 dynamicLookupNames(dynamicLookupNames),
-                                externalDependencies(externalDependencies.begin(), externalDependencies.end()),
+                                externalDependencies(externalDependencies),
 
                                 precedenceGroups(precedenceGroups),
                                 memberOperatorDecls(memberOperatorDecls),
@@ -555,6 +556,23 @@ public:
                                 const bool hadCompilationError) {
 
   SourceFileDeclFinder declFinder(SF, includePrivateDeps);
+    std::vector<std::pair<std::string, bool>> topLevelNames;
+    for (const auto p: SF->getReferencedNameTracker()->getTopLevelNames())
+      topLevelNames.push_back(std::make_pair(p.getFirst().userFacingName(), p.getSecond()));
+
+    std::vector<std::pair<std::string, bool>> dynamicLookupNames;
+    for (const auto p: SF->getReferencedNameTracker()->getDynamicLookupNames())
+      dynamicLookupNames.push_back(std::make_pair(p.getFirst().userFacingName(), p.getSecond()));
+
+    std::vector<std::pair<std::tuple<std::string, std::string, bool>, bool>> usedMembers;
+    for (const auto &p: SF->getReferencedNameTracker()->getUsedMembers())
+      usedMembers.push_back(
+        std::make_pair(
+          std::make_tuple(
+            mangleTypeAsContext(p.getFirst().first),
+            p.getFirst().second.userFacingName(),
+            declIsPrivate(p.getFirst().first)),
+          p.getSecond()));
 
       return SourceFileDepGraphConstructor(
         swiftDeps,
@@ -562,9 +580,9 @@ public:
         hadCompilationError,
 
         getInterfaceHash(SF),
-        SF->getReferencedNameTracker()->getTopLevelNames(),
-        SF->getReferencedNameTracker()->getUsedMembers(),
-        SF->getReferencedNameTracker()->getDynamicLookupNames(),
+        topLevelNames,
+        usedMembers,
+        dynamicLookupNames,
         depTracker.getDependencies(),
 
         declFinder.precedenceGroups,
@@ -633,8 +651,8 @@ private:
   /// Given a map of names and isCascades, add the resulting dependencies to the
   /// graph.
   template <NodeKind kind>
-  void addAllDependenciesFrom(const llvm::DenseMap<DeclBaseName, bool> &map) {
-    for (const auto &p : map)
+  void addAllDependenciesFrom(ArrayRef<std::pair<std::string, bool>> names) {
+    for (const auto &p : names)
       recordThatThisWholeFileDependsOn(
           DependencyKey::createDependedUponKey<kind>(p.first), p.second);
   }
@@ -642,8 +660,7 @@ private:
   /// Given a map of holder-and-member-names and isCascades, add the resulting
   /// dependencies to the graph.
   void addAllDependenciesFrom(
-      const llvm::DenseMap<std::pair<const NominalTypeDecl *, DeclBaseName>,
-                           bool> &);
+      ArrayRef<std::pair<std::tuple<std::string, std::string, bool>, bool>>);
 
   /// Given an array of external swiftDeps files, add the resulting external
   /// dependencies to the graph.
@@ -663,26 +680,23 @@ private:
 };
 } // namespace
 
-using UsedMembersMap =
-    llvm::DenseMap<std::pair<const NominalTypeDecl *, DeclBaseName>, bool>;
 void SourceFileDepGraphConstructor::addAllDependenciesFrom(
-    const UsedMembersMap &map) {
+    ArrayRef<std::pair<std::tuple<std::string, std::string, bool>, bool>>
+        members) {
 
-  UsedMembersMap filteredMap;
-  for (const auto &entry : map)
-    if (includePrivateDeps || !declIsPrivate(entry.first.first))
-      filteredMap[entry.getFirst()] = entry.getSecond();
-
-  std::unordered_set<const NominalTypeDecl *> holdersOfCascadingMembers;
-  for (auto &entry : filteredMap)
+  llvm::StringSet<> holdersOfCascadingMembers;
+  for (const auto &entry : members) {
+    if (!includePrivateDeps && std::get<2>(entry.first))
+      continue;
     if (entry.second)
-      holdersOfCascadingMembers.insert(entry.first.first);
-
-  for (auto &entry : filteredMap) {
-    // mangles twice in the name of symmetry
+      holdersOfCascadingMembers.insert(std::get<0>(entry.first));
+  }
+  for (const auto &entry : members) {
+    if (!includePrivateDeps && std::get<2>(entry.first))
+      continue;
     recordThatThisWholeFileDependsOn(
         DependencyKey::createDependedUponKey<NodeKind::nominal>(entry.first),
-        holdersOfCascadingMembers.count(entry.first.first) != 0);
+        holdersOfCascadingMembers.count(std::get<0>(entry.first)) != 0);
     recordThatThisWholeFileDependsOn(
         DependencyKey::createDependedUponKey<NodeKind::member>(entry.first),
         entry.second);
