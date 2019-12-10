@@ -4,6 +4,9 @@
 #include "swift/Driver/Job.h"
 #include "gtest/gtest.h"
 
+// This file adapts the unit tests from the older, coarse-grained, dependency
+// graph to the new fine-grained graph.
+
 using namespace swift;
 using LoadResult = CoarseGrainedDependencyGraphImpl::LoadResult;
 using namespace reference_dependency_keys;
@@ -19,13 +22,26 @@ static LoadResult simulateLoad(
         compoundNames = {},
     const bool includePrivateDeps = true,
     const bool hadCompilationError = false) {
-  StringRef interfaceHash = cmd->getFirstSwiftPrimaryInput();
+  StringRef swiftDeps = cmd->getOutput().getAdditionalOutputForType(file_types::TY_SwiftDeps);
+  assert(!swiftDeps.empty());
+  StringRef interfaceHash = swiftDeps;
   auto sfdg = SourceFileDepGraph::simulateLoad(
-      cmd->getOutput().getAdditionalOutputForType(file_types::TY_SwiftDeps),
+      swiftDeps,
       includePrivateDeps, hadCompilationError, interfaceHash, simpleNames,
       compoundNames);
 
   return dg.loadFromSourceFileDepGraph(cmd, sfdg);
+}
+
+static std::vector<const Job*> printForDebugging(std::vector<const Job*> jobs) {
+  llvm::errs() << "\nprintForDebugging: ";
+  for( auto *j: jobs) {
+    const auto swiftDeps = j->getOutput().getAdditionalOutputForType(file_types::TY_SwiftDeps);
+    assert(!swiftDeps.empty());
+    llvm::errs() << "job" << swiftDeps << ", ";
+  }
+  llvm::errs() << "\n";
+  return jobs;
 }
 
 static OutputFileMap OFM;
@@ -158,7 +174,7 @@ TEST(ModuleDepGraph, SimpleDependent) {
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
 
-  EXPECT_EQ(0u, graph.markTransitive(&job0).size());
+  EXPECT_EQ(0u, printForDebugging(graph.markTransitive(&job0)).size());
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
 }
@@ -335,7 +351,7 @@ TEST(ModuleDepGraph, MultipleDependentsDifferent) {
   EXPECT_EQ(simulateLoad(graph, &job2, {{dependsNominal,  {"q", "r", "c"}}}), LoadResult::AffectsDownstream);
 
   {
-    auto marked = graph.markTransitive(0);
+    auto marked = graph.markTransitive(&job0);
     EXPECT_EQ(2u, marked.size());
     EXPECT_TRUE(contains(marked, &job1));
     EXPECT_TRUE(contains(marked, &job2));
@@ -344,7 +360,7 @@ TEST(ModuleDepGraph, MultipleDependentsDifferent) {
   EXPECT_TRUE(graph.isMarked(&job1));
   EXPECT_TRUE(graph.isMarked(&job2));
 
-  EXPECT_EQ(0u, graph.markTransitive(0).size());
+  EXPECT_EQ(0u, graph.markTransitive(&job0).size());
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
   EXPECT_TRUE(graph.isMarked(&job2));
@@ -358,7 +374,7 @@ TEST(ModuleDepGraph, ChainedDependents) {
   EXPECT_EQ(simulateLoad(graph, &job2, {{dependsNominal,  {"z"}}}), LoadResult::AffectsDownstream);
 
   {
-    auto marked = graph.markTransitive(0);
+    auto marked = graph.markTransitive(&job0);
     EXPECT_EQ(2u, marked.size());
     EXPECT_TRUE(contains(marked, &job1));
     EXPECT_TRUE(contains(marked, &job2));
@@ -367,7 +383,7 @@ TEST(ModuleDepGraph, ChainedDependents) {
   EXPECT_TRUE(graph.isMarked(&job1));
   EXPECT_TRUE(graph.isMarked(&job2));
 
-  EXPECT_EQ(0u, graph.markTransitive(0).size());
+  EXPECT_EQ(0u, graph.markTransitive(&job0).size());
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
   EXPECT_TRUE(graph.isMarked(&job2));
@@ -385,7 +401,7 @@ TEST(ModuleDepGraph, MarkTwoNodes) {
 
 
   {
-    auto marked = graph.markTransitive(0);
+    auto marked = graph.markTransitive(&job0);
     EXPECT_EQ(2u, marked.size());
     EXPECT_TRUE(contains(marked, &job1));
     EXPECT_TRUE(contains(marked, &job2));
@@ -418,7 +434,7 @@ TEST(ModuleDepGraph, MarkOneNodeTwice) {
   EXPECT_EQ(simulateLoad(graph, &job2, {{dependsNominal,  {"b"}}}), LoadResult::AffectsDownstream);
 
   {
-    auto marked = graph.markTransitive(0);
+    auto marked = graph.markTransitive(&job0);
     EXPECT_EQ(1u, marked.size());
     EXPECT_EQ(&job1, marked.front());
   }
@@ -430,7 +446,7 @@ TEST(ModuleDepGraph, MarkOneNodeTwice) {
   EXPECT_EQ(simulateLoad(graph, &job0, {{providesNominal, {"b"}}}), LoadResult::UpToDate);
 
   {
-    auto marked = graph.markTransitive(0);
+    auto marked = graph.markTransitive(&job0);
     EXPECT_EQ(1u, marked.size());
     EXPECT_EQ(&job2, marked.front());
   }
@@ -447,7 +463,7 @@ TEST(ModuleDepGraph, MarkOneNodeTwice2) {
   EXPECT_EQ(simulateLoad(graph, &job2, {{dependsNominal,  {"b"}}}), LoadResult::AffectsDownstream);
 
   {
-    auto marked = graph.markTransitive(0);
+    auto marked = graph.markTransitive(&job0);
     EXPECT_EQ(1u, marked.size());
     EXPECT_EQ(&job1, marked.front());
   }
@@ -459,7 +475,7 @@ TEST(ModuleDepGraph, MarkOneNodeTwice2) {
   EXPECT_EQ(simulateLoad(graph, &job0, {{providesNominal, {"a", "b"}}}), LoadResult::UpToDate);
 
   {
-    auto marked = graph.markTransitive(0);
+    auto marked = graph.markTransitive(&job0);
     EXPECT_EQ(1u, marked.size());
     EXPECT_EQ(&job2, marked.front());
   }
@@ -483,7 +499,7 @@ TEST(ModuleDepGraph, NotTransitiveOnceMarked) {
   // Reload 1.
   EXPECT_EQ(simulateLoad(graph, &job1, {{dependsNominal, {"a"}}, {providesNominal, {"b"}}}), LoadResult::UpToDate);
 
-  EXPECT_EQ(0u, graph.markTransitive(0).size());
+  EXPECT_EQ(0u, graph.markTransitive(&job0).size());
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
   EXPECT_FALSE(graph.isMarked(&job2));
@@ -507,7 +523,7 @@ TEST(ModuleDepGraph, DependencyLoops) {
   EXPECT_EQ(simulateLoad(graph, &job2, {{dependsTopLevel,  {"x"}}}), LoadResult::AffectsDownstream);
 
   {
-    auto marked = graph.markTransitive(0);
+    auto marked = graph.markTransitive(&job0);
     EXPECT_EQ(2u, marked.size());
     EXPECT_TRUE(contains(marked, &job1));
     EXPECT_TRUE(contains(marked, &job2));
@@ -516,7 +532,7 @@ TEST(ModuleDepGraph, DependencyLoops) {
   EXPECT_TRUE(graph.isMarked(&job1));
   EXPECT_TRUE(graph.isMarked(&job2));
 
-  EXPECT_EQ(0u, graph.markTransitive(0).size());
+  EXPECT_EQ(0u, graph.markTransitive(&job0).size());
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
   EXPECT_TRUE(graph.isMarked(&job2));
@@ -529,12 +545,12 @@ TEST(ModuleDepGraph, MarkIntransitive) {
   EXPECT_EQ(simulateLoad(graph, &job0, {{providesTopLevel, {"a", "b", "c"}}}), LoadResult::AffectsDownstream);
   EXPECT_EQ(simulateLoad(graph, &job1, {{dependsTopLevel,  {"x", "b", "z"}}}), LoadResult::AffectsDownstream);
 
-  EXPECT_TRUE(graph.markIntransitive(0));
+  EXPECT_TRUE(graph.markIntransitive(&job0));
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_FALSE(graph.isMarked(&job1));
 
   {
-    auto marked = graph.markTransitive(0);
+    auto marked = graph.markTransitive(&job0);
     EXPECT_EQ(1u, marked.size());
     EXPECT_EQ(&job1, marked.front());
   }
@@ -548,11 +564,11 @@ TEST(ModuleDepGraph, MarkIntransitiveTwice) {
   EXPECT_EQ(simulateLoad(graph, &job0, {{providesTopLevel, {"a", "b", "c"}}}), LoadResult::AffectsDownstream);
   EXPECT_EQ(simulateLoad(graph, &job1, {{dependsTopLevel,  {"x", "b", "z"}}}), LoadResult::AffectsDownstream);
 
-  EXPECT_TRUE(graph.markIntransitive(0));
+  EXPECT_TRUE(graph.markIntransitive(&job0));
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_FALSE(graph.isMarked(&job1));
 
-  EXPECT_FALSE(graph.markIntransitive(0));
+  EXPECT_FALSE(graph.markIntransitive(&job0));
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_FALSE(graph.isMarked(&job1));
 }
@@ -567,7 +583,7 @@ TEST(ModuleDepGraph, MarkIntransitiveThenIndirect) {
   EXPECT_FALSE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
 
-  EXPECT_EQ(0u, graph.markTransitive(0).size());
+  EXPECT_EQ(0u, graph.markTransitive(&job0).size());
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
 }
@@ -650,7 +666,7 @@ TEST(ModuleDepGraph, ChainedExternalPreMarked) {
   EXPECT_EQ(simulateLoad(graph, &job0, {{dependsExternal, {"/foo"}}, {providesTopLevel, {"a"}}}), LoadResult::AffectsDownstream);
   EXPECT_EQ(simulateLoad(graph, &job1, {{dependsExternal, {"/bar"}}, {dependsTopLevel,  {"a"}}}), LoadResult::AffectsDownstream);
 
-  graph.markIntransitive(0);
+  graph.markIntransitive(&job0);
 
   EXPECT_EQ(0u, graph.markExternal("/foo").size());
   EXPECT_TRUE(graph.isMarked(&job0));

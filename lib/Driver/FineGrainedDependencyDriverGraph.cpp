@@ -94,9 +94,11 @@ bool ModuleDepGraph::isMarked(const Job *cmd) const {
 std::vector<const Job*> ModuleDepGraph::markTransitive(
     const Job *jobToBeRecompiled, const void *ignored) {
   FrontendStatsTracer tracer(stats, "fine-grained-dependencies-markTransitive");
+  assert(jobToBeRecompiled && "Ensure there is really a job");
 
   std::unordered_set<const ModuleDepGraphNode *> dependentNodes;
   const StringRef swiftDepsToBeRecompiled = getSwiftDeps(jobToBeRecompiled);
+  assert(!swiftDepsToBeRecompiled.empty() && "Must have a swift deps");
   // Do the traversal.
   for (auto &fileAndNode : nodeMap[swiftDepsToBeRecompiled]) {
     assert(isCurrentPathForTracingEmpty());
