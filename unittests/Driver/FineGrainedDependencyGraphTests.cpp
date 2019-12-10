@@ -260,16 +260,12 @@ TEST(ModuleDepGraph, SimpleDependent5) {
   EXPECT_TRUE(graph.isMarked(&job1));
 }
 
-#if 0
 
 TEST(ModuleDepGraph, SimpleDependent6) {
   ModuleDepGraph graph;
 
-  EXPECT_EQ(simulateLoad(graph, &job0, providesDynamicLookup, "a, b, c"),
-            LoadResult::UpToDate);
-  EXPECT_EQ(simulateLoad(graph, &job1, dependsDynamicLookup, "x, b, z"),
-            LoadResult::UpToDate);
-
+  EXPECT_EQ(simulateLoad(graph, &job0, {{providesDynamicLookup, {"a", "b", "c"}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job1, {{dependsDynamicLookup,  {"x", "b", "z"}}}), LoadResult::AffectsDownstream);
   {
     auto marked = graph.markTransitive(&job0);
     EXPECT_EQ(1u, marked.size());
@@ -286,12 +282,8 @@ TEST(ModuleDepGraph, SimpleDependent6) {
 TEST(ModuleDepGraph, SimpleDependentMember) {
   ModuleDepGraph graph;
 
-  EXPECT_EQ(
-      simulateLoad(graph, &job0, providesMember, "[a,aa], [b,bb], [c,cc]"),
-      LoadResult::UpToDate);
-  EXPECT_EQ(
-      simulateLoad(graph, &job1, dependsMember, "[x, xx], [b,bb], [z,zz]"),
-      LoadResult::UpToDate);
+  EXPECT_EQ( simulateLoad(graph, &job0, {}, {{providesMember, {{"a", "aa"}, {"b", "bb"}, {"c", "cc"}}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ( simulateLoad(graph, &job1, {}, {{dependsMember,  {{"x", "xx"}, {"b", "bb"}, {"z", "zz"}}}}), LoadResult::AffectsDownstream);
 
   {
     auto marked = graph.markTransitive(&job0);
@@ -315,12 +307,9 @@ static bool contains(const Range &range, const T &value) {
 TEST(ModuleDepGraph, MultipleDependentsSame) {
   ModuleDepGraph graph;
 
-  EXPECT_EQ(simulateLoad(graph, &job0, providesNominal, "a, b, c"),
-            LoadResult::UpToDate);
-  EXPECT_EQ(simulateLoad(graph, &job1, dependsNominal, "x, b, z"),
-            LoadResult::UpToDate);
-  EXPECT_EQ(simulateLoad(graph, &job2, dependsNominal, "q, b, s"),
-            LoadResult::UpToDate);
+  EXPECT_EQ(simulateLoad(graph, &job0, {{providesNominal, {"a", "b", "c"}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job1, {{dependsNominal,  {"x", "b", "z"}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job2, {{dependsNominal,  {"q", "b", "s"}}}), LoadResult::AffectsDownstream);
 
   {
     auto marked = graph.markTransitive(&job0);
@@ -341,12 +330,9 @@ TEST(ModuleDepGraph, MultipleDependentsSame) {
 TEST(ModuleDepGraph, MultipleDependentsDifferent) {
   ModuleDepGraph graph;
 
-  EXPECT_EQ(simulateLoad(graph, &job0, providesNominal, "a, b, c"),
-            LoadResult::UpToDate);
-  EXPECT_EQ(simulateLoad(graph, &job1, dependsNominal, "x, b, z"),
-            LoadResult::UpToDate);
-  EXPECT_EQ(simulateLoad(graph, &job2, dependsNominal, "q, r, c"),
-            LoadResult::UpToDate);
+  EXPECT_EQ(simulateLoad(graph, &job0, {{providesNominal, {"a", "b", "c"}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job1, {{dependsNominal,  {"x", "b", "z"}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job2, {{dependsNominal,  {"q", "r", "c"}}}), LoadResult::AffectsDownstream);
 
   {
     auto marked = graph.markTransitive(0);
@@ -367,13 +353,9 @@ TEST(ModuleDepGraph, MultipleDependentsDifferent) {
 TEST(ModuleDepGraph, ChainedDependents) {
   ModuleDepGraph graph;
 
-  EXPECT_EQ(simulateLoad(graph, &job0, providesNominal, "a, b, c"),
-            LoadResult::UpToDate);
-  EXPECT_EQ(simulateLoad(graph, &job1, dependsNominal, "x, b",
-                           providesNominal, "z"),
-            LoadResult::UpToDate);
-  EXPECT_EQ(simulateLoad(graph, &job2, dependsNominal, "z"),
-            LoadResult::UpToDate);
+  EXPECT_EQ(simulateLoad(graph, &job0, {{providesNominal, {"a", "b", "c"}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job1, {{dependsNominal,  {"x", "b"}}, {providesNominal, {"z"}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job2, {{dependsNominal,  {"z"}}}), LoadResult::AffectsDownstream);
 
   {
     auto marked = graph.markTransitive(0);
@@ -394,21 +376,13 @@ TEST(ModuleDepGraph, ChainedDependents) {
 TEST(ModuleDepGraph, MarkTwoNodes) {
   ModuleDepGraph graph;
 
-  EXPECT_EQ(simulateLoad(graph, &job0, providesNominal, "a, b"),
-            LoadResult::UpToDate);
-  EXPECT_EQ(
-      simulateLoad(graph, &job1, dependsNominal, "a", providesNominal, "z"),
-      LoadResult::UpToDate);
-  EXPECT_EQ(simulateLoad(graph, &job2, dependsNominal, "z"),
-            LoadResult::UpToDate);
-  EXPECT_EQ(simulateLoad(graph, &job10, providesNominal, "y, z",
-                           dependsNominal, "q"),
-            LoadResult::UpToDate);
-  EXPECT_EQ(simulateLoad(graph, &job11, dependsNominal, "y"),
-            LoadResult::UpToDate);
-  EXPECT_EQ(
-      simulateLoad(graph, &job12, dependsNominal, "q", providesNominal, "q"),
-      LoadResult::UpToDate);
+  EXPECT_EQ(simulateLoad(graph, &job0,  {{providesNominal, {"a", "b"}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job1,  {{dependsNominal,  {"a"}}, {providesNominal, {"z"}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job2,  {{dependsNominal,  {"z"}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job10, {{providesNominal, {"y", "z"}}, {dependsNominal, {"q"}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job11, {{dependsNominal,  {"y"}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job12, {{dependsNominal,  {"q"}}, {providesNominal, {"q"}}}), LoadResult::AffectsDownstream);
+
 
   {
     auto marked = graph.markTransitive(0);
@@ -439,12 +413,9 @@ TEST(ModuleDepGraph, MarkTwoNodes) {
 TEST(ModuleDepGraph, MarkOneNodeTwice) {
   ModuleDepGraph graph;
 
-  EXPECT_EQ(simulateLoad(graph, &job0, providesNominal, "a"),
-            LoadResult::UpToDate);
-  EXPECT_EQ(simulateLoad(graph, &job1, dependsNominal, "a"),
-            LoadResult::UpToDate);
-  EXPECT_EQ(simulateLoad(graph, &job2, dependsNominal, "b"),
-            LoadResult::UpToDate);
+  EXPECT_EQ(simulateLoad(graph, &job0, {{providesNominal, {"a"}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job1, {{dependsNominal,  {"a"}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job2, {{dependsNominal,  {"b"}}}), LoadResult::AffectsDownstream);
 
   {
     auto marked = graph.markTransitive(0);
@@ -456,8 +427,7 @@ TEST(ModuleDepGraph, MarkOneNodeTwice) {
   EXPECT_FALSE(graph.isMarked(&job2));
 
   // Reload 0.
-  EXPECT_EQ(simulateLoad(graph, &job0, providesNominal, "b"),
-            LoadResult::UpToDate);
+  EXPECT_EQ(simulateLoad(graph, &job0, {{providesNominal, {"b"}}}), LoadResult::UpToDate);
 
   {
     auto marked = graph.markTransitive(0);
@@ -472,12 +442,9 @@ TEST(ModuleDepGraph, MarkOneNodeTwice) {
 TEST(ModuleDepGraph, MarkOneNodeTwice2) {
   ModuleDepGraph graph;
 
-  EXPECT_EQ(simulateLoad(graph, &job0, providesNominal, "a"),
-            LoadResult::UpToDate);
-  EXPECT_EQ(simulateLoad(graph, &job1, dependsNominal, "a"),
-            LoadResult::UpToDate);
-  EXPECT_EQ(simulateLoad(graph, &job2, dependsNominal, "b"),
-            LoadResult::UpToDate);
+  EXPECT_EQ(simulateLoad(graph, &job0, {{providesNominal, {"a"}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job1, {{dependsNominal,  {"a"}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job2, {{dependsNominal,  {"b"}}}), LoadResult::AffectsDownstream);
 
   {
     auto marked = graph.markTransitive(0);
@@ -489,8 +456,7 @@ TEST(ModuleDepGraph, MarkOneNodeTwice2) {
   EXPECT_FALSE(graph.isMarked(&job2));
 
   // Reload 0.
-  EXPECT_EQ(simulateLoad(graph, &job0, providesNominal, "a, b"),
-            LoadResult::UpToDate);
+  EXPECT_EQ(simulateLoad(graph, &job0, {{providesNominal, {"a", "b"}}}), LoadResult::UpToDate);
 
   {
     auto marked = graph.markTransitive(0);
@@ -505,12 +471,9 @@ TEST(ModuleDepGraph, MarkOneNodeTwice2) {
 TEST(ModuleDepGraph, NotTransitiveOnceMarked) {
   ModuleDepGraph graph;
 
-  EXPECT_EQ(simulateLoad(graph, &job0, providesNominal, "a"),
-            LoadResult::UpToDate);
-  EXPECT_EQ(simulateLoad(graph, &job1, dependsNominal, "a"),
-            LoadResult::UpToDate);
-  EXPECT_EQ(simulateLoad(graph, &job2, dependsNominal, "b"),
-            LoadResult::UpToDate);
+  EXPECT_EQ(simulateLoad(graph, &job0, {{providesNominal, {"a"}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job1, {{dependsNominal,  {"a"}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job2, {{dependsNominal,  {"b"}}}), LoadResult::AffectsDownstream);
 
   EXPECT_EQ(0u, graph.markTransitive(&job1).size());
   EXPECT_FALSE(graph.isMarked(&job0));
@@ -518,9 +481,7 @@ TEST(ModuleDepGraph, NotTransitiveOnceMarked) {
   EXPECT_FALSE(graph.isMarked(&job2));
 
   // Reload 1.
-  EXPECT_EQ(
-      simulateLoad(graph, &job1, dependsNominal, "a", providesNominal, "b"),
-      LoadResult::UpToDate);
+  EXPECT_EQ(simulateLoad(graph, &job1, {{dependsNominal, {"a"}}, {providesNominal, {"b"}}}), LoadResult::UpToDate);
 
   EXPECT_EQ(0u, graph.markTransitive(0).size());
   EXPECT_TRUE(graph.isMarked(&job0));
@@ -541,14 +502,9 @@ TEST(ModuleDepGraph, NotTransitiveOnceMarked) {
 TEST(ModuleDepGraph, DependencyLoops) {
   ModuleDepGraph graph;
 
-  EXPECT_EQ(simulateLoad(graph, &job0, providesTopLevel, "a, b, c",
-                           dependsTopLevel, "a"),
-            LoadResult::UpToDate);
-  EXPECT_EQ(simulateLoad(graph, &job1, providesTopLevel, "x", dependsTopLevel,
-                           "x, b, z"),
-            LoadResult::UpToDate);
-  EXPECT_EQ(simulateLoad(graph, &job2, dependsTopLevel, "x"),
-            LoadResult::UpToDate);
+  EXPECT_EQ(simulateLoad(graph, &job0, {{providesTopLevel, {"a", "b", "c"}}, {dependsTopLevel, {"a"}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job1, {{providesTopLevel, {"x"}}, {dependsTopLevel, {"x", "b", "z"}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job2, {{dependsTopLevel,  {"x"}}}), LoadResult::AffectsDownstream);
 
   {
     auto marked = graph.markTransitive(0);
@@ -566,13 +522,12 @@ TEST(ModuleDepGraph, DependencyLoops) {
   EXPECT_TRUE(graph.isMarked(&job2));
 }
 
+
 TEST(ModuleDepGraph, MarkIntransitive) {
   ModuleDepGraph graph;
 
-  EXPECT_EQ(simulateLoad(graph, &job0, providesTopLevel, "a, b, c"),
-            LoadResult::UpToDate);
-  EXPECT_EQ(simulateLoad(graph, &job1, dependsTopLevel, "x, b, z"),
-            LoadResult::UpToDate);
+  EXPECT_EQ(simulateLoad(graph, &job0, {{providesTopLevel, {"a", "b", "c"}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job1, {{dependsTopLevel,  {"x", "b", "z"}}}), LoadResult::AffectsDownstream);
 
   EXPECT_TRUE(graph.markIntransitive(0));
   EXPECT_TRUE(graph.isMarked(&job0));
@@ -590,10 +545,8 @@ TEST(ModuleDepGraph, MarkIntransitive) {
 TEST(ModuleDepGraph, MarkIntransitiveTwice) {
   ModuleDepGraph graph;
 
-  EXPECT_EQ(simulateLoad(graph, &job0, providesTopLevel, "a, b, c"),
-            LoadResult::UpToDate);
-  EXPECT_EQ(simulateLoad(graph, &job1, dependsTopLevel, "x, b, z"),
-            LoadResult::UpToDate);
+  EXPECT_EQ(simulateLoad(graph, &job0, {{providesTopLevel, {"a", "b", "c"}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job1, {{dependsTopLevel,  {"x", "b", "z"}}}), LoadResult::AffectsDownstream);
 
   EXPECT_TRUE(graph.markIntransitive(0));
   EXPECT_TRUE(graph.isMarked(&job0));
@@ -607,10 +560,8 @@ TEST(ModuleDepGraph, MarkIntransitiveTwice) {
 TEST(ModuleDepGraph, MarkIntransitiveThenIndirect) {
   ModuleDepGraph graph;
 
-  EXPECT_EQ(simulateLoad(graph, &job0, providesTopLevel, "a, b, c"),
-            LoadResult::UpToDate);
-  EXPECT_EQ(simulateLoad(graph, &job1, dependsTopLevel, "x, b, z"),
-            LoadResult::UpToDate);
+  EXPECT_EQ(simulateLoad(graph, &job0, {{providesTopLevel, {"a", "b", "c"}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job1, {{dependsTopLevel,  {"x", "b", "z"}}}), LoadResult::AffectsDownstream);
 
   EXPECT_TRUE(graph.markIntransitive(&job1));
   EXPECT_FALSE(graph.isMarked(&job0));
@@ -624,8 +575,7 @@ TEST(ModuleDepGraph, MarkIntransitiveThenIndirect) {
 TEST(ModuleDepGraph, SimpleExternal) {
   ModuleDepGraph graph;
 
-  EXPECT_EQ(simulateLoad(graph, &job0, dependsExternal, "/foo, /bar"),
-            LoadResult::UpToDate);
+  EXPECT_EQ(simulateLoad(graph, &job0, {{dependsExternal, {"/foo", "/bar"}}}), LoadResult::AffectsDownstream);
 
   EXPECT_TRUE(contains(graph.getExternalDependencies(), "/foo"));
   EXPECT_TRUE(contains(graph.getExternalDependencies(), "/bar"));
@@ -640,8 +590,7 @@ TEST(ModuleDepGraph, SimpleExternal) {
 TEST(ModuleDepGraph, SimpleExternal2) {
   ModuleDepGraph graph;
 
-  EXPECT_EQ(simulateLoad(graph, &job0, dependsExternal, "/foo, /bar"),
-            LoadResult::UpToDate);
+  EXPECT_EQ(simulateLoad(graph, &job0, {{dependsExternal, {"/foo", "/bar"}}}), LoadResult::AffectsDownstream);
 
   EXPECT_EQ(1u, graph.markExternal("/bar").size());
   EXPECT_TRUE(graph.isMarked(&job0));
@@ -653,12 +602,8 @@ TEST(ModuleDepGraph, SimpleExternal2) {
 TEST(ModuleDepGraph, ChainedExternal) {
   ModuleDepGraph graph;
 
-  EXPECT_EQ(simulateLoad(graph, &job0, dependsExternal, "/foo",
-                           providesTopLevel, "a"),
-            LoadResult::UpToDate);
-  EXPECT_EQ(simulateLoad(graph, &job1, dependsExternal, "/bar",
-                           dependsTopLevel, "a"),
-            LoadResult::UpToDate);
+  EXPECT_EQ(simulateLoad(graph, &job0, {{dependsExternal, {"/foo"}}, {providesTopLevel, {"a"}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job1, {{dependsExternal, {"/bar"}}, {dependsTopLevel,  {"a"}}}), LoadResult::AffectsDownstream);
 
   EXPECT_TRUE(contains(graph.getExternalDependencies(), "/foo"));
   EXPECT_TRUE(contains(graph.getExternalDependencies(), "/bar"));
@@ -675,12 +620,8 @@ TEST(ModuleDepGraph, ChainedExternal) {
 TEST(ModuleDepGraph, ChainedExternalReverse) {
   ModuleDepGraph graph;
 
-  EXPECT_EQ(simulateLoad(graph, &job0, dependsExternal, "/foo",
-                           providesTopLevel, "a"),
-            LoadResult::UpToDate);
-  EXPECT_EQ(simulateLoad(graph, &job1, dependsExternal, "/bar",
-                           dependsTopLevel, "a"),
-            LoadResult::UpToDate);
+  EXPECT_EQ(simulateLoad(graph, &job0, {{dependsExternal, {"/foo"}}, {providesTopLevel, {"a"}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job1, {{dependsExternal, {"/bar"}}, {dependsTopLevel,  {"a"}}}), LoadResult::AffectsDownstream);
 
   {
     auto marked = graph.markExternal("/bar");
@@ -706,12 +647,8 @@ TEST(ModuleDepGraph, ChainedExternalReverse) {
 TEST(ModuleDepGraph, ChainedExternalPreMarked) {
   ModuleDepGraph graph;
 
-  EXPECT_EQ(simulateLoad(graph, &job0, dependsExternal, "/foo",
-                           providesTopLevel, "a"),
-            LoadResult::UpToDate);
-  EXPECT_EQ(simulateLoad(graph, &job1, dependsExternal, "/bar",
-                           dependsTopLevel, "a"),
-            LoadResult::UpToDate);
+  EXPECT_EQ(simulateLoad(graph, &job0, {{dependsExternal, {"/foo"}}, {providesTopLevel, {"a"}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job1, {{dependsExternal, {"/bar"}}, {dependsTopLevel,  {"a"}}}), LoadResult::AffectsDownstream);
 
   graph.markIntransitive(0);
 
@@ -719,4 +656,3 @@ TEST(ModuleDepGraph, ChainedExternalPreMarked) {
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_FALSE(graph.isMarked(&job1));
 }
-#endif
