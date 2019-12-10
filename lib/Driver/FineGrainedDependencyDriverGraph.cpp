@@ -103,11 +103,12 @@ std::vector<const Job*> ModuleDepGraph::markTransitive(
     findDependentNodesAndRecordCascadingOnes(dependentNodes,
                                              fileAndNode.second);
   }
-  return computeUniqueJobsFromNodes(dependentNodes);
+  return computeUniqueJobsFromNodes(dependentNodes, jobToBeRecompiled);
 }
 
-std::vector<const Job*> ModuleDepGraph::computeUniqueJobsFromNodes(
-    const std::unordered_set<const ModuleDepGraphNode *> &nodes) {
+std::vector<const Job *> ModuleDepGraph::computeUniqueJobsFromNodes(
+    const std::unordered_set<const ModuleDepGraphNode *> &nodes,
+    const NullablePtr<const Job> jobToExclude) {
 
   std::vector<const Job*>jobs;
 
@@ -119,7 +120,9 @@ std::vector<const Job*> ModuleDepGraph::computeUniqueJobsFromNodes(
     if (swiftDepsOfNodes.insert(swiftDeps).second) {
       assert(n->assertImplementationMustBeInAFile());
       ensureJobIsTracked(swiftDeps);
-      jobs.push_back(getJob(swiftDeps));
+      auto job = getJob(swiftDeps);
+      if (jobToExclude.getPtrOrNull() != job)
+        jobs.push_back(job);
     }
   }
   return jobs;

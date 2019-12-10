@@ -16,6 +16,7 @@
 #include "swift/AST/FineGrainedDependencies.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Driver/CoarseGrainedDependencyGraph.h"
 #include "swift/Driver/Job.h"
@@ -443,8 +444,11 @@ private:
       std::unordered_set<const ModuleDepGraphNode *> &foundDependents,
       const ModuleDepGraphNode *definition);
 
-  std::vector<const driver::Job*> computeUniqueJobsFromNodes(
-      const std::unordered_set<const ModuleDepGraphNode *> &nodes);
+  /// Returns a collection of unique Jobs corresponding to the \c nodes.
+  /// Excludes \c jobToExclude if present.
+  std::vector<const driver::Job *> computeUniqueJobsFromNodes(
+      const std::unordered_set<const ModuleDepGraphNode *> &nodes,
+      NullablePtr<const driver::Job> jobToExclude);
 
   /// Record a visit to this node for later dependency printing
   size_t traceArrival(const ModuleDepGraphNode *visitedNode);
