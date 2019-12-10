@@ -280,6 +280,10 @@ public:
   CoarseGrainedDependencyGraphImpl::LoadResult
   loadFromString(const driver::Job *cmd, StringRef data);
 
+  CoarseGrainedDependencyGraphImpl::LoadResult
+  loadFromSourceFileDepGraph(const driver::Job *cmd,
+                             const SourceFileDepGraph &);
+
   /// For the dot file.
   std::string getGraphID() const { return "driver"; }
 

@@ -78,8 +78,13 @@ LoadResult ModuleDepGraph::loadFromBuffer(const Job *job,
       SourceFileDepGraph::loadFromBuffer(buffer);
   if (!sourceFileDepGraph)
     return CoarseGrainedDependencyGraphImpl::LoadResult::HadError;
+  return loadFromSourceFileDepGraph(job, sourceFileDepGraph.getValue());
+}
+
+LoadResult ModuleDepGraph::loadFromSourceFileDepGraph(
+    const Job *job, const SourceFileDepGraph &sourceFileDepGraph) {
   addIndependentNode(job);
-  return integrate(sourceFileDepGraph.getValue());
+  return integrate(sourceFileDepGraph);
 }
 
 bool ModuleDepGraph::isMarked(const Job *cmd) const {

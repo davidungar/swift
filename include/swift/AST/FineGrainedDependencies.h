@@ -730,6 +730,14 @@ public:
   SourceFileDepGraph(const SourceFileDepGraph &g) = delete;
   SourceFileDepGraph(SourceFileDepGraph &&g) = default;
 
+  static SourceFileDepGraph simulateLoad(
+      StringRef swiftDepsFileName, const bool includePrivateDeps,
+      const bool hadCompilationError, StringRef interfaceHash,
+      ArrayRef<std::pair<StringRef, std::vector<std::string>>> simpleNames,
+      ArrayRef<std::pair<StringRef,
+                         std::vector<std::pair<std::string, std::string>>>>
+          compoundNames);
+
   /// Nodes are owned by the graph.
   ~SourceFileDepGraph() {
     forEachNode([&](SourceFileDepGraphNode *n) { delete n; });

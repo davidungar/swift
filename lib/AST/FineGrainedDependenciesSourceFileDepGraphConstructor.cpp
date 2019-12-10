@@ -28,6 +28,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/ReferenceDependencyKeys.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "llvm/ADT/MapVector.h"
@@ -792,4 +793,80 @@ bool swift::fine_grained_dependencies::emitReferenceDependencies(
     return false;
   });
   return hadError;
+}
+
+//==============================================================================
+// Entry point from the unit tests
+//==============================================================================
+
+SourceFileDepGraph SourceFileDepGraph::simulateLoad(
+    StringRef swiftDepsFilename, const bool includePrivateDeps,
+    const bool hadCompilationError, StringRef interfaceHash,
+    ArrayRef<std::pair<StringRef, std::vector<std::string>>> simpleNames,
+    ArrayRef<
+        std::pair<StringRef, std::vector<std::pair<std::string, std::string>>>>
+        compoundNames) {
+
+  // Dependers
+  std::vector<std::pair<std::string, bool>> topLevelNames;
+  std::vector<std::pair<std::tuple<std::string, std::string, bool>, bool>>
+      usedMembers;
+  std::vector<std::pair<std::string, bool>> dynamicLookupNames;
+  std::vector<std::string> externalDependencies;
+
+  // Providers
+  std::vector<std::pair<std::string, std::string>> topNominals;
+  std::vector<std::pair<std::string, std::string>> topValues;
+  std::vector<std::pair<std::string, std::string>> allNominals;
+  std::vector<std::pair<std::string, std::string>> potentialMemberHolders;
+  std::vector<std::pair<std::string, std::string>> valuesInExtensions;
+  std::vector<std::pair<std::string, std::string>> classMembers;
+
+  using namespace reference_dependency_keys;
+
+  for (auto const &a : simpleNames) {
+    StringRef referenceDependencyKey = a.first;
+    if (providesTopLevel == referenceDependencyKey)
+      for (std::string n : a.second)
+        topValues.push_back({"", n});
+    else if (providesDynamicLookup == referenceDependencyKey)
+      for (std::string n : a.second)
+        classMembers.push_back({"", n});
+    else if (providesNominal == referenceDependencyKey) {
+      for (std::string n : a.second) {
+        topNominals.push_back({n, ""});
+        allNominals.push_back({n, ""});
+        potentialMemberHolders.push_back({n, ""});
+      }
+    } else if (dependsTopLevel == referenceDependencyKey)
+      for (std::string n : a.second)
+        topLevelNames.push_back({n, true});
+    else if (dependsNominal == referenceDependencyKey)
+      for (std::string n : a.second)
+        usedMembers.push_back({{n, "", false}, true});
+    else if (dependsDynamicLookup == referenceDependencyKey)
+      for (std::string n : a.second)
+        dynamicLookupNames.push_back({n, true});
+    else if (dependsExternal == referenceDependencyKey)
+      externalDependencies = a.second;
+    else
+      llvm_unreachable("should be a pair");
+  }
+  for (auto const &a : compoundNames) {
+    StringRef referenceDependencyKey = a.first;
+    if (providesMember == referenceDependencyKey)
+      valuesInExtensions = a.second;
+    else if (dependsMember == referenceDependencyKey)
+      for (auto const &p : a.second)
+        usedMembers.push_back({{p.first, p.second, false}, true});
+    else
+      llvm_unreachable("should be a scalar");
+  }
+  SourceFileDepGraphConstructor c(
+      swiftDepsFilename, includePrivateDeps, hadCompilationError, interfaceHash,
+      topLevelNames, usedMembers, dynamicLookupNames, externalDependencies, {},
+      {}, {}, topNominals, topValues, allNominals, potentialMemberHolders,
+      valuesInExtensions, classMembers);
+
+  return c.construct();
 }
