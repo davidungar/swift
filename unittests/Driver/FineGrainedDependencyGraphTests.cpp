@@ -75,20 +75,13 @@ TEST(ModuleDepGraph, BasicLoad) {
                           {dependsTopLevel, {"d", "a"}}}),
             LoadResult::AffectsDownstream);
 }
-#if 0
 
 TEST(ModuleDepGraph, IndependentNodes) {
   ModuleDepGraph graph;
 
-  EXPECT_EQ(loadFromString(graph, &job0, dependsTopLevel, "a", providesTopLevel,
-                           "a0"),
-            LoadResult::UpToDate);
-  EXPECT_EQ(loadFromString(graph, &job1, dependsTopLevel, "b", providesTopLevel,
-                           "b0"),
-            LoadResult::UpToDate);
-  EXPECT_EQ(loadFromString(graph, &job2, dependsTopLevel, "c", providesTopLevel,
-                           "c0"),
-            LoadResult::UpToDate);
+  EXPECT_EQ(simulateLoad(graph, &job0, {{dependsTopLevel, {"a"}}, {providesTopLevel, {"a0"}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job1, {{dependsTopLevel, {"b"}}, {providesTopLevel, {"b0"}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job2, {{dependsTopLevel, {"c"}}, {providesTopLevel, {"c0"}}}), LoadResult::AffectsDownstream);
 
   EXPECT_EQ(0u, graph.markTransitive(&job0).size());
   EXPECT_TRUE(graph.isMarked(&job0));
@@ -111,6 +104,7 @@ TEST(ModuleDepGraph, IndependentNodes) {
   EXPECT_TRUE(graph.isMarked(&job1));
   EXPECT_TRUE(graph.isMarked(&job2));
 }
+#if 0
 
 TEST(ModuleDepGraph, IndependentDepKinds) {
   ModuleDepGraph graph;
