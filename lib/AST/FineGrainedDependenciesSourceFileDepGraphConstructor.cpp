@@ -424,44 +424,38 @@ std::string DependencyKey::computeNameForProvidedEntity<
 
 template <>
 DependencyKey
-DependencyKey::createDependedUponKey<NodeKind::topLevel, StringRef>(
-    const StringRef &name) {
+DependencyKey::createDependedUponKey<NodeKind::topLevel>(StringRef name) {
   return DependencyKey(NodeKind::topLevel, DeclAspect::interface, "", name);
 }
 
 template <>
 DependencyKey
-DependencyKey::createDependedUponKey<NodeKind::dynamicLookup, StringRef>(
-    const StringRef &name) {
+DependencyKey::createDependedUponKey<NodeKind::dynamicLookup>(StringRef name) {
   return DependencyKey(NodeKind::dynamicLookup, DeclAspect::interface, "",
                        name);
 }
+
 template <>
 DependencyKey
-DependencyKey::createDependedUponKey<NodeKind::nominal,
-                                     std::pair<StringRef, StringRef>>(
-    const std::pair<StringRef, StringRef> &p) {
-  return DependencyKey(NodeKind::nominal, DeclAspect::interface, p.first, "");
+DependencyKey::createDependedUponKey<NodeKind::externalDepend>(StringRef name) {
+  return DependencyKey(NodeKind::externalDepend, DeclAspect::interface, "",
+                       name);
 }
 
 template <>
 DependencyKey
-DependencyKey::createDependedUponKey<NodeKind::member,
-                                     std::pair<StringRef, StringRef>>(
-    const std::pair<StringRef, StringRef> &p) {
-  const bool isMemberBlank = p.second.empty();
+DependencyKey::createDependedUponKey<NodeKind::nominal>(StringRef mangledName) {
+  return DependencyKey(NodeKind::nominal, DeclAspect::interface, mangledName,
+                       "");
+}
+
+DependencyKey DependencyKey::createDependedUponKey(StringRef mangledHolderName,
+                                                   StringRef memberBaseName) {
+  const bool isMemberBlank = memberBaseName.empty();
   const auto kind =
       isMemberBlank ? NodeKind::potentialMember : NodeKind::member;
-  return DependencyKey(kind, DeclAspect::interface, p.first,
-                       isMemberBlank ? "" : p.second);
-}
-
-template <>
-DependencyKey
-DependencyKey::createDependedUponKey<NodeKind::externalDepend, std::string>(
-    const std::string &file) {
-  return DependencyKey(NodeKind::externalDepend, DeclAspect::interface, "",
-                       file);
+  return DependencyKey(kind, DeclAspect::interface, mangledHolderName,
+                       isMemberBlank ? "" : memberBaseName);
 }
 
 //==============================================================================
@@ -493,16 +487,15 @@ class SourceFileDepGraphConstructor {
   const std::vector<std::pair<std::string, bool>> dynamicLookupNames;
   const std::vector<std::string> externalDependencies;
 
-  ConstPtrVec<PrecedenceGroupDecl> precedenceGroups;
-  ConstPtrVec<FuncDecl> memberOperatorDecls;
-  ConstPtrVec<OperatorDecl> operators;
-  ConstPtrVec<NominalTypeDecl> topNominals;
-  ConstPtrVec<ValueDecl> topValues;
-  ConstPtrVec<NominalTypeDecl> allNominals;
-  ConstPtrVec<NominalTypeDecl> potentialMemberHolders;
-  ConstPtrPairVec<NominalTypeDecl, ValueDecl> valuesInExtensions;
-  ConstPtrVec<ValueDecl> classMembers;
-
+  std::vector<std::pair<std::string, std::string>> precedenceGroups;
+  std::vector<std::pair<std::string, std::string>> memberOperatorDecls;
+  std::vector<std::pair<std::string, std::string>> operators;
+  std::vector<std::pair<std::string, std::string>> topNominals;
+  std::vector<std::pair<std::string, std::string>> topValues;
+  std::vector<std::pair<std::string, std::string>> allNominals;
+  std::vector<std::pair<std::string, std::string>> potentialMemberHolders;
+  std::vector<std::pair<std::string, std::string>> valuesInExtensions;
+  std::vector<std::pair<std::string, std::string>> classMembers;
   /// Graph under construction
   SourceFileDepGraph g;
 
@@ -518,15 +511,15 @@ public:
                                 ArrayRef<std::pair<std::string, bool>> dynamicLookupNames,
                                 ArrayRef<std::string> externalDependencies,
 
-                                ConstPtrVec<PrecedenceGroupDecl> &precedenceGroups,
-                                ConstPtrVec<FuncDecl> &memberOperatorDecls,
-                                ConstPtrVec<OperatorDecl> &operators,
-                                ConstPtrVec<NominalTypeDecl> &topNominals,
-                                ConstPtrVec<ValueDecl> &topValues,
-                                ConstPtrVec<NominalTypeDecl> &allNominals,
-                                ConstPtrVec<NominalTypeDecl> &potentialMemberHolders,
-                                ConstPtrPairVec<NominalTypeDecl, ValueDecl> &valuesInExtensions,
-                                ConstPtrVec<ValueDecl> &classMembers
+                                ArrayRef<std::pair<std::string, std::string>> precedenceGroups,
+                                ArrayRef<std::pair<std::string, std::string>> memberOperatorDecls,
+                                ArrayRef<std::pair<std::string, std::string>> operators,
+                                ArrayRef<std::pair<std::string, std::string>> topNominals,
+                                ArrayRef<std::pair<std::string, std::string>> topValues,
+                                ArrayRef<std::pair<std::string, std::string>> allNominals,
+                                ArrayRef<std::pair<std::string, std::string>> potentialMemberHolders,
+                                ArrayRef<std::pair<std::string, std::string>> valuesInExtensions,
+                                ArrayRef<std::pair<std::string, std::string>> classMembers
                                 ) :
                                 swiftDeps(swiftDeps),
                                 includePrivateDeps(includePrivateDeps),
@@ -585,15 +578,15 @@ public:
         dynamicLookupNames,
         depTracker.getDependencies(),
 
-        declFinder.precedenceGroups,
-        declFinder.memberOperatorDecls,
-        declFinder.operators,
-        declFinder.topNominals,
-        declFinder.topValues,
-        declFinder.allNominals,
-        declFinder.potentialMemberHolders,
-        declFinder.valuesInExtensions,
-        declFinder.classMembers
+        namesForProvidersOfAGivenType<NodeKind::topLevel>(declFinder.precedenceGroups),
+        namesForProvidersOfAGivenType<NodeKind::topLevel>(declFinder.memberOperatorDecls),
+        namesForProvidersOfAGivenType<NodeKind::topLevel>(declFinder.operators),
+        namesForProvidersOfAGivenType<NodeKind::topLevel>(declFinder.topNominals),
+        namesForProvidersOfAGivenType<NodeKind::topLevel>(declFinder.topValues),
+        namesForProvidersOfAGivenType<NodeKind::nominal>(declFinder.allNominals),
+        namesForProvidersOfAGivenType<NodeKind::potentialMember>(declFinder.potentialMemberHolders),
+        namesForProvidersOfAGivenType<NodeKind::member>(declFinder.valuesInExtensions),
+        namesForProvidersOfAGivenType<NodeKind::dynamicLookup>(declFinder.classMembers)
         );
   }
   // clang-format on
@@ -627,18 +620,27 @@ private:
   void addDependencyArcsToGraph();
 
   /// Given an array of Decls or pairs of them in \p declsOrPairs
-  /// create nodes if needed and add the new nodes to the graph.
+  /// create string pairs for context and name
   template <NodeKind kind, typename ContentsT>
-  void addAllProviderNodesOfAGivenType(std::vector<ContentsT> &contentsVec) {
-    for (const auto declOrPair : contentsVec) {
+  static std::vector<std::pair<std::string, std::string>>
+  namesForProvidersOfAGivenType(std::vector<ContentsT> &contentsVec) {
+    std::vector<std::pair<std::string, std::string>> result;
+    for (const auto declOrPair : contentsVec)
+      result.push_back(
+          {DependencyKey::computeContextForProvidedEntity<kind>(declOrPair),
+           DependencyKey::computeNameForProvidedEntity<kind>(declOrPair)});
+    return result;
+  }
+
+  template <NodeKind kind>
+  void addAllProviderNodesOfAGivenType(
+      ArrayRef<std::pair<std::string, std::string>> providers) {
+    for (const auto &contextAndName : providers) {
       // No fingerprints for providers (Decls) yet.
       // Someday ...
       const Optional<std::string> fingerprint = None;
       auto p = g.findExistingNodePairOrCreateAndAddIfNew(
-          kind,
-          DependencyKey::computeContextForProvidedEntity<kind>(declOrPair),
-          DependencyKey::computeNameForProvidedEntity<kind>(declOrPair),
-          fingerprint);
+          kind, contextAndName.first, contextAndName.second, fingerprint);
       // Since we don't have fingerprints yet, must rebuild every provider when
       // interfaceHash changes. So when interface (i.e. interface hash) of
       // sourceFile changes, every provides is dirty. And since we don't know
@@ -695,10 +697,12 @@ void SourceFileDepGraphConstructor::addAllDependenciesFrom(
     if (!includePrivateDeps && std::get<2>(entry.first))
       continue;
     recordThatThisWholeFileDependsOn(
-        DependencyKey::createDependedUponKey<NodeKind::nominal>(entry.first),
+        DependencyKey::createDependedUponKey<NodeKind::nominal>(
+            std::get<0>(entry.first)),
         holdersOfCascadingMembers.count(std::get<0>(entry.first)) != 0);
     recordThatThisWholeFileDependsOn(
-        DependencyKey::createDependedUponKey<NodeKind::member>(entry.first),
+        DependencyKey::createDependedUponKey(std::get<0>(entry.first),
+                                             std::get<1>(entry.first)),
         entry.second);
   }
 }

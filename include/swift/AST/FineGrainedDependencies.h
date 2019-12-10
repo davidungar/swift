@@ -494,8 +494,11 @@ public:
   static std::string computeNameForProvidedEntity(Entity);
 
   /// Given some type of depended-upon entity create the key.
-  template <NodeKind kind, typename Entity>
-  static DependencyKey createDependedUponKey(const Entity &);
+  static DependencyKey createDependedUponKey(StringRef mangledHolderName,
+                                             StringRef memberBaseName);
+
+  template <NodeKind kind>
+  static DependencyKey createDependedUponKey(StringRef);
 
   std::string humanReadableName() const;
 
