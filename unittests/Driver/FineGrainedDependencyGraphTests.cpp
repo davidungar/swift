@@ -174,7 +174,7 @@ TEST(ModuleDepGraph, SimpleDependent) {
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
 
-  EXPECT_EQ(0u, printForDebugging(graph.markTransitive(&job0)).size());
+  EXPECT_EQ(0u, graph.markTransitive(&job0).size());
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
 }

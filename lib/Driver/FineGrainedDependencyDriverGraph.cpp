@@ -368,7 +368,8 @@ void ModuleDepGraph::findDependentNodesAndRecordCascadingOnes(
   forEachUseOf(definition, [&](const ModuleDepGraphNode *u) {
     // If a job is already marked as cascading, no need to visit it.
     // The unit tests expect it to be not visited.
-    const auto m = nodeMap[u->getKey()];
+    const auto &k = u->getKey();
+    const auto m = nodeMap[k];
     if (m.size()) {
       const auto swiftDeps = m.cbegin()->first;
       assert(!swiftDeps.empty());
