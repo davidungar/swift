@@ -91,7 +91,7 @@ bool ModuleDepGraph::isMarked(const Job *cmd) const {
   return cascadingJobs.count(getSwiftDeps(cmd));
 }
 
-std::vector<const Job*> ModuleDepGraph::  markTransitive(
+std::vector<const Job*> ModuleDepGraph::markTransitive(
     const Job *jobToBeRecompiled, const void *ignored) {
   FrontendStatsTracer tracer(stats, "fine-grained-dependencies-markTransitive");
   assert(jobToBeRecompiled && "Ensure there is really a job");
@@ -105,12 +105,11 @@ std::vector<const Job*> ModuleDepGraph::  markTransitive(
     findDependentNodesAndRecordCascadingOnes(dependentNodes,
                                              fileAndNode.second);
   }
-  return computeUniqueJobsFromNodes(dependentNodes, jobToBeRecompiled);
+  return computeUniqueJobsFromNodes(dependentNodes);
 }
 
-std::vector<const Job *> ModuleDepGraph::computeUniqueJobsFromNodes(
-    const std::unordered_set<const ModuleDepGraphNode *> &nodes,
-    const NullablePtr<const Job> jobToExclude) {
+std::vector<const Job*> ModuleDepGraph::computeUniqueJobsFromNodes(
+    const std::unordered_set<const ModuleDepGraphNode *> &nodes) {
 
   std::vector<const Job*>jobs;
 
@@ -122,9 +121,7 @@ std::vector<const Job *> ModuleDepGraph::computeUniqueJobsFromNodes(
     if (swiftDepsOfNodes.insert(swiftDeps).second) {
       assert(n->assertImplementationMustBeInAFile());
       ensureJobIsTracked(swiftDeps);
-      auto job = getJob(swiftDeps);
-      if (jobToExclude.getPtrOrNull() != job)
-        jobs.push_back(job);
+      jobs.push_back(getJob(swiftDeps));
     }
   }
   return jobs;
@@ -366,17 +363,6 @@ void ModuleDepGraph::findDependentNodesAndRecordCascadingOnes(
          "Should only call me for Decl nodes.");
 
   forEachUseOf(definition, [&](const ModuleDepGraphNode *u) {
-    // If a job is already marked as cascading, no need to visit it.
-    // The unit tests expect it to be not visited.
-    const auto &k = u->getKey();
-    const auto m = nodeMap[k];
-    if (m.size()) {
-      const auto swiftDeps = m.cbegin()->first;
-      assert(!swiftDeps.empty());
-      if (cascadingJobs.count(swiftDeps))
-        return;
-    }
-
     // Cycle recording and check.
     if (!foundDependents.insert(u).second)
       return;
