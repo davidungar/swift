@@ -91,7 +91,7 @@ bool ModuleDepGraph::isMarked(const Job *cmd) const {
   return cascadingJobs.count(getSwiftDeps(cmd));
 }
 
-std::vector<const Job*> ModuleDepGraph::markTransitive(
+std::vector<const Job*> ModuleDepGraph::  markTransitive(
     const Job *jobToBeRecompiled, const void *ignored) {
   FrontendStatsTracer tracer(stats, "fine-grained-dependencies-markTransitive");
   assert(jobToBeRecompiled && "Ensure there is really a job");
@@ -99,7 +99,7 @@ std::vector<const Job*> ModuleDepGraph::markTransitive(
   std::unordered_set<const ModuleDepGraphNode *> dependentNodes;
   const StringRef swiftDepsToBeRecompiled = getSwiftDeps(jobToBeRecompiled);
   assert(!swiftDepsToBeRecompiled.empty() && "Must have a swift deps");
-  // Do the traversal.
+  // Do the traversal for every node in the job to be recompiled.
   for (auto &fileAndNode : nodeMap[swiftDepsToBeRecompiled]) {
     assert(isCurrentPathForTracingEmpty());
     findDependentNodesAndRecordCascadingOnes(dependentNodes,
@@ -366,6 +366,16 @@ void ModuleDepGraph::findDependentNodesAndRecordCascadingOnes(
          "Should only call me for Decl nodes.");
 
   forEachUseOf(definition, [&](const ModuleDepGraphNode *u) {
+    // If a job is already marked as cascading, no need to visit it.
+    // The unit tests expect it to be not visited.
+    const auto m = nodeMap[u->getKey()];
+    if (m.size()) {
+      const auto swiftDeps = m.cbegin()->first;
+      assert(!swiftDeps.empty());
+      if (cascadingJobs.count(swiftDeps))
+        return;
+    }
+
     // Cycle recording and check.
     if (!foundDependents.insert(u).second)
       return;
