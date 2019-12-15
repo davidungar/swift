@@ -7,6 +7,11 @@
 // This file adapts the unit tests from the older, coarse-grained, dependency
 // graph to the new fine-grained graph.
 
+// \c markTransitive and \c markExternal may include jobs in their result
+// that would be excluded in the coarse-grained graph. But since these will be
+// jobs that have already been scheduled, downstream mechanisms will filter
+// them out.
+
 using namespace swift;
 using LoadResult = CoarseGrainedDependencyGraphImpl::LoadResult;
 using namespace reference_dependency_keys;
@@ -45,6 +50,7 @@ static std::vector<const Job*> printForDebugging(std::vector<const Job*> jobs) {
 }
 
 static OutputFileMap OFM;
+
 static Job
   job0(OFM, "0"),
   job1(OFM, "1"),

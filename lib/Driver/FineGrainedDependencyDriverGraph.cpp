@@ -102,29 +102,40 @@ std::vector<const Job*> ModuleDepGraph::markTransitive(
   // Do the traversal for every node in the job to be recompiled.
   for (auto &fileAndNode : nodeMap[swiftDepsToBeRecompiled]) {
     assert(isCurrentPathForTracingEmpty());
-    findDependentNodesAndRecordCascadingOnes(dependentNodes,
-                                             fileAndNode.second);
+    findDependentNodes(dependentNodes, fileAndNode.second);
   }
-  return computeUniqueJobsFromNodes(dependentNodes);
+  std::vector<const Job *> newJobsToCompile;
+  // The job containing the interface "cascades", in other words
+  // whenever that job gets recompiled, anything depending on it
+  // (since we don't have interface-specific dependency info as of Dec.
+  // 2018) must be recompiled.
+  for (const auto &entry : computeSwiftDepsFromInterfaceNodes(dependentNodes)) {
+    const StringRef swiftDeps = entry.getKey();
+    if (rememberThatJobCascades(swiftDeps)) {
+      const Job *j = getJob(swiftDeps.str());
+      if (j != jobToBeRecompiled)
+        newJobsToCompile.push_back(j);
+    }
+  }
+  return newJobsToCompile;
 }
 
-std::vector<const Job*> ModuleDepGraph::computeUniqueJobsFromNodes(
+llvm::StringSet<> ModuleDepGraph::computeSwiftDepsFromInterfaceNodes(
     const std::unordered_set<const ModuleDepGraphNode *> &nodes) {
 
-  std::vector<const Job*>jobs;
-
-  std::unordered_set<std::string> swiftDepsOfNodes;
+  llvm::StringSet<> swiftDepsOfNodes;
   for (const ModuleDepGraphNode *n : nodes) {
+    if (!n->getKey().isInterface())
+      continue;
     if (!n->getSwiftDeps().hasValue())
       continue;
     const std::string &swiftDeps = n->getSwiftDeps().getValue();
     if (swiftDepsOfNodes.insert(swiftDeps).second) {
       assert(n->assertImplementationMustBeInAFile());
-      ensureJobIsTracked(swiftDeps);
-      jobs.push_back(getJob(swiftDeps));
+      assert(ensureJobIsTracked(swiftDeps));
     }
   }
-  return jobs;
+  return swiftDepsOfNodes;
 }
 
 bool ModuleDepGraph::markIntransitive(const Job *node) {
@@ -352,11 +363,11 @@ void ModuleDepGraph::forEachArc(
 // Could be faster by passing in a file, not a node, but we are trying for
 // generality.
 
-void ModuleDepGraph::findDependentNodesAndRecordCascadingOnes(
+void ModuleDepGraph::findDependentNodes(
     std::unordered_set<const ModuleDepGraphNode *> &foundDependents,
     const ModuleDepGraphNode *definition) {
 
-    size_t pathLengthAfterArrival = traceArrival(definition);
+  size_t pathLengthAfterArrival = traceArrival(definition);
 
   // Moved this out of the following loop for effieciency.
   assert(definition->getSwiftDeps().hasValue() &&
@@ -366,17 +377,11 @@ void ModuleDepGraph::findDependentNodesAndRecordCascadingOnes(
     // Cycle recording and check.
     if (!foundDependents.insert(u).second)
       return;
-    if (u->getKey().isInterface() && u->getSwiftDeps().hasValue()) {
-      // An interface depends on something. Thus, if that something changes
-      // the interface must be recompiled. But if an interface changes, then
-      // anything using that interface must also be recompiled.
-      // So, the job containing the interface "cascades", in other words
-      // whenever that job gets recompiled, anything depending on it
-      // (since we don't have interface-specific dependency info as of Dec.
-      // 2018) must be recompiled.
-      rememberThatJobCascades(u->getSwiftDeps().getValue());
-      findDependentNodesAndRecordCascadingOnes(foundDependents, u);
-    }
+    // An interface depends on something. Thus, if that something changes
+    // the interface must be recompiled. But if an interface changes, then
+    // anything using that interface must also be recompiled.
+    if (u->getKey().isInterface() && u->getSwiftDeps().hasValue())
+      findDependentNodes(foundDependents, u);
   });
   traceDeparture(pathLengthAfterArrival);
 }

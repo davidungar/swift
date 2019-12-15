@@ -437,13 +437,13 @@ private:
   /// Given a definition node, and a list of already found dependents,
   /// recursively add transitive closure of dependents of the definition
   /// into the already found dependents.
-  /// Also record any dependents that "cascade", i.e. whose dependencies must be
-  /// recomputed after recompilation so that its dependents can be recompiled.
-  void findDependentNodesAndRecordCascadingOnes(
+  void findDependentNodes(
       std::unordered_set<const ModuleDepGraphNode *> &foundDependents,
       const ModuleDepGraphNode *definition);
 
-  std::vector<const driver::Job*> computeUniqueJobsFromNodes(
+  /// Givien a set of nodes, return the set of swiftDeps for the jobs those
+  /// nodes are in.
+  llvm::StringSet<> computeSwiftDepsFromInterfaceNodes(
       const std::unordered_set<const ModuleDepGraphNode *> &nodes);
 
   /// Record a visit to this node for later dependency printing
