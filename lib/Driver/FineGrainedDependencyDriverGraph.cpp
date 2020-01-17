@@ -401,6 +401,7 @@ void ModuleDepGraph::forEachDefNodeInJobMatchingKeys(
 std::unordered_set<const ModuleDepGraphNode *>
 ModuleDepGraph::findNodesTransitivelyDependingUponKeysOccurringInJob(
     const ArrayRef<DependencyKey> keys, const StringRef swiftDeps) {
+
   std::unordered_set<const ModuleDepGraphNode *> dependentNodes;
   forEachDefNodeInJobMatchingKeys(
       swiftDeps, keys, [&](const ModuleDepGraphNode *const def) {
@@ -409,6 +410,18 @@ ModuleDepGraph::findNodesTransitivelyDependingUponKeysOccurringInJob(
         findDependentNodes(dependentNodes, def);
       });
   return dependentNodes;
+}
+
+void ModuleDepGraph::isNodeInAMarkedJob(const ModuleDepGraphNode *n) const {
+  const auto maybeSwiftDeps = n->getSwiftDeps();
+  if (!maybeSwiftDeps)
+    return false;
+  const auto swiftDeps = maybeSwiftDeps.getValue();
+  if (swiftDeps.empty())
+    return false;
+  // Since we are doing whole jobs at this point, no need to dive
+  // into a job that has already been noted for scheduling and searching.
+  return isSwiftDepsMarked(swiftDeps);
 }
 
 void ModuleDepGraph::findDependentNodes(
@@ -420,14 +433,17 @@ void ModuleDepGraph::findDependentNodes(
   // Moved this out of the following loop for effieciency.
   assert(definition->getIsProvides() && "Should only call me for Decl nodes.");
 
-  // Cycle recording and check.
-  if (foundDependents.insert(definition).second) {
-    forEachUseOf(definition, [&](const ModuleDepGraphNode *u) {
-      // If this use also provides something, follow it
-      if (u->getIsProvides())
-        findDependentNodes(foundDependents, u);
-    });
-  }
+  forEachUseOf(definition, [&](const ModuleDepGraphNode *u) {
+    if (isNodeInAMarkedJob(u))
+      return;
+    // Cycle recording and check.
+    if (!foundDependents.insert(u).second)
+      return;
+    // If this use also provides something, follow it
+    if (u->getIsProvides())
+      findDependentNodes(foundDependents, u);
+  });
+
   traceDeparture(pathLengthAfterArrival);
 }
 
