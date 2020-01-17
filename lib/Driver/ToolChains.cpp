@@ -234,6 +234,8 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
                        options::OPT_enable_fine_grained_dependencies);
   inputArgs.AddLastArg(arguments,
                        options::OPT_disable_fine_grained_dependencies);
+  inputArgs.AddLastArg(arguments, options::OPT_enable_type_fingerprints);
+  inputArgs.AddLastArg(arguments, options::OPT_disable_type_fingerprints);
   inputArgs.AddLastArg(arguments,
                        options::OPT_fine_grained_dependency_include_intrafile);
   inputArgs.AddLastArg(arguments, options::OPT_package_description_version);
