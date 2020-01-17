@@ -189,6 +189,8 @@ class ModuleDepGraph {
   const bool verifyFineGrainedDependencyGraphAfterEveryImport;
   const bool emitFineGrainedDependencyDotFileAfterEveryImport;
 
+  const bool EnableTypeDependencies;
+
   /// If tracing dependencies, holds a vector used to hold the current path
   /// def - use/def - use/def - ...
   Optional<std::vector<const ModuleDepGraphNode *>> currentPathIfTracing;
@@ -275,12 +277,14 @@ public:
   /// \p stats may be null
   ModuleDepGraph(const bool verifyFineGrainedDependencyGraphAfterEveryImport,
                  const bool emitFineGrainedDependencyDotFileAfterEveryImport,
+                 const bool EnableTypeDependencies,
                  const bool shouldTraceDependencies,
                  UnifiedStatsReporter *stats)
       : verifyFineGrainedDependencyGraphAfterEveryImport(
             verifyFineGrainedDependencyGraphAfterEveryImport),
         emitFineGrainedDependencyDotFileAfterEveryImport(
             emitFineGrainedDependencyDotFileAfterEveryImport),
+        EnableTypeDependencies(EnableTypeDependencies),
         currentPathIfTracing(
             shouldTraceDependencies
                 ? llvm::Optional<std::vector<const ModuleDepGraphNode *>>(
@@ -289,8 +293,6 @@ public:
         stats(stats) {
     assert(verify() && "ModuleDepGraph should be fine when created");
   }
-
-  ModuleDepGraph() : ModuleDepGraph(false, false, false, nullptr) {}
 
   using Changes = Optional<std::unordered_set<DependencyKey>>;
 

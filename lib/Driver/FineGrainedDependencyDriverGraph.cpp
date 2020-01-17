@@ -416,6 +416,7 @@ ModuleDepGraph::findNodesTransitivelyDependingUponKeysOccurringInJob(
   return dependentNodes;
 }
 
+#warning : delete?
 bool ModuleDepGraph::isNodeInAMarkedJob(const ModuleDepGraphNode *n) const {
   const auto maybeSwiftDeps = n->getSwiftDeps();
   if (!maybeSwiftDeps)
@@ -438,8 +439,9 @@ void ModuleDepGraph::findDependentNodes(
   assert(definition->getIsProvides() && "Should only call me for Decl nodes.");
 
   forEachUseOf(definition, [&](const ModuleDepGraphNode *u) {
-    if (isNodeInAMarkedJob(u))
+    if (!EnableTypeDependencies && isNodeInAMarkedJob(u))
       return;
+#warning too slow if type deps
     // Cycle recording and check.
     if (!foundDependents.insert(u).second)
       return;

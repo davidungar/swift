@@ -278,6 +278,9 @@ private:
   /// faster rebuilds.
   const bool EnableFineGrainedDependencies;
 
+  /// Is the parser recording token hashes for each type body?
+  const bool EnableTypeFingerprints;
+
   /// Helpful for debugging, but slows down the driver. So, only turn on when
   /// needed.
   const bool VerifyFineGrainedDependencyGraphAfterEveryImport;
@@ -285,7 +288,7 @@ private:
   /// needed.
   const bool EmitFineGrainedDependencyDotFileAfterEveryImport;
 
-  /// Experiment with inter-file dependencies
+  /// Experiment with intrafile dependencies
   const bool FineGrainedDependenciesIncludeIntrafileOnes;
 
   /// Experiment with source-range-based dependencies
@@ -328,6 +331,7 @@ public:
               std::unique_ptr<UnifiedStatsReporter> Stats = nullptr,
               bool OnlyOneDependencyFile = false,
               bool EnableFineGrainedDependencies = false,
+              bool EnableTypeFingerprints = false,
               bool VerifyFineGrainedDependencyGraphAfterEveryImport = false,
               bool EmitFineGrainedDependencyDotFileAfterEveryImport = false,
               bool FineGrainedDependenciesIncludeIntrafileOnes = false,
@@ -395,6 +399,8 @@ public:
   bool getEnableFineGrainedDependencies() const {
     return EnableFineGrainedDependencies;
   }
+
+  bool getEnableTypeFingerprints() const { return EnableTypeFingerprints; }
 
   bool getVerifyFineGrainedDependencyGraphAfterEveryImport() const {
     return VerifyFineGrainedDependencyGraphAfterEveryImport;
