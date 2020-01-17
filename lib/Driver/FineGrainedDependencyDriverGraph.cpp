@@ -87,7 +87,11 @@ ModuleDepGraph::Changes ModuleDepGraph::loadFromSourceFileDepGraph(
 }
 
 bool ModuleDepGraph::isMarked(const Job *cmd) const {
-  return swiftDepsOfJobsThatNeedRunning.count(getSwiftDeps(cmd));
+  return isSwiftDepsMarked(getSwiftDeps(cmd));
+}
+
+bool ModuleDepGraph::isSwiftDepsMarked(StringRef swiftDeps) const {
+  return swiftDepsOfMarkedJobs.count(swiftDeps);
 }
 
 std::vector<const Job *>
@@ -112,20 +116,20 @@ ModuleDepGraph::getJobsToRecompileAfterWhenKeysInAJobChange(
           changedKeys, swiftDepsContainingChangedKeys);
 
   // Job already ran or is scheduled, no need to return it.
-  recordJobNeedsRunning(swiftDepsContainingChangedKeys);
+  markJobViaSwiftDeps(swiftDepsContainingChangedKeys);
 
   std::vector<const ModuleDepGraphNode *> dependentNodeVec{
       dependentNodes.begin(), dependentNodes.end()};
-  return jobsThatNowNeedRunningBecauseTheyUse(dependentNodeVec);
+  return jobsThatAreMarkedBecauseTheyUse(dependentNodeVec);
 }
 
 std::vector<const driver::Job *>
-ModuleDepGraph::jobsThatNowNeedRunningBecauseTheyUse(
+ModuleDepGraph::jobsThatAreMarkedBecauseTheyUse(
     const ArrayRef<const ModuleDepGraphNode *> uses) {
   std::vector<const Job *> jobs;
   for (const auto &entry : computeSwiftDepsFromInterfaceNodes(uses)) {
     const StringRef swiftDeps = entry.getKey();
-    if (recordJobNeedsRunning(swiftDeps)) {
+    if (markJobViaSwiftDeps(swiftDeps)) {
       const Job *j = getJob(swiftDeps.str());
       jobs.push_back(j);
     }
@@ -152,7 +156,7 @@ llvm::StringSet<> ModuleDepGraph::computeSwiftDepsFromInterfaceNodes(
 }
 
 bool ModuleDepGraph::markIntransitive(const Job *job) {
-  return recordJobNeedsRunning(getSwiftDeps(job));
+  return markJobViaSwiftDeps(getSwiftDeps(job));
 }
 
 void ModuleDepGraph::addIndependentNode(const Job *job) {

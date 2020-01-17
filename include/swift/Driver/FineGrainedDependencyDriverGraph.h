@@ -164,10 +164,12 @@ class ModuleDepGraph {
   std::unordered_set<std::string> externalDependencies;
 
   /// The new version of "Marked."
-  /// Aka "isMarked". Holds the swiftDeps paths for jobs the driver has or will
-  /// schedule.
-  /// TODO: Move scheduledJobs out of the graph, ultimately.
-  std::unordered_set<std::string> swiftDepsOfJobsThatNeedRunning;
+  /// Aka "isMarked".
+  /// If  job is in here, all of its dependent jobs have already been searched
+  /// for jobs that depend on them, OR the job is about to be scheduled and
+  /// we'll need to run all dependent jobs after it completes. (See the call to
+  /// \c markIntransitive in \c shouldScheduleCompileJobAccordingToCondition.)
+  std::unordered_set<std::string> swiftDepsOfMarkedJobs;
 
   /// Keyed by swiftdeps filename, so we can get back to Jobs.
   std::unordered_map<std::string, const driver::Job *> jobsBySwiftDeps;
@@ -349,8 +351,10 @@ public:
       ArrayRef<DependencyKey>, const driver::Job *jobToBeRecompiled);
 
 private:
-  std::vector<const driver::Job *> jobsThatNowNeedRunningBecauseTheyUse(
+  std::vector<const driver::Job *> jobsThatAreMarkedBecauseTheyUse(
       const ArrayRef<const ModuleDepGraphNode *> uses);
+
+  bool isSwiftDepsMarked(StringRef) const;
 
 public:
   /// "Mark" this node only.
@@ -506,8 +510,8 @@ private:
       const driver::Job *dependentJob);
 
   /// Return true if job was not scheduled before
-  bool recordJobNeedsRunning(StringRef swiftDeps) {
-    return swiftDepsOfJobsThatNeedRunning.insert(swiftDeps).second;
+  bool markJobViaSwiftDeps(StringRef swiftDeps) {
+    return swiftDepsOfMarkedJobs.insert(swiftDeps).second;
   }
 
   /// For debugging and visualization, write out the graph to a dot file.
