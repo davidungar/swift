@@ -477,6 +477,12 @@ private:
   findNodesTransitivelyDependingUponKeysOccurringInJob(
       const ArrayRef<DependencyKey> keys, const StringRef swiftDeps);
 
+  /// The dependency graph is traversed to find jobs that must be recompiled
+  /// when a node is dirty.
+  /// When not using per-type-body fingerprints, there's no need to re-traverse any node
+  /// in a job that has been marked.
+  bool isNodeInAMarkedJob(const ModuleDepGraphNode *n) const;
+
   /// Given a definition node, and a list of already found defs & uses,
   /// recursively add transitive closure of dependents of the definition
   /// into the already found dependents.

@@ -412,7 +412,7 @@ ModuleDepGraph::findNodesTransitivelyDependingUponKeysOccurringInJob(
   return dependentNodes;
 }
 
-void ModuleDepGraph::isNodeInAMarkedJob(const ModuleDepGraphNode *n) const {
+bool ModuleDepGraph::isNodeInAMarkedJob(const ModuleDepGraphNode *n) const {
   const auto maybeSwiftDeps = n->getSwiftDeps();
   if (!maybeSwiftDeps)
     return false;
