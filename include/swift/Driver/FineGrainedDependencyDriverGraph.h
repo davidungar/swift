@@ -189,7 +189,7 @@ class ModuleDepGraph {
   const bool verifyFineGrainedDependencyGraphAfterEveryImport;
   const bool emitFineGrainedDependencyDotFileAfterEveryImport;
 
-  const bool EnableTypeDependencies;
+  const bool EnableTypeFingerprints;
 
   /// If tracing dependencies, holds a vector used to hold the current path
   /// def - use/def - use/def - ...
@@ -277,14 +277,14 @@ public:
   /// \p stats may be null
   ModuleDepGraph(const bool verifyFineGrainedDependencyGraphAfterEveryImport,
                  const bool emitFineGrainedDependencyDotFileAfterEveryImport,
-                 const bool EnableTypeDependencies,
+                 const bool EnableTypeFingerprints,
                  const bool shouldTraceDependencies,
                  UnifiedStatsReporter *stats)
       : verifyFineGrainedDependencyGraphAfterEveryImport(
             verifyFineGrainedDependencyGraphAfterEveryImport),
         emitFineGrainedDependencyDotFileAfterEveryImport(
             emitFineGrainedDependencyDotFileAfterEveryImport),
-        EnableTypeDependencies(EnableTypeDependencies),
+        EnableTypeFingerprints(EnableTypeFingerprints),
         currentPathIfTracing(
             shouldTraceDependencies
                 ? llvm::Optional<std::vector<const ModuleDepGraphNode *>>(
@@ -309,6 +309,10 @@ public:
 
   /// For the dot file.
   std::string getGraphID() const { return "driver"; }
+
+  void forCorrespondingImplementationOfProvidedInterface(
+      const ModuleDepGraphNode *,
+      function_ref<void(ModuleDepGraphNode *)>) const;
 
   void forEachUseOf(const ModuleDepGraphNode *def,
                     function_ref<void(const ModuleDepGraphNode *use)>);
@@ -341,9 +345,9 @@ public:
   /// are recompiled. Such jobs are added to the \ref scheduledJobs set, and
   /// accessed via \ref isMarked.
   ///
-  /// Only return jobs marked that were previously unmarked. Not required for
-  /// the driver because it won't run a job twice, but required for the unit
-  /// test.
+  /// Returns jobs to be run because of changes to any/ever node in the
+  /// argument. Only return jobs marked that were previously unmarked, assuming
+  /// previously marked jobs are already scheduled.
   std::vector<const driver::Job*> markTransitive(
       const driver::Job *jobToBeRecompiled, const void *ignored = nullptr);
 
@@ -448,7 +452,8 @@ private:
   bool
   integrateSourceFileDepGraphNode(const SourceFileDepGraph &g,
                                   const SourceFileDepGraphNode *integrand,
-                                  const PreexistingNodeIfAny preexistingMatch);
+                                  const PreexistingNodeIfAny preexistingMatch,
+                                  StringRef swiftDepsOfJob);
 
   /// Integrate the \p integrand, a node that represents a Decl in the swiftDeps
   /// file being integrated. \p preexistingNodeInPlace holds the node
@@ -459,7 +464,7 @@ private:
   /// ModuleDepGraphNode.
   std::pair<bool, ModuleDepGraphNode *>
   integrateSourceFileDeclNode(const SourceFileDepGraphNode *integrand,
-                              StringRef swiftDepsOfSourceFileGraph,
+                              StringRef swiftDepsOfJob,
                               const PreexistingNodeIfAny preexistingMatch);
 
   /// Create a brand-new ModuleDepGraphNode to integrate \p integrand.
@@ -498,7 +503,7 @@ private:
 
   /// Givien a set of nodes, return the set of swiftDeps for the jobs those
   /// nodes are in.
-  llvm::StringSet<> computeSwiftDepsFromInterfaceNodes(
+  std::vector<std::string> computeSwiftDepsFromNodes(
       ArrayRef<const ModuleDepGraphNode *> nodes);
 
   /// Record a visit to this node for later dependency printing

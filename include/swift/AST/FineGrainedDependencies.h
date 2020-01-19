@@ -501,7 +501,7 @@ public:
   static DependencyKey createDependedUponKey(StringRef);
 
   static DependencyKey
-  createTransitiveKeyForWholeSourceFile(StringRef swiftDeps);
+  createKeyForWholeSourceFile(StringRef swiftDeps);
 
   std::string humanReadableName() const;
 

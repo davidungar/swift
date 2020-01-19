@@ -141,7 +141,7 @@ std::string DependencyKey::demangleTypeAsContext(StringRef s) {
   return swift::Demangle::demangleTypeAsString(s.str());
 }
 
-DependencyKey DependencyKey::createTransitiveKeyForWholeSourceFile(
+DependencyKey DependencyKey::createKeyForWholeSourceFile(
     const StringRef swiftDeps) {
   assert(!swiftDeps.empty());
   const auto context = DependencyKey::computeContextForProvidedEntity<

@@ -357,6 +357,15 @@ namespace driver {
       PendingExecution.insert(Cmd);
     }
 
+    // Sort for ease of testing
+    template <typename Jobs>
+    void scheduleCommandsInSortedOrder(const Jobs &jobs) {
+      llvm::SmallVector<const Job *, 16> sortedJobs;
+      Comp.sortJobsToMatchCompilationInputs(jobs, sortedJobs);
+      for (const Job *Cmd : sortedJobs)
+        scheduleCommandIfNecessaryAndPossible(Cmd);
+    }
+
     void addPendingJobToTaskQueue(const Job *Cmd) {
       // FIXME: Failing here should not take down the whole process.
       bool success =
@@ -395,8 +404,7 @@ namespace driver {
                        << LogJobArray(AllBlocked) << "\n";
         }
         BlockingCommands.erase(BlockedIter);
-        for (auto *Blocked : AllBlocked)
-          scheduleCommandIfNecessaryAndPossible(Blocked);
+        scheduleCommandsInSortedOrder(AllBlocked);
       }
     }
 
@@ -451,7 +459,7 @@ namespace driver {
                                  diag::warn_unable_to_load_dependencies,
                                  DependenciesFile);
       Comp.disableIncrementalBuild(
-          Twine("malformed swift dependencies file ' ") + DependenciesFile +
+          Twine("malformed swift dependencies file '") + DependenciesFile +
           "'");
     }
 
@@ -492,6 +500,17 @@ namespace driver {
     reloadAndRemarkDepsOnNormalExit(const Job *FinishedCmd,
                                     const bool cmdFailed, const bool forRanges,
                                     StringRef DependenciesFile) {
+      return Comp.getEnableFineGrainedDependencies()
+      ? reloadAndRemarkFineGrainedDepsOnNormalExit(FinishedCmd, cmdFailed, forRanges, DependenciesFile)
+      : reloadAndRemarkCoarseGrainedDepsOnNormalExit(FinishedCmd, cmdFailed, forRanges, DependenciesFile);
+    }
+
+
+    std::vector<const Job *>
+    reloadAndRemarkCoarseGrainedDepsOnNormalExit(const Job *FinishedCmd,
+                                                 const bool cmdFailed, const bool forRanges,
+                                                 StringRef DependenciesFile) {
+      assert(!Comp.getEnableFineGrainedDependencies() && "Only for coarse-grained");
       // "Marked" means that everything provided by this node (i.e. Job) is
       // dirty. Thus any file using any of these provides must be
       // recompiled. (Only non-private entities are output as provides.) In
@@ -499,45 +518,54 @@ namespace driver {
       // other recompilations. It is possible that the current code marks
       // things that do not need to be marked. Unecessary compilation would
       // result if that were the case.
-      bool wasKnownToNeedRunning = isMarkedInDepGraph(FinishedCmd, forRanges);
+      bool wasMarkedBeforeReload = isMarkedInDepGraph(FinishedCmd, forRanges);
 
-      auto handleLoadFailure = [&] {
-        if (cmdFailed) {
-          // let the next build handle it.
-          return std::vector<const Job *>();
-        }
-        dependencyLoadFailed(DependenciesFile);
-        // Better try compiling whatever was waiting on more info.
-        for (const Job *Cmd : DeferredCommands)
-          scheduleCommandIfNecessaryAndPossible(Cmd);
-        DeferredCommands.clear();
-        return std::vector<const Job *>();
-      };
-
-      if (Comp.getEnableFineGrainedDependencies()) {
-        const auto loadResult = getFineGrainedDepGraph(forRanges).loadFromPath(
-            FinishedCmd, DependenciesFile, Comp.getDiags());
-        const bool loadFailed = !loadResult;
-        if (loadFailed)
-          return handleLoadFailure();
-        std::vector<fine_grained_dependencies::DependencyKey> changedKeys{
-            loadResult.getValue().begin(), loadResult.getValue().end()};
-        return getFineGrainedDepGraph(forRanges)
-            .getJobsToRecompileAfterWhenKeysInAJobChange(changedKeys,
-                                                         FinishedCmd);
-      } else {
-        const auto loadResult = getDepGraph(forRanges).loadFromPath(
-            FinishedCmd, DependenciesFile, Comp.getDiags());
-        using LoadResult = CoarseGrainedDependencyGraph::LoadResult;
-        const bool loadFailed = loadResult == LoadResult::HadError;
-        if (loadFailed)
-          return handleLoadFailure();
-        if (loadResult == LoadResult::UpToDate && !wasKnownToNeedRunning)
-          return {};
-        return getDepGraph(forRanges).markTransitive(FinishedCmd,
-                                                     IncrementalTracer);
+      const auto loadResult = getDepGraph(forRanges).loadFromPath(
+                                                                  FinishedCmd, DependenciesFile, Comp.getDiags());
+      using LoadResult = CoarseGrainedDependencyGraph::LoadResult;
+      const bool loadFailed = loadResult == LoadResult::HadError;
+      if (loadFailed) {
+        handleDependenciesReloadFailure(cmdFailed, DependenciesFile);
+        return {};
       }
+      if (loadResult == LoadResult::UpToDate && !wasMarkedBeforeReload)
+        return {};
+      return getDepGraph(forRanges).markTransitive(FinishedCmd,
+                                                   IncrementalTracer);
     }
+
+    std::vector<const Job *>
+    reloadAndRemarkFineGrainedDepsOnNormalExit(const Job *FinishedCmd,
+                                    const bool cmdFailed, const bool forRanges,
+                                    StringRef DependenciesFile) {
+      assert(Comp.getEnableFineGrainedDependencies() && "Only for fine-grained");
+      const auto loadResult = getFineGrainedDepGraph(forRanges).loadFromPath(
+            FinishedCmd, DependenciesFile, Comp.getDiags());
+      const bool loadFailed = !loadResult;
+        if (loadFailed) {
+          handleDependenciesReloadFailure(cmdFailed, DependenciesFile);
+          return {};
+        }
+      std::vector<fine_grained_dependencies::DependencyKey> changedKeys{
+        loadResult.getValue().begin(), loadResult.getValue().end()};
+      return getFineGrainedDepGraph(forRanges)
+      .getJobsToRecompileAfterWhenKeysInAJobChange(changedKeys,
+                                                   FinishedCmd);
+    }
+
+    void  handleDependenciesReloadFailure(const bool cmdFailed, const StringRef DependenciesFile) {
+      if (cmdFailed) {
+        // let the next build handle it.
+         return;
+       }
+       dependencyLoadFailed(DependenciesFile);
+       // Better try compiling whatever was waiting on more info.
+       for (const Job *Cmd : DeferredCommands)
+         scheduleCommandIfNecessaryAndPossible(Cmd);
+       DeferredCommands.clear();
+     };
+
+
 
     std::vector<const Job *>
     reloadAndRemarkDepsOnAbnormalExit(const Job *FinishedCmd,
@@ -727,18 +755,9 @@ namespace driver {
       noteBuildingJobs(DependentsInEffect, useRangesForScheduling,
                        "because of dependencies discovered later");
 
-      // Sort dependents for more deterministic behavior
-      llvm::SmallVector<const Job *, 16> UnsortedDependents;
-      for (const Job *j : DependentsInEffect)
-        UnsortedDependents.push_back(j);
-      llvm::SmallVector<const Job *, 16> SortedDependents;
-      Comp.sortJobsToMatchCompilationInputs(UnsortedDependents,
-                                            SortedDependents);
-
-      for (const Job *Cmd : SortedDependents) {
+      scheduleCommandsInSortedOrder(DependentsInEffect);
+      for (const Job *Cmd : DependentsInEffect)
         DeferredCommands.erase(Cmd);
-        scheduleCommandIfNecessaryAndPossible(Cmd);
-      }
       return TaskFinishedResponse::ContinueExecution;
     }
 
@@ -1116,6 +1135,12 @@ namespace driver {
           // using markIntransitive and having later functions call
           // markTransitive. That way markIntransitive would be an
           // implementation detail of CoarseGrainedDependencyGraph.
+          //
+          // As it stands, after this job finishes, this mark will tell the code
+          // that this job was known to be "cascading". That knowledge will
+          // any dependent jobs to be run if they haven't already been.
+          //
+          // TODO: I think this is overly tricky
           markIntransitiveInDepGraph(Cmd, forRanges);
         }
         LLVM_FALLTHROUGH;
@@ -2108,17 +2133,22 @@ void Compilation::addDependencyPathOrCreateDummy(
   }
 }
 
+template <typename JobCollection>
 void Compilation::sortJobsToMatchCompilationInputs(
-    const ArrayRef<const Job *> unsortedJobs,
+    const JobCollection &unsortedJobs,
     SmallVectorImpl<const Job *> &sortedJobs) const {
   llvm::DenseMap<StringRef, const Job *> jobsByInput;
   for (const Job *J : unsortedJobs) {
-    const CompileJobAction *CJA = cast<CompileJobAction>(&J->getSource());
-    const InputAction *IA = CJA->findSingleSwiftInput();
-    auto R =
-        jobsByInput.insert(std::make_pair(IA->getInputArg().getValue(), J));
-    assert(R.second);
-    (void)R;
+    // Only worry about sorting compilation jobs
+    if (const CompileJobAction *CJA =
+            dyn_cast<CompileJobAction>(&J->getSource())) {
+      const InputAction *IA = CJA->findSingleSwiftInput();
+      auto R =
+          jobsByInput.insert(std::make_pair(IA->getInputArg().getValue(), J));
+      assert(R.second);
+      (void)R;
+    } else
+      sortedJobs.push_back(J);
   }
   for (const InputPair &P : getInputFiles()) {
     auto I = jobsByInput.find(P.second->getValue());
@@ -2127,3 +2157,8 @@ void Compilation::sortJobsToMatchCompilationInputs(
     }
   }
 }
+
+template void
+Compilation::sortJobsToMatchCompilationInputs<ArrayRef<const Job *>>(
+    const ArrayRef<const Job *> &,
+    SmallVectorImpl<const Job *> &sortedJobs) const;

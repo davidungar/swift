@@ -57,6 +57,9 @@ ModuleDepGraph::Changes ModuleDepGraph::loadFromPath(const Job *Cmd,
   if (!buffer)
     return None;
   auto r = loadFromBuffer(Cmd, *buffer.get());
+  assert(path == getSwiftDeps(Cmd) && "Should be reading the job's swiftdeps");
+  assert(!r || !nodeMap[path].empty() &&
+         "Must have a node for the whole file");
   if (emitFineGrainedDependencyDotFileAfterEveryImport)
     emitDotFileForJob(diags, Cmd);
   if (verifyFineGrainedDependencyGraphAfterEveryImport)
@@ -90,14 +93,14 @@ bool ModuleDepGraph::isMarked(const Job *cmd) const {
   return isSwiftDepsMarked(getSwiftDeps(cmd));
 }
 
-bool ModuleDepGraph::isSwiftDepsMarked(StringRef swiftDeps) const {
+bool ModuleDepGraph::isSwiftDepsMarked(const StringRef swiftDeps) const {
   return swiftDepsOfMarkedJobs.count(swiftDeps);
 }
-
+#error start
 std::vector<const Job *>
 ModuleDepGraph::markTransitive(const Job *jobToBeRecompiled,
                                const void *ignored) {
-  const auto startingKey = DependencyKey::createTransitiveKeyForWholeSourceFile(
+  const auto startingKey = DependencyKey::createKeyForWholeSourceFile(
       getSwiftDeps(jobToBeRecompiled));
   return getJobsToRecompileAfterWhenKeysInAJobChange({startingKey},
                                                      jobToBeRecompiled);
@@ -127,7 +130,7 @@ std::vector<const driver::Job *>
 ModuleDepGraph::jobsThatAreMarkedBecauseTheyUse(
     const ArrayRef<const ModuleDepGraphNode *> uses) {
   std::vector<const Job *> jobs;
-  for (const auto &entry : computeSwiftDepsFromInterfaceNodes(uses)) {
+  for (const auto &entry : computeSwiftDepsFromNodes(uses)) {
     const StringRef swiftDeps = entry.getKey();
     if (markJobViaSwiftDeps(swiftDeps)) {
       const Job *j = getJob(swiftDeps.str());
@@ -137,22 +140,20 @@ ModuleDepGraph::jobsThatAreMarkedBecauseTheyUse(
   return jobs;
 }
 
-llvm::StringSet<> ModuleDepGraph::computeSwiftDepsFromInterfaceNodes(
-    const ArrayRef<const ModuleDepGraphNode *> nodes) {
-
+#error end
+std::vector<std::string> ModuleDepGraph::computeSwiftDepsFromNodes(
+    const ArrayRef<const ModuleDepGraphNode *> nodes) const {
   llvm::StringSet<> swiftDepsOfNodes;
   for (const ModuleDepGraphNode *n : nodes) {
-    //    if (!n->doesNodeProvideAnInterface())
-    //      continue;
     if (!n->getIsProvides())
       continue;
     const std::string &swiftDeps = n->getSwiftDepsOfProvides();
-    if (swiftDepsOfNodes.insert(swiftDeps).second) {
-      assert(n->assertImplementationMustBeInAFile());
-      assert(ensureJobIsTracked(swiftDeps));
-    }
+    swiftDepsOfNodes.insert(swiftDeps);
   }
-  return swiftDepsOfNodes;
+  std::vector<std::string> swiftDepsVec;
+  for (const auto &entry : swiftDepsOfNodes)
+    swiftDepsVec.push_back(entry.getKey().str());
+  return swiftDepsVec;
 }
 
 bool ModuleDepGraph::markIntransitive(const Job *job) {
@@ -203,24 +204,24 @@ void ModuleDepGraph::forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
 // MARK: Integrating SourceFileDepGraph into ModuleDepGraph
 //==============================================================================
 
-ModuleDepGraph::Changes ModuleDepGraph::integrate(const SourceFileDepGraph &g) {
+LoadResult ModuleDepGraph::integrate(const SourceFileDepGraph &g,
+                                     StringRef swiftDepsOfJob) {
   FrontendStatsTracer tracer(stats, "fine-grained-dependencies-integrate");
 
-  StringRef swiftDeps = g.getSwiftDepsOfJobThatProducedThisGraph();
   // When done, disappearedNodes contains the nodes which no longer exist.
-  auto disappearedNodes = nodeMap[swiftDeps];
-  // When done, changedDependencyKeys contains a list of keys that changed
+  auto disappearedNodes = nodeMap[swiftDepsOfJob];
+  // When done, changeDependencyKeys contains a list of keys that changed
   // as a result of this integration.
   auto changedDependencyKeys = std::unordered_set<DependencyKey>();
 
   g.forEachNode([&](const SourceFileDepGraphNode *integrand) {
     const auto &key = integrand->getKey();
-    auto preexistingMatch = findPreexistingMatch(swiftDeps, integrand);
+    auto preexistingMatch = findPreexistingMatch(swiftDepsOfJob, integrand);
     if (preexistingMatch.hasValue() &&
         preexistingMatch.getValue().first == LocationOfPreexistingNode::here)
       disappearedNodes.erase(key); // Node was and still is. Do not erase it.
-    const bool changed =
-        integrateSourceFileDepGraphNode(g, integrand, preexistingMatch);
+    const bool changed = integrateSourceFileDepGraphNode(
+        g, integrand, preexistingMatch, swiftDepsOfJob);
     if (changed)
       changedDependencyKeys.insert(key);
   });
@@ -259,7 +260,8 @@ ModuleDepGraph::PreexistingNodeIfAny ModuleDepGraph::findPreexistingMatch(
 
 bool ModuleDepGraph::integrateSourceFileDepGraphNode(
     const SourceFileDepGraph &g, const SourceFileDepGraphNode *integrand,
-    const PreexistingNodeIfAny preexistingMatch) {
+    const PreexistingNodeIfAny preexistingMatch,
+    const StringRef swiftDepsOfJob) {
 
   // Track externalDependencies so Compilation can check them.
   if (integrand->getKey().getKind() == NodeKind::externalDepend)
@@ -271,23 +273,22 @@ bool ModuleDepGraph::integrateSourceFileDepGraphNode(
   if (integrand->isDepends())
     return false;
 
-  StringRef swiftDepsOfSourceFileGraph =
-      g.getSwiftDepsOfJobThatProducedThisGraph();
-  auto changedAndUseNode = integrateSourceFileDeclNode(
-      integrand, swiftDepsOfSourceFileGraph, preexistingMatch);
+  auto changedAndUseNode =
+      integrateSourceFileDeclNode(integrand, swiftDepsOfJob, preexistingMatch);
   recordWhatUseDependsUpon(g, integrand, changedAndUseNode.second);
   return changedAndUseNode.first;
 }
 
 std::pair<bool, ModuleDepGraphNode *>
 ModuleDepGraph::integrateSourceFileDeclNode(
-    const SourceFileDepGraphNode *integrand,
-    StringRef swiftDepsOfSourceFileGraph,
+    const SourceFileDepGraphNode *integrand, StringRef swiftDepsOfJob,
     const PreexistingNodeIfAny preexistingMatch) {
 
   if (!preexistingMatch.hasValue()) {
-    auto *newNode = integrateByCreatingANewNode(
-        integrand, swiftDepsOfSourceFileGraph.str());
+    // The driver will be accessing nodes by the swiftDeps of the job,
+    // so pass that in.
+    auto *newNode =
+        integrateByCreatingANewNode(integrand, swiftDepsOfJob.str());
     return std::make_pair(true, newNode); // New node
   }
   const auto where = preexistingMatch.getValue().first;
@@ -298,13 +299,13 @@ ModuleDepGraph::integrateSourceFileDeclNode(
 
   case LocationOfPreexistingNode::nowhere:
     // Some other file depended on this, but didn't know where it was.
-    moveNodeToDifferentFile(match, swiftDepsOfSourceFileGraph.str());
+    moveNodeToDifferentFile(match, swiftDepsOfJob.str());
     match->integrateFingerprintFrom(integrand);
     return std::make_pair(true, match); // New Decl, assume changed
 
   case LocationOfPreexistingNode::elsewhere:
-    auto *newNode = integrateByCreatingANewNode(
-        integrand, swiftDepsOfSourceFileGraph.str());
+    auto *newNode =
+        integrateByCreatingANewNode(integrand, swiftDepsOfJob.str());
     return std::make_pair(true, newNode); // New node;
   }
   llvm_unreachable("impossible");
@@ -352,14 +353,22 @@ void ModuleDepGraph::forEachUseOf(
   for (const ModuleDepGraphNode *useNode : iter->second)
     fn(useNode);
   // Add in implicit interface->implementation dependency
-  if (def->getKey().isInterface() && def->getSwiftDeps()) {
-    const auto &dk = def->getKey();
-    const DependencyKey key(dk.getKind(), DeclAspect::interface,
-                            dk.getContext(), dk.getName());
-    if (const auto interfaceNode =
-            nodeMap.find(def->getSwiftDeps().getValue(), dk))
-      fn(interfaceNode.getValue());
-  }
+  forCorrespondingImplementationOfProvidedInterface(def, fn);
+}
+
+void ModuleDepGraph::forCorrespondingImplementationOfProvidedInterface(
+    const ModuleDepGraphNode *interfaceNode,
+    function_ref<void(ModuleDepGraphNode *)> fn) const {
+  if (!interfaceNode->getKey().isInterface() || !interfaceNode->getIsProvides())
+    return;
+  const auto swiftDeps = interfaceNode->getSwiftDeps().getValue();
+  const auto &interfaceKey = interfaceNode->getKey();
+  const DependencyKey implementationKey(
+      interfaceKey.getKind(), DeclAspect::implementation,
+      interfaceKey.getContext(), interfaceKey.getName());
+  if (const auto implementationNode =
+          nodeMap.find(swiftDeps, implementationKey))
+    fn(implementationNode.getValue());
 }
 
 void ModuleDepGraph::forEachNode(
@@ -378,24 +387,12 @@ void ModuleDepGraph::forEachMatchingNode(
 void ModuleDepGraph::forEachArc(
     function_ref<void(const ModuleDepGraphNode *, const ModuleDepGraphNode *)>
         fn) const {
-  /// Use find instead of [] because this is const
-  for (const auto &defUse : usesByDef)
-    forEachMatchingNode(defUse.first, [&](const ModuleDepGraphNode *defNode) {
-      for (const auto &useNode : defUse.second)
-        fn(defNode, useNode);
-    });
-}
-
-void ModuleDepGraph::forEachDefNodeInJobMatchingKeys(
-    const StringRef swiftDeps, ArrayRef<DependencyKey> keys,
-    function_ref<void(const ModuleDepGraphNode *)> foundOne) {
-  std::vector<const ModuleDepGraphNode *> matches;
-  const auto &allNodesInJob = nodeMap[swiftDeps];
-  for (const auto &k : keys) {
-    const auto iter = allNodesInJob.find(k);
-    if (iter != allNodesInJob.end() && iter->second->getIsProvides())
-      foundOne(iter->second);
-  }
+  forEachNode([&](const ModuleDepGraphNode *defNode) {
+    auto *mutableThis = const_cast<ModuleDepGraph *>(this);
+    mutableThis->forEachUseOf(
+        defNode,
+        [&](const ModuleDepGraphNode *const useNode) { fn(defNode, useNode); });
+  });
 }
 
 //==============================================================================
@@ -416,7 +413,6 @@ ModuleDepGraph::findNodesTransitivelyDependingUponKeysOccurringInJob(
   return dependentNodes;
 }
 
-#warning : delete?
 bool ModuleDepGraph::isNodeInAMarkedJob(const ModuleDepGraphNode *n) const {
   const auto maybeSwiftDeps = n->getSwiftDeps();
   if (!maybeSwiftDeps)
@@ -435,11 +431,11 @@ void ModuleDepGraph::findDependentNodes(
 
   size_t pathLengthAfterArrival = traceArrival(definition);
 
-  // Moved this out of the following loop for effieciency.
+  // Moved this out of the following loop for efficiency.
   assert(definition->getIsProvides() && "Should only call me for Decl nodes.");
 
   forEachUseOf(definition, [&](const ModuleDepGraphNode *u) {
-    if (!EnableTypeDependencies && isNodeInAMarkedJob(u))
+    if (!EnableTypeFingerprints && isNodeInAMarkedJob(u))
       return;
 #warning too slow if type deps
     // Cycle recording and check.
