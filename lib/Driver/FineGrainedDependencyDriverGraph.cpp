@@ -100,7 +100,7 @@ bool ModuleDepGraph::haveAnyNodesBeenTraversedIn(const Job *cmd) const {
   }
 
   bool result = false;
-  forEachNodeIn(swiftDeps, [&]
+  forEachNodeInJob(swiftDeps, [&]
     (const ModuleDepGraphNode* n) {
       if (n->getHasBeenTracedAsADependent())
         result = true;
@@ -111,8 +111,9 @@ bool ModuleDepGraph::haveAnyNodesBeenTraversedIn(const Job *cmd) const {
 
 std::vector<const Job *>
 ModuleDepGraph::findJobsToRecompileWhenWholeJobChanges(const Job *jobToBeRecompiled) {
-  std::vector<const ModuleDepGraphNode *> allNodesInJob;
-  forEachNodeIn(getSwiftDeps(jobToBeRecompiled), [&](const ModuleDepGraphNode *n) {
+  std::vector<ModuleDepGraphNode *> allNodesInJob;
+  forEachNodeInJob(getSwiftDeps(jobToBeRecompiled),
+  [&](ModuleDepGraphNode *n) {
     allNodesInJob.push_back(n);
   });
   return findJobsToRecompileWhenNodesChange(allNodesInJob);
@@ -121,12 +122,16 @@ ModuleDepGraph::findJobsToRecompileWhenWholeJobChanges(const Job *jobToBeRecompi
 
 template <typename Nodes>
 std::vector<const Job *>
-ModuleDepGraph::findJobsToRecompileWhenNodesChange( Nodes& nodes) {
-  std::vector<const ModuleDepGraphNode *> foundDependents;
-  for (const ModuleDepGraphNode* n: nodes)
+ModuleDepGraph::findJobsToRecompileWhenNodesChange( const Nodes& nodes) {
+  std::vector<ModuleDepGraphNode *> foundDependents;
+  for (ModuleDepGraphNode* n: nodes)
     findPreviouslyUntracedDependents(foundDependents, n);
   return jobsContaining(foundDependents);
 }
+#warning needed?
+template
+std::vector<const Job *>
+ModuleDepGraph::findJobsToRecompileWhenNodesChange<std::unordered_set<ModuleDepGraphNode*>>( const std::unordered_set<ModuleDepGraphNode*>&);
 
 
 std::vector<std::string> ModuleDepGraph::computeSwiftDepsFromNodes(
@@ -364,7 +369,7 @@ void ModuleDepGraph::forCorrespondingImplementationOfProvidedInterface(
 }
 
 void ModuleDepGraph::forEachNode(
-    function_ref<void(const ModuleDepGraphNode *)> fn) const {
+    function_ref<void(ModuleDepGraphNode *)> fn) const {
   nodeMap.forEachEntry([&](const std::string &, const DependencyKey &,
                            ModuleDepGraphNode *n) { fn(n); });
 }
@@ -380,15 +385,14 @@ void ModuleDepGraph::forEachArc(
     function_ref<void(const ModuleDepGraphNode *, const ModuleDepGraphNode *)>
         fn) const {
   forEachNode([&](const ModuleDepGraphNode *defNode) {
-    auto *mutableThis = const_cast<ModuleDepGraph *>(this);
-    mutableThis->forEachUseOf(
+    forEachUseOf(
         defNode,
         [&](const ModuleDepGraphNode *const useNode) { fn(defNode, useNode); });
   });
 }
 
-void ModuleDepGraph::forEachNodeIn(StringRef swiftDeps,
-                    function_ref<void(const ModuleDepGraphNode*)> fn) const {
+void ModuleDepGraph::forEachNodeInJob(StringRef swiftDeps,
+                    function_ref<void(ModuleDepGraphNode*)> fn) const {
     if (const auto *nodesByKeys = nodeMap.find(swiftDeps).getPtrOrNull()) {
       for (const auto &keyAndNode: *nodesByKeys)
         fn(keyAndNode.second);
@@ -399,7 +403,7 @@ void ModuleDepGraph::forEachNodeIn(StringRef swiftDeps,
 // MARK: ModuleDepGraph traversal
 //==============================================================================
 void ModuleDepGraph::findPreviouslyUntracedDependents(
-    std::vector<const ModuleDepGraphNode *> &foundDependents,
+    std::vector<ModuleDepGraphNode *> &foundDependents,
     const ModuleDepGraphNode *definition) {
 
   size_t pathLengthAfterArrival = traceArrival(definition);

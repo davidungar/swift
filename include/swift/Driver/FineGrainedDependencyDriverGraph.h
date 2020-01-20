@@ -64,6 +64,7 @@ public:
 
   bool getHasBeenTracedAsADependent() const { return hasBeenTracedAsADependent; }
   void setHasBeenTracedAsADependent() { hasBeenTracedAsADependent = true; }
+  #warning: missing call to me:
   void clearHasBeedTracedAsADependent() { hasBeenTracedAsADependent = false; }
 
   /// Integrate \p integrand's fingerprint into \p dn.
@@ -204,7 +205,7 @@ class ModuleDepGraph {
   UnifiedStatsReporter *const stats;
 
   //==============================================================================
-  // MARK: ModuleDepGraphNode - mutating dependencies
+  // MARK: ModuleDepGraph - mutating dependencies
   //==============================================================================
 
   /// Encapsulate the invariant between where the node resides in
@@ -265,7 +266,7 @@ class ModuleDepGraph {
 
 
   //============================================================================
-  // MARK: ModuleDepGraphNode - utilities for Job and swiftdeps
+  // MARK: ModuleDepGraph - utilities for Job and swiftdeps
   //============================================================================
 private:
   static StringRef getSwiftDeps(const driver::Job *cmd) {
@@ -283,7 +284,7 @@ private:
   }
 
   //============================================================================
-  // MARK: ModuleDepGraphNode - creation
+  // MARK: ModuleDepGraph - creation
   //============================================================================
 
 public:
@@ -310,7 +311,7 @@ public:
     assert(verify() && "ModuleDepGraph should be fine when created");
   }
   //============================================================================
-  // MARK: ModuleDepGraphNode - updating from a switdeps file
+  // MARK: ModuleDepGraph - updating from a switdeps file
   //============================================================================
 public:
   using Changes = Optional<std::unordered_set<ModuleDepGraphNode*>>;
@@ -382,7 +383,7 @@ private:
 
 
   //============================================================================
-  // MARK: ModuleDepGraphNode - dot file support
+  // MARK: ModuleDepGraph - dot file support
   //============================================================================
 public:
 
@@ -408,7 +409,7 @@ public:
 
 
   //============================================================================
-  // MARK: ModuleDepGraphNode - traversal
+  // MARK: ModuleDepGraph - traversal
   //============================================================================
 public:
 
@@ -419,7 +420,7 @@ public:
   void forEachUseOf(const ModuleDepGraphNode *def,
                     function_ref<void(ModuleDepGraphNode *use)>) const;
 
-  void forEachNode(function_ref<void(const ModuleDepGraphNode *)>) const;
+  void forEachNode(function_ref<void(ModuleDepGraphNode *)>) const;
 
   void forEachArc(function_ref<void(const ModuleDepGraphNode *def,
                                     const ModuleDepGraphNode *use)>) const;
@@ -429,13 +430,13 @@ public:
   forEachMatchingNode(const DependencyKey &key,
                       function_ref<void(const ModuleDepGraphNode *)>) const;
 
-  void forEachNodeIn(StringRef swiftDeps,
-                     function_ref<void(const ModuleDepGraphNode*)>) const;
+  void forEachNodeInJob(StringRef swiftDeps,
+                     function_ref<void(ModuleDepGraphNode*)>) const;
 
 
   /// Given a definition node, transitively find all previous untraced dependents and add them to the array.
   void findPreviouslyUntracedDependents(
-      std::vector<const ModuleDepGraphNode *> &foundDependents,
+      std::vector<ModuleDepGraphNode *> &foundDependents,
       const ModuleDepGraphNode *definition);
 
   /// Givien a set of nodes, return the set of swiftDeps for the jobs those
@@ -468,7 +469,7 @@ public:
     }
 
    //============================================================================
-    // MARK: ModuleDepGraphNode - job-level queries and operations
+    // MARK: ModuleDepGraph - job-level queries and operations
     //============================================================================
   public:
   // This section contains the interface to the status quo code in the driver.
@@ -491,7 +492,7 @@ public:
 
   template <typename Nodes>
   std::vector<const driver::Job *> findJobsToRecompileWhenNodesChange(
-      Nodes&);
+      const Nodes&);
 
 private:
   std::vector<const driver::Job *> jobsContaining(
@@ -508,7 +509,7 @@ public:
 
 
    //============================================================================
-     // MARK: ModuleDepGraphNode - External dependencies
+     // MARK: ModuleDepGraph - External dependencies
      //============================================================================
 
   public:
@@ -520,7 +521,7 @@ public:
       StringRef externalDependency, function_ref<void(const driver::Job *)> fn);
 
   //============================================================================
-  // MARK: ModuleDepGraphNode - verifyication
+  // MARK: ModuleDepGraph - verifyication
   //============================================================================
 
   private:
