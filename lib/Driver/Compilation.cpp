@@ -546,7 +546,7 @@ namespace driver {
           handleDependenciesReloadFailure(cmdFailed, DependenciesFile);
           return {};
         }
-        return getFineGrainedDepGraph(forRanges).getJobsToRecompileWhenNodesChange(changedNodes);
+        return getFineGrainedDepGraph(forRanges).getJobsToRecompileWhenNodesChange(changedNodes.getValue());
      }
 
     void  handleDependenciesReloadFailure(const bool cmdFailed, const StringRef DependenciesFile) {
@@ -1140,7 +1140,7 @@ namespace driver {
             // As it stands, after this job finishes, this mark will tell the code
             // that this job was known to be "cascading". That knowledge will
             // any dependent jobs to be run if they haven't already been.
-            getDepGraph(forRanges).markIntransitive(Cmd, nullptr);
+            getDepGraph(forRanges).markIntransitive(Cmd);
           }
         }
         LLVM_FALLTHROUGH;

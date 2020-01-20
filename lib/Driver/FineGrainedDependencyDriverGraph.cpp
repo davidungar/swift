@@ -86,7 +86,7 @@ ModuleDepGraph::loadFromBuffer(const Job *job, llvm::MemoryBuffer &buffer) {
 ModuleDepGraph::Changes ModuleDepGraph::loadFromSourceFileDepGraph(
     const Job *job, const SourceFileDepGraph &sourceFileDepGraph) {
   registerJob(job);
-  return integrate(sourceFileDepGraph);
+  return integrate(sourceFileDepGraph, getSwiftDeps(job));
 }
 
 bool ModuleDepGraph::haveAnyNodesBeenTraversedIn(const Job *cmd) const {
@@ -119,8 +119,11 @@ ModuleDepGraph::getJobsToRecompileWhenWholeJobChanges(const Job *jobToBeRecompil
 }
 
 
+template <typename Nodes>
 std::vector<const Job *>
-ModuleDepGraph::getJobsToRecompileWhenNodesChange( ArrayRef<const ModuleDepGraphNode*> nodes) const {
+ModuleDepGraph::getJobsToRecompileWhenNodesChange( Nodes& nodes) const {
+  for (const ModuleDepGraphNode* n: nodes) {
+  }
   #error what?
 }
 
@@ -152,7 +155,7 @@ std::vector<StringRef> ModuleDepGraph::getExternalDependencies() const {
 }
 
 // Add every (swiftdeps) use of the external dependency to foundJobs.
-std::vector<const Job*> ModuleDepGraph::findExternallyDependentUntracedJobs(StringRef externalDependency) const {
+std::vector<const Job*> ModuleDepGraph::findExternallyDependentUntracedJobs(StringRef externalDependency) {
   FrontendStatsTracer tracer(stats, "fine-grained-dependencies-findExternallyDependentUntracedJobs");
   std::vector<const Job *> foundJobs;
   forEachUntracedJobDirectlyDependentOnExternalSwiftDeps(
@@ -184,7 +187,7 @@ void ModuleDepGraph::forEachUntracedJobDirectlyDependentOnExternalSwiftDeps(
 // MARK: Integrating SourceFileDepGraph into ModuleDepGraph
 //==============================================================================
 
-LoadResult ModuleDepGraph::integrate(const SourceFileDepGraph &g,
+ModuleDepGraph::Changes ModuleDepGraph::integrate(const SourceFileDepGraph &g,
                                      StringRef swiftDepsOfJob) {
   FrontendStatsTracer tracer(stats, "fine-grained-dependencies-integrate");
 
@@ -192,7 +195,7 @@ LoadResult ModuleDepGraph::integrate(const SourceFileDepGraph &g,
   auto disappearedNodes = nodeMap[swiftDepsOfJob];
   // When done, changeDependencyKeys contains a list of keys that changed
   // as a result of this integration.
-  auto changedDependencyKeys = std::unordered_set<DependencyKey>();
+  auto changedNodes = std::unordered_set<ModuleDepGraphNode*>();
 
   g.forEachNode([&](const SourceFileDepGraphNode *integrand) {
     const auto &key = integrand->getKey();
@@ -203,38 +206,40 @@ LoadResult ModuleDepGraph::integrate(const SourceFileDepGraph &g,
     const bool changed = integrateSourceFileDepGraphNode(
         g, integrand, preexistingMatch, swiftDepsOfJob);
     if (changed)
-      changedDependencyKeys.insert(key);
+      changedNodes.insert(preexistingMatch.getValue().second);
   });
 
   for (auto &p : disappearedNodes) {
-    changedDependencyKeys.insert(p.second->getKey());
-    removeNode(p.second);
+    changedNodes.insert(p.second);
+    // Must leave node allocated so we can return the pointer
   }
 
-  return changedDependencyKeys;
+  return changedNodes;
 }
 
 ModuleDepGraph::PreexistingNodeIfAny ModuleDepGraph::findPreexistingMatch(
     StringRef swiftDepsOfCompilationToBeIntegrated,
-    const SourceFileDepGraphNode *integrand) {
-  const auto &matches = nodeMap[integrand->getKey()];
-  const auto &expatsIter = matches.find("");
-  if (expatsIter != matches.end()) {
-    assert(matches.size() == 1 &&
+    const SourceFileDepGraphNode *integrand) const {
+  const auto *matches = nodeMap.find(integrand->getKey()).getPtrOrNull();
+  if (!matches)
+    return None;
+  const auto &expatsIter = matches->find("");
+  if (expatsIter != matches->end()) {
+    assert(matches->size() == 1 &&
            "If an expat exists, then must not be any matches in other files");
     return std::make_pair(LocationOfPreexistingNode::nowhere,
                           expatsIter->second);
   }
   if (integrand->getIsProvides()) {
     const auto &preexistingNodeInPlaceIter =
-        matches.find(swiftDepsOfCompilationToBeIntegrated);
-    if (preexistingNodeInPlaceIter != matches.end())
+        matches->find(swiftDepsOfCompilationToBeIntegrated);
+    if (preexistingNodeInPlaceIter != matches->end())
       return std::make_pair(LocationOfPreexistingNode::here,
                             preexistingNodeInPlaceIter->second);
   }
-  if (!matches.empty())
+  if (!matches->empty())
     return std::make_pair(LocationOfPreexistingNode::elsewhere,
-                          matches.begin()->second);
+                          matches->begin()->second);
   return None;
 }
 
@@ -323,14 +328,13 @@ void ModuleDepGraph::removeNode(ModuleDepGraphNode *n) {
 //==============================================================================
 // MARK: ModuleDepGraph access
 //==============================================================================
-
 void ModuleDepGraph::forEachUseOf(
     const ModuleDepGraphNode *def,
-    function_ref<void(const ModuleDepGraphNode *)> fn) {
+    function_ref<void(ModuleDepGraphNode *)> fn) const {
   auto iter = usesByDef.find(def->getKey());
   if (iter == usesByDef.end())
     return;
-  for (const ModuleDepGraphNode *useNode : iter->second)
+  for (ModuleDepGraphNode *useNode : iter->second)
     fn(useNode);
   // Add in implicit interface->implementation dependency
   forCorrespondingImplementationOfProvidedInterface(def, fn);
@@ -376,15 +380,14 @@ void ModuleDepGraph::forEachArc(
 }
 
 void ModuleDepGraph::forEachNodeIn(StringRef swiftDeps,
-                    function_Ref<void(const ModuleDepGraphNode*)>) const {
+                    function_ref<void(const ModuleDepGraphNode*)>) const {
 #error what
 }
 
 //==============================================================================
 // MARK: ModuleDepGraph traversal
 //==============================================================================
-
-void ModuleDepGraph::appendPreviouslyUntracedDependents(
+void ModuleDepGraph::findPreviouslyUntracedDependents(
     std::vector<const ModuleDepGraphNode *> &foundDependents,
     const ModuleDepGraphNode *definition) {
 
@@ -394,14 +397,14 @@ void ModuleDepGraph::appendPreviouslyUntracedDependents(
   assert(definition->getIsProvides() && "Should only call me for Decl nodes.");
 
   // Don't check def because we might be here because the def changed
-  forEachUseOf(definition, [&](const ModuleDepGraphNode *u) {
+  forEachUseOf(definition, [&](ModuleDepGraphNode *u) {
     if (u->getHasBeenTracedAsADependent())
       return;
     u->setHasBeenTracedAsADependent();
     foundDependents.push_back(u);
     // If this use also provides something, follow it
     if (u->getIsProvides())
-      appendPreviouslyUntracedDependents(foundDependents, u);
+      findPreviouslyUntracedDependents(foundDependents, u);
   });
 
   traceDeparture(pathLengthAfterArrival);

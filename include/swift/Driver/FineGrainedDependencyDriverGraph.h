@@ -286,7 +286,7 @@ private:
   // MARK: ModuleDepGraphNode - creation
   //============================================================================
 
-private:
+public:
   /// For templates such as DotFileEmitter.
   using NodeType = ModuleDepGraphNode;
 
@@ -312,8 +312,8 @@ private:
   //============================================================================
   // MARK: ModuleDepGraphNode - updating from a switdeps file
   //============================================================================
-private:
-  using Changes = Optional<std::unordered_set<DependencyKey>>;
+public:
+  using Changes = Optional<std::unordered_set<ModuleDepGraphNode*>>;
 
   /// Unlike the standard \c CoarseGrainedDependencyGraph, returns \c
   /// CoarseGrainedDependencyGraphImpl::LoadResult::AffectsDownstream when
@@ -321,6 +321,7 @@ private:
   /// compensates.
   Changes loadFromPath(const driver::Job *, StringRef, DiagnosticEngine &);
 
+private:
   Changes loadFromString(const driver::Job *cmd, StringRef data);
 
   Changes loadFromSourceFileDepGraph(const driver::Job *cmd,
@@ -335,7 +336,7 @@ private:
 
    /// Integrate a SourceFileDepGraph into the receiver.
    /// Integration happens when the driver needs to read SourceFileDepGraph.
-   Changes integrate(const SourceFileDepGraph &);
+   Changes integrate(const SourceFileDepGraph &, StringRef swiftDepsOfJob);
 
    enum class LocationOfPreexistingNode { nowhere, here, elsewhere };
 
@@ -383,7 +384,7 @@ private:
   //============================================================================
   // MARK: ModuleDepGraphNode - dot file support
   //============================================================================
-private:
+public:
 
   /// For the dot file.
   std::string getGraphID() const { return "driver"; }
@@ -400,23 +401,23 @@ private:
 
   /// For debugging and visualization, write out the graph to a dot file.
   /// \p diags may be null if no diagnostics are needed.
-  void emitDotFileForJob(DiagnosticEngine &, const driver::Job *) const;
-  void emitDotFile(DiagnosticEngine &, StringRef baseName) const;
-  void emitDotFile()  const { emitDotFile(llvm::errs()); }
-  void emitDotFile(llvm::raw_ostream &)  const;
+  void emitDotFileForJob(DiagnosticEngine &, const driver::Job *);
+  void emitDotFile(DiagnosticEngine &, StringRef baseName);
+  void emitDotFile()  { emitDotFile(llvm::errs()); }
+  void emitDotFile(llvm::raw_ostream &);
 
 
   //============================================================================
   // MARK: ModuleDepGraphNode - traversal
   //============================================================================
-private:
+public:
 
   void forCorrespondingImplementationOfProvidedInterface(
       const ModuleDepGraphNode *,
       function_ref<void(ModuleDepGraphNode *)>) const;
 
   void forEachUseOf(const ModuleDepGraphNode *def,
-                    function_ref<void(const ModuleDepGraphNode *use)>)  const;
+                    function_ref<void(ModuleDepGraphNode *use)>) const;
 
   void forEachNode(function_ref<void(const ModuleDepGraphNode *)>) const;
 
@@ -433,9 +434,9 @@ private:
 
 
   /// Given a definition node, transitively find all previous untraced dependents and add them to the array.
-  void appendPreviouslyUntracedDependents(
-      std::unordered_set<const ModuleDepGraphNode *> &foundDependents,
-      const ModuleDepGraphNode *definition)  const;
+  void findPreviouslyUntracedDependents(
+      std::vector<const ModuleDepGraphNode *> &foundDependents,
+      const ModuleDepGraphNode *definition);
 
   /// Givien a set of nodes, return the set of swiftDeps for the jobs those
   /// nodes are in.
@@ -469,7 +470,7 @@ private:
    //============================================================================
     // MARK: ModuleDepGraphNode - job-level queries and operations
     //============================================================================
-  private:
+  public:
   // This section contains the interface to the status quo code in the driver.
 
   bool haveAnyNodesBeenTraversedIn(const driver::Job *) const;
@@ -488,27 +489,29 @@ private:
   std::vector<const driver::Job*> getJobsToRecompileWhenWholeJobChanges(
       const driver::Job *jobToBeRecompiled) const;
 
+  template <typename Nodes>
   std::vector<const driver::Job *> getJobsToRecompileWhenNodesChange(
-      ArrayRef<const ModuleDepGraphNode*>) const;
+      Nodes&) const;
 
+private:
   std::vector<const driver::Job *> jobsContaining(
       const ArrayRef<const ModuleDepGraphNode *> uses) const;
 
 
-
+public:
   /// Record a new (to this graph) Job.
   void registerJob(const driver::Job *);
 
   /// Find jobs that were previously not known to need compilation but that
   /// depend on \c externalDependency.
-  std::vector<const driver::Job*> findExternallyDependentUntracedJobs(StringRef externalDependency) const;
+  std::vector<const driver::Job*> findExternallyDependentUntracedJobs(StringRef externalDependency);
 
 
    //============================================================================
      // MARK: ModuleDepGraphNode - External dependencies
      //============================================================================
 
-  private:
+  public:
 
   std::vector<StringRef> getExternalDependencies() const;
 
