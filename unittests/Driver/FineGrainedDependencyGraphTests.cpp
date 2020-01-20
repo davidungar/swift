@@ -7,7 +7,7 @@
 // This file adapts the unit tests from the older, coarse-grained, dependency
 // graph to the new fine-grained graph.
 
-// \c markTransitive and \c markExternal may include jobs in their result
+// \c markTransitive and \c findExternallyDependentUntracedJobs may include jobs in their result
 // that would be excluded in the coarse-grained graph. But since these will be
 // jobs that have already been scheduled, downstream mechanisms will filter
 // them out.
@@ -737,10 +737,10 @@ TEST(ModuleDepGraph, SimpleExternal) {
   EXPECT_TRUE(contains(graph.getExternalDependencies(), "/foo"));
   EXPECT_TRUE(contains(graph.getExternalDependencies(), "/bar"));
 
-  EXPECT_EQ(1u, graph.markExternal("/foo").size());
+  EXPECT_EQ(1u, graph.findExternallyDependentUntracedJobs("/foo").size());
   EXPECT_TRUE(graph.isMarked(&job0));
 
-  EXPECT_EQ(0u, graph.markExternal("/foo").size());
+  EXPECT_EQ(0u, graph.findExternallyDependentUntracedJobs("/foo").size());
   EXPECT_TRUE(graph.isMarked(&job0));
 }
 
@@ -750,10 +750,10 @@ TEST(ModuleDepGraph, SimpleExternal2) {
   EXPECT_EQ(simulateLoad(graph, &job0, {{dependsExternal, {"/foo", "/bar"}}}),
             LoadResult::AffectsDownstream);
 
-  EXPECT_EQ(1u, graph.markExternal("/bar").size());
+  EXPECT_EQ(1u, graph.findExternallyDependentUntracedJobs("/bar").size());
   EXPECT_TRUE(graph.isMarked(&job0));
 
-  EXPECT_EQ(0u, graph.markExternal("/bar").size());
+  EXPECT_EQ(0u, graph.findExternallyDependentUntracedJobs("/bar").size());
   EXPECT_TRUE(graph.isMarked(&job0));
 }
 
@@ -772,11 +772,11 @@ TEST(ModuleDepGraph, ChainedExternal) {
   EXPECT_TRUE(contains(graph.getExternalDependencies(), "/foo"));
   EXPECT_TRUE(contains(graph.getExternalDependencies(), "/bar"));
 
-  EXPECT_EQ(2u, graph.markExternal("/foo").size());
+  EXPECT_EQ(2u, graph.findExternallyDependentUntracedJobs("/foo").size());
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
 
-  EXPECT_EQ(0u, graph.markExternal("/foo").size());
+  EXPECT_EQ(0u, graph.findExternallyDependentUntracedJobs("/foo").size());
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
 }
@@ -794,19 +794,19 @@ TEST(ModuleDepGraph, ChainedExternalReverse) {
       LoadResult::AffectsDownstream);
 
   {
-    auto marked = graph.markExternal("/bar");
+    auto marked = graph.findExternallyDependentUntracedJobs("/bar");
     EXPECT_EQ(1u, marked.size());
     EXPECT_EQ(&job1, marked.front());
   }
   EXPECT_FALSE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
 
-  EXPECT_EQ(0u, graph.markExternal("/bar").size());
+  EXPECT_EQ(0u, graph.findExternallyDependentUntracedJobs("/bar").size());
   EXPECT_FALSE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
 
   {
-    auto marked = graph.markExternal("/foo");
+    auto marked = graph.findExternallyDependentUntracedJobs("/foo");
     EXPECT_EQ(1u, marked.size());
     EXPECT_EQ(&job0, marked.front());
   }
@@ -828,7 +828,7 @@ TEST(ModuleDepGraph, ChainedExternalPreMarked) {
 
   graph.markIntransitive(&job0);
 
-  EXPECT_EQ(0u, graph.markExternal("/foo").size());
+  EXPECT_EQ(0u, graph.findExternallyDependentUntracedJobs("/foo").size());
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_FALSE(graph.isMarked(&job1));
 }

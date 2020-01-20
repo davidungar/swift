@@ -518,7 +518,7 @@ namespace driver {
       // other recompilations. It is possible that the current code marks
       // things that do not need to be marked. Unecessary compilation would
       // result if that were the case.
-      bool wasMarkedBeforeReload = isMarkedInDepGraph(FinishedCmd, forRanges);
+      bool wasMarkedBeforeReload = getDepGraph(forRanges).isMarked(FinishedCmd);
 
       const auto loadResult = getDepGraph(forRanges).loadFromPath(
                                                                   FinishedCmd, DependenciesFile, Comp.getDiags());
@@ -539,19 +539,15 @@ namespace driver {
                                     const bool cmdFailed, const bool forRanges,
                                     StringRef DependenciesFile) {
       assert(Comp.getEnableFineGrainedDependencies() && "Only for fine-grained");
-      const auto loadResult = getFineGrainedDepGraph(forRanges).loadFromPath(
+      const auto changedNodes = getFineGrainedDepGraph(forRanges).loadFromPath(
             FinishedCmd, DependenciesFile, Comp.getDiags());
-      const bool loadFailed = !loadResult;
+      const bool loadFailed = !changedNodes;
         if (loadFailed) {
           handleDependenciesReloadFailure(cmdFailed, DependenciesFile);
           return {};
         }
-      std::vector<fine_grained_dependencies::DependencyKey> changedKeys{
-        loadResult.getValue().begin(), loadResult.getValue().end()};
-      return getFineGrainedDepGraph(forRanges)
-      .getJobsToRecompileAfterWhenKeysInAJobChange(changedKeys,
-                                                   FinishedCmd);
-    }
+        return getFineGrainedDepGraph(forRanges).getJobsToRecompileWhenNodesChange(changedNodes);
+     }
 
     void  handleDependenciesReloadFailure(const bool cmdFailed, const StringRef DependenciesFile) {
       if (cmdFailed) {
@@ -576,13 +572,14 @@ namespace driver {
         // The job won't be treated as newly added next time. Conservatively
         // mark it as affecting other jobs, because some of them may have
         // completed already.
-        return markTransitiveInDepGraph(FinishedCmd, forRanges,
+        return getJobsToRecompileWhenWholeJobChanges(FinishedCmd, forRanges,
                                         IncrementalTracer);
       case Job::Condition::Always:
         // Any incremental task that shows up here has already been marked;
         // we didn't need to wait for it to finish to start downstream
         // tasks.
-        assert(isMarkedInDepGraph(FinishedCmd, forRanges));
+        if (!Comp.getEnableFineGrainedDependencies())
+          assert(getDepGraph(forRanges).isMarked(FinishedCmd));
         break;
       case Job::Condition::RunWithoutCascading:
         // If this file changed, it might have been a non-cascading change
@@ -590,7 +587,7 @@ namespace driver {
         // updated or compromised, so we don't actually know anymore; we
         // have to conservatively assume the changes could affect other
         // files.
-        return markTransitiveInDepGraph(FinishedCmd, forRanges,
+        return getJobsToRecompileWhenWholeJobChanges(FinishedCmd, forRanges,
                                         IncrementalTracer);
 
       case Job::Condition::CheckDependencies:
@@ -1104,7 +1101,7 @@ namespace driver {
       if (DependenciesFile.empty())
         return std::make_pair(Job::Condition::Always, false);
       if (Cmd->getCondition() == Job::Condition::NewlyAdded) {
-        addIndependentNodeToDepGraph(Cmd, forRanges);
+        registerJobToDepGraph(Cmd, forRanges);
         return std::make_pair(Job::Condition::NewlyAdded, true);
       }
       const bool depGraphLoadError =
@@ -1128,20 +1125,23 @@ namespace driver {
       case Job::Condition::Always:
       case Job::Condition::NewlyAdded:
         if (Comp.getIncrementalBuildEnabled() && hasDependenciesFileName) {
-          // Mark this job as cascading.
-          //
-          // It would probably be safe and simpler to markTransitive on the
-          // start nodes in the "Always" condition from the start instead of
-          // using markIntransitive and having later functions call
-          // markTransitive. That way markIntransitive would be an
-          // implementation detail of CoarseGrainedDependencyGraph.
-          //
-          // As it stands, after this job finishes, this mark will tell the code
-          // that this job was known to be "cascading". That knowledge will
-          // any dependent jobs to be run if they haven't already been.
-          //
-          // TODO: I think this is overly tricky
-          markIntransitiveInDepGraph(Cmd, forRanges);
+          if (Comp.getEnableFineGrainedDependencies()) {
+            // No need to do anything since after this jos is run and its
+            // dependencies reloaded, they will show up as changed nodes
+          } else {
+            // Mark this job as cascading.
+            //
+            // It would probably be safe and simpler to markTransitive on the
+            // start nodes in the "Always" condition from the start instead of
+            // using markIntransitive and having later functions call
+            // markTransitive. That way markIntransitive would be an
+            // implementation detail of CoarseGrainedDependencyGraph.
+            //
+            // As it stands, after this job finishes, this mark will tell the code
+            // that this job was known to be "cascading". That knowledge will
+            // any dependent jobs to be run if they haven't already been.
+            getDepGraph(forRanges).markIntransitive(Cmd, nullptr);
+          }
         }
         LLVM_FALLTHROUGH;
       case Job::Condition::RunWithoutCascading:
@@ -1189,7 +1189,7 @@ namespace driver {
       // files that haven't changed, so that they'll get built in parallel if
       // possible and after the first set of files if it's not.
       for (auto *Cmd : InitialCascadingCommands) {
-        for (const auto *transitiveCmd: markTransitiveInDepGraph(Cmd, forRanges,
+        for (const auto *transitiveCmd: getJobsToRecompileWhenWholeJobChanges(Cmd, forRanges,
                                  IncrementalTracer))
           CascadedJobs.insert(transitiveCmd);
       }
@@ -1571,9 +1571,12 @@ namespace driver {
 
           // Be conservative, in case we use ranges this time but not next.
           bool mightBeCascading = true;
-          if (Comp.getIncrementalBuildEnabled())
-            mightBeCascading = isMarkedInDepGraph(
-                Cmd, /*forRanges=*/Comp.getEnableSourceRangeDependencies());
+          if (Comp.getIncrementalBuildEnabled()) {
+            const bool forRanges = Comp.getEnableSourceRangeDependencies();
+            mightBeCascading = Comp.getEnableFineGrainedDependencies()
+            ?  getFineGrainedDepGraph(forRanges).haveAnyNodesBeenTraversedIn(Cmd)
+            : getDepGraph(forRanges).isMarked(Cmd);
+          }
           UnfinishedCommands.insert({Cmd, mightBeCascading});
         }
       }
@@ -1638,12 +1641,6 @@ namespace driver {
 
     // MARK: dependency graph interface
 
-    bool isMarkedInDepGraph(const Job *const Cmd, const bool forRanges) {
-      return Comp.getEnableFineGrainedDependencies()
-                 ? getFineGrainedDepGraph(forRanges).isMarked(Cmd)
-                 : getDepGraph(forRanges).isMarked(Cmd);
-    }
-
     std::vector<StringRef> getExternalDependencies(const bool forRanges) const {
       if (Comp.getEnableFineGrainedDependencies())
         return getFineGrainedDepGraph(forRanges).getExternalDependencies();
@@ -1658,30 +1655,24 @@ namespace driver {
     markExternalInDepGraph(StringRef externalDependency,
                                 const bool forRanges) {
       return Comp.getEnableFineGrainedDependencies()
-        ? getFineGrainedDepGraph(forRanges).markExternal(externalDependency)
+        ? getFineGrainedDepGraph(forRanges).findExternallyDependentUntracedJobs(externalDependency)
         : getDepGraph(forRanges).markExternal(externalDependency);
     }
 
-    bool markIntransitiveInDepGraph(const Job *Cmd, const bool forRanges) {
-      return Comp.getEnableFineGrainedDependencies()
-                 ? getFineGrainedDepGraph(forRanges).markIntransitive(Cmd)
-                 : getDepGraph(forRanges).markIntransitive(Cmd);
-    }
-
-    std::vector<const Job*> markTransitiveInDepGraph(
+    std::vector<const Job*> getJobsToRecompileWhenWholeJobChanges(
         const Job *Cmd,
         const bool forRanges,
         CoarseGrainedDependencyGraph::MarkTracer *tracer = nullptr) {
       return Comp.getEnableFineGrainedDependencies()
-        ? getFineGrainedDepGraph(forRanges).markTransitive(Cmd, tracer)
+        ? getFineGrainedDepGraph(forRanges).getJobsToRecompileWhenWholeJobChanges(Cmd)
         : getDepGraph(forRanges).markTransitive(Cmd, tracer);
     }
 
-    void addIndependentNodeToDepGraph(const Job *Cmd, const bool forRanges) {
+    void registerJobToDepGraph(const Job *Cmd, const bool forRanges) {
       if (Comp.getEnableFineGrainedDependencies())
-        getFineGrainedDepGraph(forRanges).addIndependentNode(Cmd);
+        getFineGrainedDepGraph(forRanges).registerJob(Cmd);
       else
-        getDepGraph(forRanges).addIndependentNode(Cmd);
+        getDepGraph(forRanges).registerJob(Cmd);
     }
 
     /// Return hadError
