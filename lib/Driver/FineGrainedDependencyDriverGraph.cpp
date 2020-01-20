@@ -110,21 +110,22 @@ bool ModuleDepGraph::haveAnyNodesBeenTraversedIn(const Job *cmd) const {
 
 
 std::vector<const Job *>
-ModuleDepGraph::getJobsToRecompileWhenWholeJobChanges(const Job *jobToBeRecompiled) const {
+ModuleDepGraph::findJobsToRecompileWhenWholeJobChanges(const Job *jobToBeRecompiled) {
   std::vector<const ModuleDepGraphNode *> allNodesInJob;
   forEachNodeIn(getSwiftDeps(jobToBeRecompiled), [&](const ModuleDepGraphNode *n) {
     allNodesInJob.push_back(n);
   });
-  return getJobsToRecompileWhenNodesChange(allNodesInJob);
+  return findJobsToRecompileWhenNodesChange(allNodesInJob);
 }
 
 
 template <typename Nodes>
 std::vector<const Job *>
-ModuleDepGraph::getJobsToRecompileWhenNodesChange( Nodes& nodes) const {
-  for (const ModuleDepGraphNode* n: nodes) {
-  }
-  #error what?
+ModuleDepGraph::findJobsToRecompileWhenNodesChange( Nodes& nodes) {
+  std::vector<const ModuleDepGraphNode *> foundDependents;
+  for (const ModuleDepGraphNode* n: nodes)
+    findPreviouslyUntracedDependents(foundDependents, n);
+  return jobsContaining(foundDependents);
 }
 
 
@@ -141,6 +142,13 @@ std::vector<std::string> ModuleDepGraph::computeSwiftDepsFromNodes(
   for (const auto &entry : swiftDepsOfNodes)
     swiftDepsVec.push_back(entry.getKey().str());
   return swiftDepsVec;
+}
+
+std::vector<const Job*>ModuleDepGraph::jobsContaining(ArrayRef<const ModuleDepGraphNode *> nodes) const {
+  std::vector<const Job*> jobs;
+  for (StringRef swiftDeps: computeSwiftDepsFromNodes(nodes))
+    jobs.push_back(getJob(swiftDeps.str()));
+  return jobs;
 }
 
 void ModuleDepGraph::registerJob(const Job *job) {
@@ -161,7 +169,7 @@ std::vector<const Job*> ModuleDepGraph::findExternallyDependentUntracedJobs(Stri
   forEachUntracedJobDirectlyDependentOnExternalSwiftDeps(
       externalDependency, [&](const Job *job) {
         foundJobs.push_back(job);
-        for (const Job* marked: getJobsToRecompileWhenWholeJobChanges(job))
+        for (const Job* marked: findJobsToRecompileWhenWholeJobChanges(job))
           foundJobs.push_back(marked);
       });
   return foundJobs;
@@ -380,8 +388,11 @@ void ModuleDepGraph::forEachArc(
 }
 
 void ModuleDepGraph::forEachNodeIn(StringRef swiftDeps,
-                    function_ref<void(const ModuleDepGraphNode*)>) const {
-#error what
+                    function_ref<void(const ModuleDepGraphNode*)> fn) const {
+    if (const auto *nodesByKeys = nodeMap.find(swiftDeps).getPtrOrNull()) {
+      for (const auto &keyAndNode: *nodesByKeys)
+        fn(keyAndNode.second);
+    }
 }
 
 //==============================================================================

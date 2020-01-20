@@ -486,12 +486,12 @@ public:
   /// argument. Only return jobs marked that were previously unmarked, assuming
   /// previously marked jobs are already scheduled.
   /// TODO: rewrite above comment
-  std::vector<const driver::Job*> getJobsToRecompileWhenWholeJobChanges(
-      const driver::Job *jobToBeRecompiled) const;
+  std::vector<const driver::Job*> findJobsToRecompileWhenWholeJobChanges(
+      const driver::Job *jobToBeRecompiled);
 
   template <typename Nodes>
-  std::vector<const driver::Job *> getJobsToRecompileWhenNodesChange(
-      Nodes&) const;
+  std::vector<const driver::Job *> findJobsToRecompileWhenNodesChange(
+      Nodes&);
 
 private:
   std::vector<const driver::Job *> jobsContaining(

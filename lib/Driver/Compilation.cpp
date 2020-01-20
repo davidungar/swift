@@ -546,7 +546,7 @@ namespace driver {
           handleDependenciesReloadFailure(cmdFailed, DependenciesFile);
           return {};
         }
-        return getFineGrainedDepGraph(forRanges).getJobsToRecompileWhenNodesChange(changedNodes.getValue());
+        return getFineGrainedDepGraph(forRanges).findJobsToRecompileWhenNodesChange(changedNodes.getValue());
      }
 
     void  handleDependenciesReloadFailure(const bool cmdFailed, const StringRef DependenciesFile) {
@@ -572,7 +572,7 @@ namespace driver {
         // The job won't be treated as newly added next time. Conservatively
         // mark it as affecting other jobs, because some of them may have
         // completed already.
-        return getJobsToRecompileWhenWholeJobChanges(FinishedCmd, forRanges,
+        return findJobsToRecompileWhenWholeJobChanges(FinishedCmd, forRanges,
                                         IncrementalTracer);
       case Job::Condition::Always:
         // Any incremental task that shows up here has already been marked;
@@ -587,7 +587,7 @@ namespace driver {
         // updated or compromised, so we don't actually know anymore; we
         // have to conservatively assume the changes could affect other
         // files.
-        return getJobsToRecompileWhenWholeJobChanges(FinishedCmd, forRanges,
+        return findJobsToRecompileWhenWholeJobChanges(FinishedCmd, forRanges,
                                         IncrementalTracer);
 
       case Job::Condition::CheckDependencies:
@@ -1189,7 +1189,7 @@ namespace driver {
       // files that haven't changed, so that they'll get built in parallel if
       // possible and after the first set of files if it's not.
       for (auto *Cmd : InitialCascadingCommands) {
-        for (const auto *transitiveCmd: getJobsToRecompileWhenWholeJobChanges(Cmd, forRanges,
+        for (const auto *transitiveCmd: findJobsToRecompileWhenWholeJobChanges(Cmd, forRanges,
                                  IncrementalTracer))
           CascadedJobs.insert(transitiveCmd);
       }
@@ -1659,12 +1659,12 @@ namespace driver {
         : getDepGraph(forRanges).markExternal(externalDependency);
     }
 
-    std::vector<const Job*> getJobsToRecompileWhenWholeJobChanges(
+    std::vector<const Job*> findJobsToRecompileWhenWholeJobChanges(
         const Job *Cmd,
         const bool forRanges,
         CoarseGrainedDependencyGraph::MarkTracer *tracer = nullptr) {
       return Comp.getEnableFineGrainedDependencies()
-        ? getFineGrainedDepGraph(forRanges).getJobsToRecompileWhenWholeJobChanges(Cmd)
+        ? getFineGrainedDepGraph(forRanges).findJobsToRecompileWhenWholeJobChanges(Cmd)
         : getDepGraph(forRanges).markTransitive(Cmd, tracer);
     }
 
