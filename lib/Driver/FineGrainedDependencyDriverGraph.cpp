@@ -95,14 +95,14 @@ bool ModuleDepGraph::haveAnyNodesBeenTraversedIn(const Job *cmd) const {
   // optimization
   const auto fileKey = DependencyKey::createKeyForWholeSourceFile(swiftDeps);
   if (const auto fileNode = nodeMap.find(swiftDeps, fileKey)) {
-    if (fileNode && fileNode.getValue()->getHasBeenTracedAsADependent())
+    if (fileNode && fileNode.getValue()->getHasBeenTraced())
       return true;
   }
 
   bool result = false;
   forEachNodeInJob(swiftDeps, [&]
     (const ModuleDepGraphNode* n) {
-      if (n->getHasBeenTracedAsADependent())
+      if (n->getHasBeenTraced())
         result = true;
   });
   return result;
@@ -128,7 +128,7 @@ ModuleDepGraph::findJobsToRecompileWhenNodesChange( const Nodes& nodes) {
     findPreviouslyUntracedDependents(foundDependents, n);
   return jobsContaining(foundDependents);
 }
-#warning needed?
+
 template
 std::vector<const Job *>
 ModuleDepGraph::findJobsToRecompileWhenNodesChange<std::unordered_set<ModuleDepGraphNode*>>( const std::unordered_set<ModuleDepGraphNode*>&);
@@ -188,11 +188,8 @@ void ModuleDepGraph::forEachUntracedJobDirectlyDependentOnExternalSwiftDeps(
       DependencyKey::createDependedUponKey<NodeKind::externalDepend>(
           externalSwiftDeps.str());
   for (const ModuleDepGraphNode *useNode : usesByDef[key]) {
-    const auto swiftDepsOfUse = useNode->getSwiftDepsOfProvides();
-    if (useNode->getHasBeenTracedAsADependent())
-      continue;
-    const Job *job = getJob(swiftDepsOfUse);
-    fn(job);
+    if (!useNode->getHasBeenTraced())
+      fn( getJob(useNode->getSwiftDepsOfProvides()));
   }
 }
 
@@ -226,6 +223,10 @@ ModuleDepGraph::Changes ModuleDepGraph::integrate(const SourceFileDepGraph &g,
     changedNodes.insert(p.second);
     // Must leave node allocated so we can return the pointer
   }
+
+  // Make sure the changes can be retraced:
+  for (auto *n: changedNodes)
+    n->clearHasBeenTraced();
 
   return changedNodes;
 }
@@ -404,7 +405,11 @@ void ModuleDepGraph::forEachNodeInJob(StringRef swiftDeps,
 //==============================================================================
 void ModuleDepGraph::findPreviouslyUntracedDependents(
     std::vector<ModuleDepGraphNode *> &foundDependents,
-    const ModuleDepGraphNode *definition) {
+    ModuleDepGraphNode *definition) {
+
+  if (definition->getHasBeenTraced())
+    return;
+  definition->setHasBeenTraced();
 
   size_t pathLengthAfterArrival = traceArrival(definition);
 
@@ -413,9 +418,6 @@ void ModuleDepGraph::findPreviouslyUntracedDependents(
 
   // Don't check def because we might be here because the def changed
   forEachUseOf(definition, [&](ModuleDepGraphNode *u) {
-    if (u->getHasBeenTracedAsADependent())
-      return;
-    u->setHasBeenTracedAsADependent();
     foundDependents.push_back(u);
     // If this use also provides something, follow it
     if (u->getIsProvides())

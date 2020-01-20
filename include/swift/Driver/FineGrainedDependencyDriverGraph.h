@@ -62,10 +62,9 @@ public:
                      Optional<std::string> swiftDeps)
       : DepGraphNode(key, fingerprint), swiftDeps(swiftDeps) {}
 
-  bool getHasBeenTracedAsADependent() const { return hasBeenTracedAsADependent; }
-  void setHasBeenTracedAsADependent() { hasBeenTracedAsADependent = true; }
-  #warning: missing call to me:
-  void clearHasBeedTracedAsADependent() { hasBeenTracedAsADependent = false; }
+  bool getHasBeenTraced() const { return hasBeenTracedAsADependent; }
+  void setHasBeenTraced() { hasBeenTracedAsADependent = true; }
+  void clearHasBeenTraced() { hasBeenTracedAsADependent = false; }
 
   /// Integrate \p integrand's fingerprint into \p dn.
   /// \returns true if there was a change requiring recompilation.
@@ -437,7 +436,7 @@ public:
   /// Given a definition node, transitively find all previous untraced dependents and add them to the array.
   void findPreviouslyUntracedDependents(
       std::vector<ModuleDepGraphNode *> &foundDependents,
-      const ModuleDepGraphNode *definition);
+      ModuleDepGraphNode *definition);
 
   /// Givien a set of nodes, return the set of swiftDeps for the jobs those
   /// nodes are in.
