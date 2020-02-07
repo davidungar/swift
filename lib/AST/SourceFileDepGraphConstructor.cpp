@@ -311,7 +311,7 @@ DependencyKey DependencyKey::createInterfaceKey(NodeKind kind,
   return DependencyKey(kind, DeclAspect::interface, context, name);
 }
 
-DependencyKey DependencyKey::createNominalOrMemberInterfaceKeyNominal(
+DependencyKey DependencyKey::createMemberOrPotentialMemberInterfaceKey(
     StringRef mangledHolderName, StringRef memberBaseNameIfAny) {
   const bool isMemberBlank = memberBaseNameIfAny.empty();
   const auto kind =
@@ -536,8 +536,8 @@ template <NodeKind kind>
 void SourceFileDepGraphConstructor::addAllDependenciesFrom(
     ArrayRef<SerializableUse> depends) {
   for (const auto &d : depends) {
-    recordDefUse(DependencyKey::createInterfaceKey(kind, d.context, d.name),
-                 d.isCascadingUse, d.use);
+    const DeclAspect aspect = aspectOfUsedDeclaration(d.isCascadingUse);
+    recordDefUse(DependencyKey::create(kind, aspect, d.context, d.name), d.use);
   }
 }
 
@@ -555,12 +555,17 @@ void SourceFileDepGraphConstructor::addAllDependenciesFrom<NodeKind::member>(
   for (const auto &entry : nominalMemberPotentialMemberDepends) {
     if (!includePrivateDeps && entry.isPrivate.getValueOr(false))
       continue;
+    const bool nominalKeyIsCascadingUse = holdersOfCascadingMembers.count(entry.context) != 0;
+    const DeclAspect nominalAspect = DependencyKey::aspectOfUsedDeclaration(nominalKeyIsCascadingUse);
+    const DeclAspect memberAspect = DependencyKey::aspectOfUsedDeclaration(entry.isCascadingUse);
+
     recordDefUse(
-        DependencyKey::createInterfaceKey(NodeKind::nominal, entry.context, ""),
-        holdersOfCascadingMembers.count(entry.context) != 0, entry.use);
-    recordDefUse(DependencyKey::createNominalOrMemberInterfaceKeyNominal(
-                     entry.context, entry.name),
-                 entry.isCascadingUse, entry.use);
+        DependencyKey::create(NodeKind::nominal, nominalAspect, entry.context, ""), entry.use);
+
+    recordDefUse(DependencyKey::createMemberOrPotentialMemberInterfaceKey(
+        memberAspect,
+        entry.context, entry.name),
+        entry.use);
   }
 }
 
@@ -613,8 +618,22 @@ void SourceFileDepGraphConstructor::recordDefUse(
   auto useNodePair =
       use ? g.findExistingNodePairOrCreateAndAddIfNew(use.getValue())
           : g.getSourceFileNodePair();
-  g.addArc(defNode, useNodePair.useDependingOnCascading(isCascadingUse));
+  g.addArc(defNode, useNodePair.aspectOfUsedDeclaration(isCascadingUse));
 }
+
+void SourceFileDepGraphConstructor::recordAUse(
+  const NodeKind kind,
+  const StringRef context,
+  const StringRef name,
+  const bool isCascadingUse,
+  const Optional<SerializableDecl> user) {
+    const DeclAspect aspect = DependencyKey::aspectIfIsCascadingUse(isCascadingUse);
+    DependencyKey usedKey = DependencyKey::create("gazorp", kind, aspect, isCascadingUse, name);
+auto useNodePair =
+      use ? g.findExistingNodePairOrCreateAndAddIfNew(use.getValue())
+          : g.getSourceFileNodePair();
+
+    }
 
 //==============================================================================
 // Entry point from the Frontend to this whole system

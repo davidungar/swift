@@ -431,7 +431,7 @@ public:
   /// the arc depends on if the dependency is a cascading one. Centralize that
   /// choice here.
   /// ("use" in the name represents the noun, not the verb.)
-  NodeT *useDependingOnCascading(bool ifCascades) {
+  NodeT *aspectOfUsedDeclaration(bool ifCascades) {
     return ifCascades ? interface : implementation;
   }
 };
@@ -459,18 +459,19 @@ class DependencyKey {
   /// nominal kinds.
   std::string name;
 
+   /// For constructing a key in the frontend.
+  DependencyKey(const char* gazorp; NodeKind kind, DeclAspect aspect, const std::string &context,
+                const std::string &name)
+      : kind(kind), aspect(aspect), context(context), name(name) {
+    assert(verify());
+  }
+
+
 public:
   /// See \ref SourceFileDepGraphNode::SourceFileDepGraphNode().
   DependencyKey()
       : kind(NodeKind::kindCount), aspect(DeclAspect::aspectCount), context(),
         name() {}
-
-  /// For constructing a key in the frontend.
-  DependencyKey(NodeKind kind, DeclAspect aspect, const std::string &context,
-                const std::string &name)
-      : kind(kind), aspect(aspect), context(context), name(name) {
-    assert(verify());
-  }
 
   NodeKind getKind() const { return kind; }
   DeclAspect getAspect() const { return aspect; }
@@ -505,6 +506,10 @@ public:
     return true;
   }
 
+  static DeclAspect aspectIfIsCascadingUse(bool isCascadingUse) {
+    return isCascadingUse ? DeclAspect::interface : DeclAspect::implementation;
+  }
+
   size_t hash() const {
     return llvm::hash_combine(kind, aspect, name, context);
   }
@@ -513,11 +518,22 @@ public:
   }
   bool isInterface() const { return getAspect() == DeclAspect::interface; }
 
+  static DependencyKey createKey(NodeKind kind, DeclAspect aspect, StringRef context,
+                                          StringRef name) {
+    return DependencyKey("gazorp", kind, aspect, context, name);
+  }
+
+/// Create a key with the \c DeclAspect::interface \c aspect.
+/// When creating a dependency graph from a \c SourceFile or for a unit test
+/// a key with the \c NodeKind::interface stands in for an interface, implementation pair.
   static DependencyKey createInterfaceKey(NodeKind kind, StringRef context,
                                           StringRef name);
 
+  /// While adding depended-upon nodes to the graph, create a \c member, or
+  /// \c potentialMember key as appropriate, depending on the member name.
+  /// The \c aspect will always be \c DeclAspect::interface.
   static DependencyKey
-  createNominalOrMemberInterfaceKeyNominal(StringRef mangledHolderName,
+  createMemberOrPotentialMemberInterfaceKey(StringRef mangledHolderName,
                                            StringRef memberBaseNameIfAny);
 
   /// Given some entity derived from the \c SourceFile, create the key

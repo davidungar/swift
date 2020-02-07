@@ -158,8 +158,24 @@ private:
   template <NodeKind kind>
   void addAllDependenciesFrom(ArrayRef<SerializableUse> depends);
 
-  void recordDefUse(const DependencyKey &defKey, bool isCascadingUse,
+  /// Record a link between a definition (a declaration in some file), and a use (a declaration in this file).
+  /// The use may not be known, in which case the whole file will depend upon the use.
+  /// Since dependencies are collapsed to base names, only the key of the used declaration is needed.
+  ///
+  /// \param defKey The key of the used declaration.
+  /// \param use The using declaration, if known.
+  void recordDefUse(const DependencyKey &defKey,
                     Optional<SerializableDecl> use);
+
+  /// Record that a declaration is used in this file, by the specific user if known.
+  ///
+  /// \param kind The kind of the used declaration
+  /// \param isCascadingUse If the use changes, does the interface of the user change?
+  /// \param context For some kinds of declarations, the mangled type name
+  /// \param name The base name of the used declaration
+  /// \param user If known, the specific declaration using the used declaration (for cross-type dependencies)
+  void recordAUse(
+    NodeKind kind, bool isCascadingUse, StringRef context, StringRef name, Optional<SerializableDecl> user);
 };
 
 } // namespace fine_grained_dependencies
