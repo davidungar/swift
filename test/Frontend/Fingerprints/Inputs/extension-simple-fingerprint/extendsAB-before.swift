@@ -1,0 +1,2 @@
+extension A { }
+extension B { }
