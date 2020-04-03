@@ -235,6 +235,10 @@ public:
         ip->widenSourceRangeForIgnoredASTNode(nd);
       } else {
         const unsigned preCount = ip->getChildren().size();
+
+        if (ip->getClassName() == "LookupParentDiversionScope")
+          llvm::errs() << "HERE\n";
+
         auto *const newIP =
             addToScopeTreeAndReturnInsertionPoint(nd, ip).getPtrOr(ip);
         if (ip != organicInsertionPoint)
@@ -385,6 +389,7 @@ public:
     // Use the ASTWalker to find buried captures and closures
     forEachClosureIn(expr, [&](NullablePtr<CaptureListExpr> captureList,
                                ClosureExpr *closureExpr) {
+      llvm::errs() << "HERE8 found at " << ctx.SourceMgr.getLineNumber(closureExpr->getLoc()) << "\n";
       ifUniqueConstructExpandAndInsert<WholeClosureScope>(parent, closureExpr,
                                                           captureList);
     });
@@ -1044,6 +1049,10 @@ public:
 NullablePtr<ASTScopeImpl>
 ScopeCreator::addToScopeTreeAndReturnInsertionPoint(ASTNode n,
                                                     ASTScopeImpl *parent) {
+
+  if (parent->getClassName() == "LookupParentDiversionScope")
+    llvm::errs() << "HERE2\n";
+
   if (!isWorthTryingToCreateScopeFor(n))
     return parent;
   if (auto *p = n.dyn_cast<Decl *>())
@@ -1753,18 +1762,29 @@ void ScopeCreator::forEachClosureIn(
   ASTScopeAssert(expr,
                  "If looking for closures, must have an expression to search.");
 
+  llvm::errs() << "HERE3: " <<  ctx.SourceMgr.getLineNumber(expr->getStartLoc()) << "\n";
+  if (ctx.SourceMgr.getLineNumber(expr->getStartLoc()) == 42) {
+    llvm::errs() << "HERE4\n";
+    llvm::errs() << "\n\n\n";
+    expr->dump();
+    llvm::errs() << "\n\n\n";
+  }
+
   /// AST walker that finds top-level closures in an expression.
   class ClosureFinder : public ASTWalker {
     function_ref<void(NullablePtr<CaptureListExpr>, ClosureExpr *)>
         foundClosure;
+    const bool trace;
 
   public:
     ClosureFinder(
         function_ref<void(NullablePtr<CaptureListExpr>, ClosureExpr *)>
-            foundClosure)
-        : foundClosure(foundClosure) {}
+            foundClosure,
+                  bool trace)
+        : foundClosure(foundClosure), trace(trace) {}
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (trace) llvm::errs() << "HERE7: " << __FUNCTION__ << "\n";
       if (auto *closure = dyn_cast<ClosureExpr>(E)) {
         foundClosure(nullptr, closure);
         return {false, E};
@@ -1776,21 +1796,31 @@ void ScopeCreator::forEachClosureIn(
       return {true, E};
     }
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+      if (trace) llvm::errs() << "HERE7: " << __FUNCTION__ << "\n";
       if (isa<BraceStmt>(S)) { // closures hidden in here
         return {true, S};
       }
       return {false, S};
     }
     std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override {
+      if (trace) llvm::errs() << "HERE7: " << __FUNCTION__ << "\n";
       return {false, P};
     }
-    bool walkToDeclPre(Decl *D) override { return false; }
-    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
-    bool walkToTypeReprPre(TypeRepr *T) override { return false; }
-    bool walkToParameterListPre(ParameterList *PL) override { return false; }
+    bool walkToDeclPre(Decl *D) override {
+      if (trace) llvm::errs() << "HERE7: " << __FUNCTION__ << "\n";
+      return false; }
+    bool walkToTypeLocPre(TypeLoc &TL) override {
+      if (trace) llvm::errs() << "HERE7: " << __FUNCTION__ << "\n";
+      return false; }
+    bool walkToTypeReprPre(TypeRepr *T) override {
+      if (trace) llvm::errs() << "HERE7: " << __FUNCTION__ << "\n";
+      return false; }
+    bool walkToParameterListPre(ParameterList *PL) override {
+      if (trace) llvm::errs() << "HERE7: " << __FUNCTION__ << "\n";
+      return false; }
   };
 
-  expr->walk(ClosureFinder(foundClosure));
+  expr->walk(ClosureFinder(foundClosure, ctx.SourceMgr.getLineNumber(expr->getStartLoc()) == 42));
 }
 
 #pragma mark new operators
