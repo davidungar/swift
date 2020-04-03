@@ -930,6 +930,7 @@ namespace {
       auto *selfCall =
         CallExpr::createImplicit(context, ref, selfOpenedRef, { },
                                  [&](const Expr *E) { return cs.getType(E); });
+      assert(selfCall->getStartLoc().getOpaquePointerValue() <= selfCall->getEndLoc().getOpaquePointerValue());
       selfCall->setType(refTy->getResult());
       cs.cacheType(selfCall->getArg());
       cs.cacheType(selfCall);

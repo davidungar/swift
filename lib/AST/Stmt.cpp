@@ -143,6 +143,7 @@ BraceStmt::BraceStmt(SourceLoc lbloc, ArrayRef<ASTNode> elts,
                           getTrailingObjects<ASTNode>());
 
 #ifndef NDEBUG
+  assert(lbloc.getOpaquePointerValue() <= rbloc.getOpaquePointerValue() && "Should not be backwards");
   for (auto elt : elts)
     if (auto *decl = elt.dyn_cast<Decl *>())
       assert(!isa<AccessorDecl>(decl) && "accessors should not be added here");
