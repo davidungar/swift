@@ -569,7 +569,7 @@ private:
         return DITy;
 
       // Create a Forward-declared type.
-      auto Loc = getDebugLocWithoutLineForPerturbationTesting(*this, NTD);
+      auto Loc = getDebugLoc(*this, NTD);
       auto File = getOrCreateFile(Loc.Filename);
       auto Line = Loc.Line;
       auto FwdDecl = DBuilder.createReplaceableCompositeType(
@@ -2242,7 +2242,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
 
   auto *Scope = dyn_cast_or_null<llvm::DILocalScope>(getOrCreateScope(DS));
   assert(Scope && "variable has no local scope");
-  auto Loc = getDebugLoc(*this, VarDecl);
+  auto Loc = getDebugLocWithoutLineForPerturbationTesting(*this, VarDecl);
 
   // FIXME: this should be the scope of the type's declaration.
   // If this is an argument, attach it to the current function scope.
