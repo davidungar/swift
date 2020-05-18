@@ -106,6 +106,8 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
                           ? clang::CodeGenOptions::FramePointerKind::All
                           : clang::CodeGenOptions::FramePointerKind::None);
   CGO.DiscardValueNames = !Opts.shouldProvideValueNames();
+  llvm::errs() << "HERE IRGenModule2: "
+    << (Opts.DebugInfoLevel != IRGenDebugInfoLevel::None) << "\n";
   switch (Opts.DebugInfoLevel) {
   case IRGenDebugInfoLevel::None:
     CGO.setDebugInfo(clang::codegenoptions::DebugInfoKind::NoDebugInfo);
@@ -549,6 +551,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   DefaultCC = SWIFT_DEFAULT_LLVM_CC;
   SwiftCC = llvm::CallingConv::Swift;
 
+  llvm::errs() << "HERE IRGenModule: "
+    << (opts.DebugInfoLevel > IRGenDebugInfoLevel::None) << "\n";
   if (opts.DebugInfoLevel > IRGenDebugInfoLevel::None)
     DebugInfo = IRGenDebugInfo::createIRGenDebugInfo(IRGen.Opts, *CI, *this,
                                                      Module,

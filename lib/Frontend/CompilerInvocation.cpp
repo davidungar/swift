@@ -1214,6 +1214,9 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     else
       assert(A->getOption().matches(options::OPT_gnone) &&
              "unknown -g<kind> option");
+
+    if (Args.getLastArg(OPT_gnone))
+      Opts.DebugInfoLevel = IRGenDebugInfoLevel::None;
   }
   if (Opts.DebugInfoLevel >= IRGenDebugInfoLevel::LineTables) {
     if (Args.hasArg(options::OPT_debug_info_store_invocation)) {

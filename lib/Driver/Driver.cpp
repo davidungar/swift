@@ -1596,6 +1596,8 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     else
       assert(A->getOption().matches(options::OPT_gnone) &&
              "unknown -g<kind> option");
+    if (Args.getLastArg(options::OPT_gnone))
+        OI.DebugInfoLevel = IRGenDebugInfoLevel::None;
   }
 
   if (const Arg *A = Args.getLastArg(options::OPT_debug_info_format)) {
