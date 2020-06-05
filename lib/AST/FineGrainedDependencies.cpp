@@ -149,6 +149,16 @@ SourceFileDepGraphNode *SourceFileDepGraph::findExistingNodeOrCreateIfNew(
         return n;
       });
   assert(result->getKey() == key && "Keys must match.");
+
+  /// TRY THIS
+//  if (!isProvides && result->getIsProvides()) {
+//    SourceFileDepGraphNode *n =
+//        new SourceFileDepGraphNode(key, fingerprint, isProvides);
+//    addNode(n);
+//    return n;
+//  }
+
+
   if (!isProvides)
     return result;
   // If have provides and depends with same key, result is one node that
