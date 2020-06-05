@@ -1307,8 +1307,8 @@ public:
       // Force some requests, which can produce diagnostics.
 
       // Check redeclaration.
-      (void) evaluateOrDefault(decl->getASTContext().evaluator,
-                               CheckRedeclarationRequest{VD}, {});
+//      (void) evaluateOrDefault(decl->getASTContext().evaluator,
+//                               CheckRedeclarationRequest{VD}, {});
 
       // Compute access level.
       (void) VD->getFormalAccess();
