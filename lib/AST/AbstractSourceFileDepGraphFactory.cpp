@@ -84,9 +84,10 @@ void AbstractSourceFileDepGraphFactory::addAUsedDecl(
   // Otherwise, if the defNode's type-body fingerprint changes,
   // the whole file will be marked as dirty, losing the benefit of the
   // fingerprint.
-  if (defNode->getIsProvides() &&
-      useKey.getKind() == NodeKind::sourceFileProvide)
-    return;
+    // HERE-David
+//  if (defNode->getIsProvides() &&
+//      useKey.getKind() == NodeKind::sourceFileProvide)
+//    return;
   auto nullableUse = g.findExistingNode(useKey);
   assert(nullableUse.isNonNull() && "Use must be an already-added provides");
   auto *useNode = nullableUse.get();
