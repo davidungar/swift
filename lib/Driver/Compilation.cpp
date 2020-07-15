@@ -229,6 +229,9 @@ namespace driver {
 
     /// Jobs that incremental-mode has decided it can skip.
     CommandSet DeferredCommands;
+    
+    /// Hold the merge modules job if any until we know it's needed
+    const Job* DeferredMergeModuleCommand = nullptr;
   public:
     /// Why are we keeping two dependency graphs?
     ///
@@ -701,6 +704,10 @@ namespace driver {
       scheduleCommandsInSortedOrder(DependentsInEffect);
       for (const Job *Cmd : DependentsInEffect)
         DeferredCommands.erase(Cmd);
+      if (DeferredMergeModuleCommand) {
+        scheduleCommandIfNecessaryAndPossible(DeferredMergeModuleCommand);
+        DeferredMergeModuleCommand = nullptr;
+      }
       return TaskFinishedResponse::ContinueExecution;
     }
 
@@ -866,7 +873,12 @@ namespace driver {
           computeFirstRoundCompileJobsForIncrementalCompilation();
 
       for (const Job *Cmd : Comp.getJobs()) {
-        if (Cmd->getFirstSwiftPrimaryInput().empty() ||
+        if (isa<MergeModuleJobAction>(&Cmd->getSource())) {
+          DeferredMergeModuleCommand = Cmd;
+          noteBuilding(Cmd, /*willBeBuilding*/ false, /*isTentative=*/false,
+                       Comp.getEnableSourceRangeDependencies(), "");
+       }
+        else if (Cmd->getFirstSwiftPrimaryInput().empty() ||
             compileJobsToSchedule.count(Cmd)) {
           scheduleCommandIfNecessaryAndPossible(Cmd);
           noteBuilding(Cmd, /*willBeBuilding*/ true, /*isTentative=*/false,
