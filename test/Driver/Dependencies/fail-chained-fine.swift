@@ -47,7 +47,7 @@
 // CHECK-RECORD-A-DAG: "{{(./)?}}f.swift": [
 // CHECK-RECORD-A-DAG: "{{(./)?}}bad.swift": !private [
 
-// RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path "%{python.unquoted};%S/Inputs/update-dependencies.py;%swift-dependency-tool" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift ./f.swift ./bad.swift -module-name main -j1 -v > %t/a2.txt 2>&1
+// RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path "%{python.unquoted};%S/Inputs/update-dependencies.py;%swift-dependency-tool" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift ./f.swift ./bad.swift -module-name main -j1 -v -driver-show-incremental -driver-show-job-lifecycle > %t/a2.txt 2>&1
 // RUN: %FileCheck -check-prefix=CHECK-A2 %s < %t/a2.txt
 // RUN: %FileCheck -check-prefix=NEGATIVE-A2 %s < %t/a2.txt
 // RUN: %FileCheck -check-prefix=CHECK-RECORD-CLEAN %s < %t/main~buildrecord.swiftdeps
