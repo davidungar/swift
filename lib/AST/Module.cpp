@@ -1112,12 +1112,6 @@ Fingerprint SourceFile::getInterfaceHashIncludingTypeMembers() const {
             hashTypeBodyFingerprints(childIDC);
       };
 
-  // HERE
-  //  for (auto *D : getTopLevelDecls()) {
-  //    if (auto IDC = dyn_cast<IterableDeclContext>(D))
-  //      hashTypeBodyFingerprints(IDC);
-  //  }
-
   return Fingerprint{std::move(hash)};
 }
 
