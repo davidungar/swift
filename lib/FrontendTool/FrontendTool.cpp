@@ -737,11 +737,29 @@ class PrimaryScheduler {
   ArrayRef<SourceFile*> sourceFiles;
 public:
   PrimaryScheduler(ArrayRef<SourceFile*> sourceFiles) : sourceFiles(sourceFiles) {}
+  const llvm::sys::fs::file_t  inpipe = 3;
+  const llvm::sys::fs::file_t outpipe = 4;
+
   NullablePtr<SourceFile> nextToCompile() {
-    if (i < sourceFiles.size())
-      return sourceFiles[i++];
-    else
-      return NullablePtr<SourceFile>();
+    std::vector<char> buf;
+    write(outpipe, "", 1);
+    auto r = llvm::sys::fs::readNativeFile(inpipe, buf);
+    if (r) {
+      const auto n = *r;
+      if (n == 0)
+        return NullablePtr<SourceFile>();
+      StringRef name(&buf.front(), n);
+      llvm::errs() << "HERE name " << name << "' " << n << "\n";
+      abort(); // find source file for name
+    }
+    else {
+      auto err = r.takeError();
+      llvm::errs() << "HERE ERROR " << err << "\n";;
+      if (i < sourceFiles.size())
+        return sourceFiles[i++];
+      else
+        return NullablePtr<SourceFile>();
+    }
   }
 };
 
