@@ -741,11 +741,8 @@ class PrimaryScheduler {
 
 public:
   PrimaryScheduler(ArrayRef<SourceFile*> sourceFiles) : sourceFiles(sourceFiles)  {
-    // fix this (dmu)
-    for (unsigned i = 0; i < sourceFiles.size(); ++i) {
-      auto *SF = sourceFiles[i];
+    for (auto *SF: sourceFiles)
       sourceFileMap.insert({SF->getFilename(), SF});
-    }
   }
   const llvm::sys::fs::file_t  inpipe = 3;
   const llvm::sys::fs::file_t outpipe = 4;
