@@ -750,7 +750,12 @@ public:
         return NullablePtr<SourceFile>();
       StringRef name(&buf.front(), n);
       llvm::errs() << "HERE name " << name << "' " << n << "\n";
-      abort(); // find source file for name
+      for (unsigned i = 0; i < sourceFiles.size(); i++) { //dmu
+        auto * SF = sourceFiles[i];
+        if (name == SF->getFilename())
+          return SF;
+      }
+      abort();
     }
     else {
       auto err = r.takeError();
