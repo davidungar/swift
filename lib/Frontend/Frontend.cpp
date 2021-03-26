@@ -219,6 +219,8 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
       Invocation.getSearchPathOptions(),
       Invocation.getClangImporterOptions(),
       SourceMgr, Diagnostics));
+  llvm::errs() << "HERE regParseReq " << Context.get() << " eval " << &Context->evaluator << "\n";
+  llvm::errs().flush();
   registerParseRequestFunctions(Context->evaluator);
   registerTypeCheckerRequestFunctions(Context->evaluator);
   registerSILGenRequestFunctions(Context->evaluator);
