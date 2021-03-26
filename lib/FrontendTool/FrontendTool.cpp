@@ -617,17 +617,11 @@ constructDetailedTaskDescription(const CompilerInvocation &Invocation,
                                  Outputs};
 }
 
-static void emitSwiftdepsForAllPrimaryInputsIfNeeded(
-    CompilerInstance &Instance) {
-  const auto &Invocation = Instance.getInvocation();
-  if (Invocation.getFrontendOptions()
-          .InputsAndOutputs.hasReferenceDependenciesPath() &&
-      Instance.getPrimarySourceFiles().empty()) {
-    Instance.getDiags().diagnose(
-        SourceLoc(), diag::emit_reference_dependencies_without_primary_file);
-    return;
-  }
 
+static void emitSwiftdepsForOnePrimaryInputIfNeeded(
+    CompilerInstance &Instance,
+    SourceFile* SF) {
+  const auto &Invocation = Instance.getInvocation();
   // Do not write out swiftdeps for any primaries if we've encountered an
   // error. Without this, the driver will attempt to integrate swiftdeps
   // from broken swift files. One way this could go wrong is if a primary that
@@ -643,17 +637,12 @@ static void emitSwiftdepsForAllPrimaryInputsIfNeeded(
   if (Instance.getDiags().hadAnyError())
     return;
 
-  for (auto *SF : Instance.getPrimarySourceFiles()) {
-    const std::string &referenceDependenciesFilePath =
-        Invocation.getReferenceDependenciesFilePathForPrimary(
-            SF->getFilename());
-    if (referenceDependenciesFilePath.empty()) {
-      continue;
-    }
-
+  const std::string &referenceDependenciesFilePath =
+  Invocation.getReferenceDependenciesFilePathForPrimary(SF->getFilename());
+  if (!referenceDependenciesFilePath.empty())
     emitReferenceDependencies(Instance, SF, referenceDependenciesFilePath);
-  }
 }
+
 
 static bool writeTBDIfNeeded(CompilerInstance &Instance) {
   const auto &Invocation = Instance.getInvocation();
@@ -773,6 +762,7 @@ static bool performCompileStepsPostSema(CompilerInstance &Instance,
       result |= performCompileStepsPostSILGen(Instance, std::move(SM),
                                               PrimaryFile, PSPs, ReturnValue,
                                               observer);
+      emitSwiftdepsForOnePrimaryInputIfNeeded(Instance, PrimaryFile);
     }
 
     return result;
@@ -1014,9 +1004,6 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
   if (FrontendOptions::doesActionRequireSwiftStandardLibrary(action)) {
     emitIndexData(Instance);
   }
-
-  // Emit Swiftdeps for every file in the batch.
-  emitSwiftdepsForAllPrimaryInputsIfNeeded(Instance);
 
   // Emit Make-style dependencies.
   emitMakeDependenciesIfNeeded(Instance.getDiags(),
