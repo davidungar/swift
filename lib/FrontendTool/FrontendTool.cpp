@@ -735,31 +735,44 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 class PrimaryScheduler {
   unsigned long i = 0;
   ArrayRef<SourceFile*> sourceFiles;
+  //dmu make const
+  llvm::StringMap<SourceFile*> sourceFileMap;
+
+
 public:
-  PrimaryScheduler(ArrayRef<SourceFile*> sourceFiles) : sourceFiles(sourceFiles) {}
+  PrimaryScheduler(ArrayRef<SourceFile*> sourceFiles) : sourceFiles(sourceFiles)  {
+    // fix this (dmu)
+    for (unsigned i = 0; i < sourceFiles.size(); ++i) {
+      auto *SF = sourceFiles[i];
+      sourceFileMap.insert({SF->getFilename(), SF});
+    }
+  }
   const llvm::sys::fs::file_t  inpipe = 3;
   const llvm::sys::fs::file_t outpipe = 4;
 
   NullablePtr<SourceFile> nextToCompile() {
     std::vector<char> buf;
-    write(outpipe, "", 1);
-    auto r = llvm::sys::fs::readNativeFile(inpipe, buf);
+    llvm::errs() << "HERE about to write\n"; llvm::errs().flush();
+    auto wr = write(outpipe, "", 1);
+    llvm::errs() << "HERE wrote " << wr << "\n"; llvm::errs().flush();
+    auto r = llvm::sys::fs::readNativeFile(inpipe, buf); llvm::errs().flush();
     if (r) {
       const auto n = *r;
+      llvm::errs() << "HERE read " << n << "\n"; llvm::errs().flush();
       if (n == 0)
         return NullablePtr<SourceFile>();
       StringRef name(&buf.front(), n);
-      llvm::errs() << "HERE name " << name << "' " << n << "\n";
-      for (unsigned i = 0; i < sourceFiles.size(); i++) { //dmu
-        auto * SF = sourceFiles[i];
-        if (name == SF->getFilename())
-          return SF;
+      llvm::errs() << "HERE name " << name << "' " << n << "\n"; llvm::errs().flush();
+      auto iter = sourceFileMap.find(name);
+      if (iter == sourceFileMap.end()) {
+        llvm::report_fatal_error("NOT FOUND");
       }
-      abort();
+      return iter->second;
     }
     else {
       auto err = r.takeError();
-      llvm::errs() << "HERE ERROR " << err << "\n";;
+      llvm::errs() << "HERE ERROR " << err << "\n"; llvm::errs().flush();
+      llvm::consumeError(std::move(err));
       if (i < sourceFiles.size())
         return sourceFiles[i++];
       else
