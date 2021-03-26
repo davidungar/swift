@@ -732,6 +732,19 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           int &ReturnValue,
                                           FrontendObserver *observer);
 
+class PrimaryScheduler {
+  unsigned long i = 0;
+  ArrayRef<SourceFile*> sourceFiles;
+public:
+  PrimaryScheduler(ArrayRef<SourceFile*> sourceFiles) : sourceFiles(sourceFiles) {}
+  NullablePtr<SourceFile> nextToCompile() {
+    if (i < sourceFiles.size())
+      return sourceFiles[i++];
+    else
+      return NullablePtr<SourceFile>();
+  }
+};
+
 static bool performCompileStepsPostSema(CompilerInstance &Instance,
                                         int &ReturnValue,
                                         FrontendObserver *observer) {
@@ -753,16 +766,22 @@ static bool performCompileStepsPostSema(CompilerInstance &Instance,
   // each source file, and run the remaining SILOpt-Serialize-IRGen-LLVM
   // once for each such input.
   if (!Instance.getPrimarySourceFiles().empty()) {
+    auto primaryScheduler = PrimaryScheduler(Instance.getPrimarySourceFiles());
     bool result = false;
-    for (auto *PrimaryFile : Instance.getPrimarySourceFiles()) {
-      auto SM = performASTLowering(*PrimaryFile, Instance.getSILTypes(),
-                                   SILOpts);
-      const PrimarySpecificPaths PSPs =
-          Instance.getPrimarySpecificPathsForSourceFile(*PrimaryFile);
-      result |= performCompileStepsPostSILGen(Instance, std::move(SM),
-                                              PrimaryFile, PSPs, ReturnValue,
-                                              observer);
-      emitSwiftdepsForOnePrimaryInputIfNeeded(Instance, PrimaryFile);
+    for (;;) {
+      // NullablePtr dmu
+      if (SourceFile *PrimaryFile = primaryScheduler.nextToCompile().getPtrOrNull()) {
+        auto SM = performASTLowering(*PrimaryFile, Instance.getSILTypes(),
+                                     SILOpts);
+        const PrimarySpecificPaths PSPs =
+        Instance.getPrimarySpecificPathsForSourceFile(*PrimaryFile);
+        result |= performCompileStepsPostSILGen(Instance, std::move(SM),
+                                                PrimaryFile, PSPs, ReturnValue,
+                                                observer);
+        emitSwiftdepsForOnePrimaryInputIfNeeded(Instance, PrimaryFile);
+      }
+      else
+        break;
     }
 
     return result;
