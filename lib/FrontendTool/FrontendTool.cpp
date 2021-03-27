@@ -786,37 +786,35 @@ public:
   const llvm::sys::fs::file_t outpipe = 4;
 
   NullablePtr<SourceFile> nextToCompile() {
-    std::vector<char> buf;
+    char buf[10000];
     llvm::errs() << "HERE about to write\n"; llvm::errs().flush();
     auto wr = write(outpipe, "", 1);
     //fflush(wr);
     llvm::errs() << "HERE wrote " << wr << "\n"; llvm::errs().flush();
     int r = 0;
-    do {
-      llvm::Expected<size_t> x = llvm::sys::fs::readNativeFile(inpipe, buf); llvm::errs().flush();
-     // llvm::errs() << "READ done\n";
-      if (x) {
-        r = *x;
-        if (!r)
-          continue;
+    for (;;) {
+      r = read(inpipe, buf, 10000);
+
+      if (r) {
         llvm::errs() << "HERE READ " << r << "\n"; llvm::errs().flush();
       }
+      else if (r == 0)
+        return nullptr;
       else {
-        auto err = x.takeError();
-        llvm::errs() << "HERE ERROR " << err << "\n"; llvm::errs().flush();
-        llvm::consumeError(std::move(err));
+         llvm::errs() << "HERE ERROR " << errno << "\n"; llvm::errs().flush();
         exit(1);
       }
       break;
-    } while (r == 0);
+    }
     if (r) {
        llvm::errs() << "HERE read " << r << "\n"; llvm::errs().flush();
-      StringRef name(&buf.front(), r);
+      StringRef name(buf, r);
       llvm::errs() << "HERE name " << name << "' " << r << "\n"; llvm::errs().flush();
       auto iter = sourceFileMap.find(name);
       if (iter == sourceFileMap.end()) {
         llvm::report_fatal_error("NOT FOUND");
       }
+      llvm::errs() << "HERE FOUND " << name << "\n";
       return iter->second;
     }
     else {
