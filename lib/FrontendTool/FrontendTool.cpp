@@ -783,14 +783,10 @@ public:
       sourceFileMap.insert({SF->getFilename(), SF});
   }
   const llvm::sys::fs::file_t  inpipe = 3;
-  const llvm::sys::fs::file_t outpipe = 4;
 
   NullablePtr<SourceFile> nextToCompile() {
     char buf[10000];
-    llvm::errs() << "HERE about to write\n"; llvm::errs().flush();
-    auto wr = write(outpipe, "", 1);
-    //fflush(wr);
-    llvm::errs() << "HERE wrote " << wr << "\n"; llvm::errs().flush();
+     llvm::errs() << "HERE about to read\n"; llvm::errs().flush();
     int r = 0;
     for (;;) {
       r = read(inpipe, buf, 10000);
@@ -860,6 +856,11 @@ static bool performCompileStepsPostSema(CompilerInstance &Instance,
                                                 PrimaryFile, PSPs, ReturnValue,
                                                 observer);
         emitSwiftdepsForOnePrimaryInputIfNeeded(Instance, PrimaryFile);
+
+        const llvm::sys::fs::file_t outpipe = 4;
+        auto wr = write(outpipe, "", 1);
+   //    fflush(wr);
+       llvm::errs() << "HERE wrote " << wr << "\n"; llvm::errs().flush();
       }
       else
         break;
