@@ -770,6 +770,9 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           int &ReturnValue,
                                           FrontendObserver *observer);
 
+const llvm::sys::fs::file_t  logpipe = 5;
+
+
 class PrimaryScheduler {
   unsigned long i = 0;
   ArrayRef<SourceFile*> sourceFiles;
@@ -785,38 +788,39 @@ public:
   const llvm::sys::fs::file_t  inpipe = 3;
 
   NullablePtr<SourceFile> nextToCompile() {
-    bool HERE = false;
+    bool HERE = true;
+    llvm::raw_fd_ostream logStream(logpipe, false, true);
     //assert(false && "sdafasdfsadfasdfasfd");
     char buf[10000];
-    if (HERE) { llvm::outs() << "HEREf about to read\n"; llvm::outs().flush(); }
+    if (HERE) { logStream << "HEREf about to read\n"; logStream.flush(); }
     int r = 0;
     r = read(inpipe, buf, 10000);
 
     if (r > 0) {
-      if (HERE) { llvm::outs() << "HEREf READ " << r << "\n"; llvm::outs().flush();}
+      if (HERE) { logStream << "HEREf READ " << r << "\n"; logStream.flush();}
     }
     else if (r == 0) {
-      if (HERE) { llvm::outs() << "HEREf READ 0" << r << "\n"; llvm::outs().flush();}
+      if (HERE) { logStream << "HEREf READ 0" << r << "\n"; logStream.flush();}
       return nullptr;
     }
     else {
-      if (HERE) { llvm::outs() << "HEREf ERROR " << errno << "\n"; llvm::outs().flush();}
+      if (HERE) { logStream << "HEREf ERROR " << errno << "\n"; logStream.flush();}
       exit(1);
     }
 
     assert( r > 0);
-    if (HERE) { llvm::outs() << "HEREf read " << r << "\n"; llvm::outs().flush();}
+    if (HERE) { logStream << "HEREf read " << r << "\n"; logStream.flush();}
     assert(buf[r-1]);
     StringRef name(buf, r);
-    if (HERE) { llvm::outs() << "HEREf name " << name << "' " << r << "\n"; llvm::outs().flush();}
+    if (HERE) { logStream << "HEREf name " << name << "' " << r << "\n"; logStream.flush();}
     auto iter = sourceFileMap.find(name);
     if (iter == sourceFileMap.end()) {
       for (auto &x: sourceFileMap) {
-        if (HERE) {  llvm::outs() << "HEREf Name <" << x.first() << ">;";}
+        if (HERE) {  logStream << "HEREf Name <" << x.first() << ">;"; logStream.flush();}
       }
       llvm::report_fatal_error("NOT FOUND");
     }
-    if (HERE) { llvm::outs() << "HEREf FOUND " << name << "\n";}
+    if (HERE) { logStream << "HEREf FOUND " << name << "\n"; logStream.flush();}
     return iter->second;
   }
 };
@@ -859,7 +863,8 @@ static bool performCompileStepsPostSema(CompilerInstance &Instance,
         const llvm::sys::fs::file_t outpipe = 4;
         auto wr = write(outpipe, "", 1);
    //    fflush(wr);
-       llvm::outs() << "HEREf wrote " << wr << "\n"; llvm::outs().flush();
+       llvm::raw_fd_ostream logStream(logpipe, false, true);
+       logStream << "HEREf wrote " << wr << "\n"; logStream.flush();
       }
       else
         break;
