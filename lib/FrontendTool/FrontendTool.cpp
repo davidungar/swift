@@ -789,7 +789,6 @@ public:
     //assert(false && "sdafasdfsadfasdfasfd");
     char buf[10000];
     if (HERE) { llvm::outs() << "HEREf about to read\n"; llvm::outs().flush(); }
-    if (HERE) { llvm::errs() << "HEREf about to read\n"; llvm::errs().flush(); }
     int r = 0;
     for (;;) {
       r = read(inpipe, buf, 10000);
