@@ -790,41 +790,34 @@ public:
     char buf[10000];
     if (HERE) { llvm::outs() << "HEREf about to read\n"; llvm::outs().flush(); }
     int r = 0;
-    for (;;) {
-      r = read(inpipe, buf, 10000);
+    r = read(inpipe, buf, 10000);
 
-      if (r > 0) {
-        if (HERE) { llvm::outs() << "HEREf READ " << r << "\n"; llvm::outs().flush();}
-      }
-      else if (r == 0)
-        return nullptr;
-      else {
-        if (HERE) { llvm::outs() << "HEREf ERROR " << errno << "\n"; llvm::outs().flush();}
-        exit(1);
-      }
-      break;
+    if (r > 0) {
+      if (HERE) { llvm::outs() << "HEREf READ " << r << "\n"; llvm::outs().flush();}
     }
-    if (r) {
-      if (HERE) { llvm::outs() << "HEREf read " << r << "\n"; llvm::outs().flush();}
-      assert(buf[r-1]);
-      StringRef name(buf, r);
-      if (HERE) { llvm::outs() << "HEREf name " << name << "' " << r << "\n"; llvm::outs().flush();}
-      auto iter = sourceFileMap.find(name);
-      if (iter == sourceFileMap.end()) {
-        for (auto &x: sourceFileMap) {
-          if (HERE) {  llvm::outs() << "HEREf Name <" << x.first() << ">;";}
-        }
-        llvm::report_fatal_error("NOT FOUND");
-      }
-      if (HERE) { llvm::outs() << "HEREf FOUND " << name << "\n";}
-      return iter->second;
+    else if (r == 0) {
+      if (HERE) { llvm::outs() << "HEREf READ 0" << r << "\n"; llvm::outs().flush();}
+      return nullptr;
     }
     else {
-       if (i < sourceFiles.size())
-        return sourceFiles[i++];
-      else
-        return NullablePtr<SourceFile>();
+      if (HERE) { llvm::outs() << "HEREf ERROR " << errno << "\n"; llvm::outs().flush();}
+      exit(1);
     }
+
+    assert( r > 0);
+    if (HERE) { llvm::outs() << "HEREf read " << r << "\n"; llvm::outs().flush();}
+    assert(buf[r-1]);
+    StringRef name(buf, r);
+    if (HERE) { llvm::outs() << "HEREf name " << name << "' " << r << "\n"; llvm::outs().flush();}
+    auto iter = sourceFileMap.find(name);
+    if (iter == sourceFileMap.end()) {
+      for (auto &x: sourceFileMap) {
+        if (HERE) {  llvm::outs() << "HEREf Name <" << x.first() << ">;";}
+      }
+      llvm::report_fatal_error("NOT FOUND");
+    }
+    if (HERE) { llvm::outs() << "HEREf FOUND " << name << "\n";}
+    return iter->second;
   }
 };
 
