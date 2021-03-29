@@ -785,37 +785,39 @@ public:
   const llvm::sys::fs::file_t  inpipe = 3;
 
   NullablePtr<SourceFile> nextToCompile() {
-    bool HERE = false;
+    bool HERE = true;
+    //assert(false && "sdafasdfsadfasdfasfd");
     char buf[10000];
-    if (HERE) { llvm::outs() << "HERE about to read\n"; llvm::outs().flush(); }
+    if (HERE) { llvm::outs() << "HEREf about to read\n"; llvm::outs().flush(); }
+    if (HERE) { llvm::errs() << "HEREf about to read\n"; llvm::errs().flush(); }
     int r = 0;
     for (;;) {
       r = read(inpipe, buf, 10000);
 
-      if (r) {
-        if (HERE) { llvm::outs() << "HERE READ " << r << "\n"; llvm::outs().flush();}
+      if (r > 0) {
+        if (HERE) { llvm::outs() << "HEREf READ " << r << "\n"; llvm::outs().flush();}
       }
       else if (r == 0)
         return nullptr;
       else {
-        if (HERE) { llvm::outs() << "HERE ERROR " << errno << "\n"; llvm::outs().flush();}
+        if (HERE) { llvm::outs() << "HEREf ERROR " << errno << "\n"; llvm::outs().flush();}
         exit(1);
       }
       break;
     }
     if (r) {
-      if (HERE) { llvm::outs() << "HERE read " << r << "\n"; llvm::outs().flush();}
+      if (HERE) { llvm::outs() << "HEREf read " << r << "\n"; llvm::outs().flush();}
       assert(buf[r-1]);
       StringRef name(buf, r);
-      if (HERE) { llvm::outs() << "HERE name " << name << "' " << r << "\n"; llvm::outs().flush();}
+      if (HERE) { llvm::outs() << "HEREf name " << name << "' " << r << "\n"; llvm::outs().flush();}
       auto iter = sourceFileMap.find(name);
       if (iter == sourceFileMap.end()) {
         for (auto &x: sourceFileMap) {
-          if (HERE) {  llvm::outs() << "HERE Name <" << x.first() << ">;";}
+          if (HERE) {  llvm::outs() << "HEREf Name <" << x.first() << ">;";}
         }
         llvm::report_fatal_error("NOT FOUND");
       }
-      if (HERE) { llvm::outs() << "HERE FOUND " << name << "\n";}
+      if (HERE) { llvm::outs() << "HEREf FOUND " << name << "\n";}
       return iter->second;
     }
     else {
@@ -865,7 +867,7 @@ static bool performCompileStepsPostSema(CompilerInstance &Instance,
         const llvm::sys::fs::file_t outpipe = 4;
         auto wr = write(outpipe, "", 1);
    //    fflush(wr);
-       llvm::outs() << "HERE wrote " << wr << "\n"; llvm::outs().flush();
+       llvm::outs() << "HEREf wrote " << wr << "\n"; llvm::outs().flush();
       }
       else
         break;
