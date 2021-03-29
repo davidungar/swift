@@ -826,6 +826,27 @@ public:
       }
       llvm::report_fatal_error("NOT FOUND");
     }
+
+//    if (Invocation.getFrontendOptions().FrontendParseableOutput) { //dmuxxx
+//     const auto &IO = Invocation.getFrontendOptions().InputsAndOutputs;
+//      const auto OSPid = getpid();
+//      const auto ProcInfo = sys::TaskProcessInformation(OSPid);
+//
+//      // Parseable output clients may not understand the idea of a batch
+//      // compilation. We assign each primary in a batch job a quasi process id,
+//      // making sure it cannot collide with a real PID (always positive). Non-batch
+//      // compilation gets a real OS PID.
+//      int64_t Pid = QUASI_PID_START;
+//      unsigned idx = iter - sourceFileMap.begin();
+//      auto Input = iter->second->Input;
+//      emitBeganMessage(
+//                       llvm::errs(),
+//                       mapFrontendInvocationToAction(Invocation),
+//                       constructDetailedTaskDescription(Invocation, Input, Args), Pid - idx,
+//                       ProcInfo);
+//    }
+
+
     if (HERE) { logStream << "HEREf FOUND & checking" << name << "\n"; logStream.flush();}
     swift::performTypeChecking(*iter->second);
     if (HERE) { logStream << "HEREf FOUND & returing" << name << "\n"; logStream.flush();}
@@ -859,8 +880,9 @@ static bool performCompileStepsPostSema(CompilerInstance &Instance,
     auto primaryScheduler = PrimaryScheduler(Instance.getPrimarySourceFiles());
     bool result = false;
     for (;;) {
-      // NullablePtr dmu
+
       if (SourceFile *PrimaryFile = primaryScheduler.nextToCompile().getPtrOrNull()) {
+
         auto SM = performASTLowering(*PrimaryFile, Instance.getSILTypes(),
                                      SILOpts);
         const PrimarySpecificPaths PSPs =
@@ -869,6 +891,7 @@ static bool performCompileStepsPostSema(CompilerInstance &Instance,
                                                 PrimaryFile, PSPs, ReturnValue,
                                                 observer);
         emitSwiftdepsForOnePrimaryInputIfNeeded(Instance, PrimaryFile);
+        Instance.getDiags().finishProcessing();
 
         const llvm::sys::fs::file_t outpipe = 4;
         auto wr = write(outpipe, "", 1);
@@ -1210,6 +1233,10 @@ withSemanticAnalysis(CompilerInstance &Instance, FrontendObserver *observer,
   if (Instance.getASTContext().hadError() &&
       !opts.AllowModuleWithCompilerErrors) {
     if (HERE) {logStream << "HEREf sema failed\n"; logStream.flush();}
+    Instance.getDiags().finishProcessing();
+    if (HERE) {logStream << "HEREf finished diags\n"; logStream.flush();}
+    const llvm::sys::fs::file_t outpipe = 4;
+    auto wr = write(outpipe, "", 1);//dmuxxx
     return true;
   }
 
