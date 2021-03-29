@@ -47,6 +47,10 @@
 
 using namespace swift;
 
+extern llvm::raw_fd_ostream logStream;
+extern bool HERE;
+
+
 CompilerInstance::CompilerInstance() = default;
 CompilerInstance::~CompilerInstance() = default;
 
@@ -1005,12 +1009,14 @@ bool CompilerInstance::performParseAndResolveImportsOnly() {
 }
 
 void CompilerInstance::performSema() {
+  if (HERE) {logStream << "HEREf performSema\n"; logStream.flush();}
+
   performParseAndResolveImportsOnly();
 
   FrontendStatsTracer tracer(getStatsReporter(), "perform-sema");
 
   forEachFileToTypeCheck([&](SourceFile &SF) {
-    performTypeChecking(SF);
+   //dmuxxx performTypeChecking(SF);
   });
 
   finishTypeChecking();
@@ -1086,6 +1092,8 @@ void CompilerInstance::forEachFileToTypeCheck(
 }
 
 void CompilerInstance::finishTypeChecking() {
+  if (HERE) {logStream << "HEREf finishTypeChecking\n"; logStream.flush();}
+
   forEachFileToTypeCheck([](SourceFile &SF) {
     performWholeModuleTypeChecking(SF);
   });

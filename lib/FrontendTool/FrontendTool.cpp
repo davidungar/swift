@@ -93,6 +93,14 @@
 using namespace swift;
 using namespace swift::parseable_output;
 
+const llvm::sys::fs::file_t  logpipe = 5;
+static std::error_code logEC;
+llvm::raw_fd_ostream logStream("/tmp/x", logEC, llvm::sys::fs::OpenFlags::OF_Append);
+//static llvm::raw_fd_ostream logStream(logpipe, false, true);
+bool HERE = true;
+
+
+
 static std::string displayName(StringRef MainExecutablePath) {
   std::string Name = llvm::sys::path::stem(MainExecutablePath).str();
   Name += " -frontend";
@@ -770,7 +778,6 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           int &ReturnValue,
                                           FrontendObserver *observer);
 
-const llvm::sys::fs::file_t  logpipe = 5;
 
 
 class PrimaryScheduler {
@@ -788,8 +795,7 @@ public:
   const llvm::sys::fs::file_t  inpipe = 3;
 
   NullablePtr<SourceFile> nextToCompile() {
-    bool HERE = true;
-    llvm::raw_fd_ostream logStream(logpipe, false, true);
+    if (logStream.has_error()) { abort(); }
     //assert(false && "sdafasdfsadfasdfasfd");
     char buf[10000];
     if (HERE) { logStream << "HEREf about to read\n"; logStream.flush(); }
@@ -820,14 +826,18 @@ public:
       }
       llvm::report_fatal_error("NOT FOUND");
     }
-    if (HERE) { logStream << "HEREf FOUND " << name << "\n"; logStream.flush();}
-    return iter->second;
+    if (HERE) { logStream << "HEREf FOUND & checking" << name << "\n"; logStream.flush();}
+    swift::performTypeChecking(*iter->second);
+    if (HERE) { logStream << "HEREf FOUND & returing" << name << "\n"; logStream.flush();}
+   return iter->second;
   }
 };
 
 static bool performCompileStepsPostSema(CompilerInstance &Instance,
                                         int &ReturnValue,
                                         FrontendObserver *observer) {
+  if (HERE) {logStream << "HEREf performCompileStepsPostSema\n"; logStream.flush();}
+
   const auto &Invocation = Instance.getInvocation();
   const SILOptions &SILOpts = Invocation.getSILOptions();
   const FrontendOptions &opts = Invocation.getFrontendOptions();
@@ -863,8 +873,7 @@ static bool performCompileStepsPostSema(CompilerInstance &Instance,
         const llvm::sys::fs::file_t outpipe = 4;
         auto wr = write(outpipe, "", 1);
    //    fflush(wr);
-       llvm::raw_fd_ostream logStream(logpipe, false, true);
-       logStream << "HEREf wrote " << wr << "\n"; logStream.flush();
+        if (HERE) {logStream << "HEREf wrote " << wr << "\n"; logStream.flush();}
       }
       else
         break;
@@ -1172,6 +1181,8 @@ static bool printSwiftFeature(CompilerInstance &instance) {
 static bool
 withSemanticAnalysis(CompilerInstance &Instance, FrontendObserver *observer,
                      llvm::function_ref<bool(CompilerInstance &)> cont) {
+  if (HERE) {logStream << "HEREf withSemanticAnalysis\n"; logStream.flush();}
+
   const auto &Invocation = Instance.getInvocation();
   const auto &opts = Invocation.getFrontendOptions();
   assert(!FrontendOptions::shouldActionOnlyParse(opts.RequestedAction) &&
@@ -1180,6 +1191,8 @@ withSemanticAnalysis(CompilerInstance &Instance, FrontendObserver *observer,
   Instance.performSema();
   if (observer)
     observer->performedSemanticAnalysis(Instance);
+  if (HERE) {logStream << "HEREf didSema\n"; logStream.flush();}
+
 
   switch (opts.CrashMode) {
   case FrontendOptions::DebugCrashMode::AssertAfterParse:
@@ -1195,8 +1208,10 @@ withSemanticAnalysis(CompilerInstance &Instance, FrontendObserver *observer,
   (void)migrator::updateCodeAndEmitRemapIfNeeded(&Instance);
 
   if (Instance.getASTContext().hadError() &&
-      !opts.AllowModuleWithCompilerErrors)
+      !opts.AllowModuleWithCompilerErrors) {
+    if (HERE) {logStream << "HEREf sema failed\n"; logStream.flush();}
     return true;
+  }
 
   return cont(Instance);
 }
@@ -1231,6 +1246,8 @@ static bool performParseOnly(ModuleDecl &MainModule) {
 static bool performAction(CompilerInstance &Instance,
                           int &ReturnValue,
                           FrontendObserver *observer) {
+  if (HERE) {logStream << "HEREf performAction\n"; logStream.flush();}
+
   const auto &opts = Instance.getInvocation().getFrontendOptions();
   auto &Context = Instance.getASTContext();
   switch (Instance.getInvocation().getFrontendOptions().RequestedAction) {
@@ -1343,6 +1360,9 @@ static bool performAction(CompilerInstance &Instance,
 static bool performCompile(CompilerInstance &Instance,
                            int &ReturnValue,
                            FrontendObserver *observer) {
+
+  if (HERE) {logStream << "HEREf performCompile\n"; logStream.flush();}
+
   const auto &Invocation = Instance.getInvocation();
   const auto &opts = Invocation.getFrontendOptions();
   const FrontendOptions::ActionType Action = opts.RequestedAction;
@@ -2040,6 +2060,9 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   PrintingDiagnosticConsumer PDC;
 
+  if (HERE) {logStream << "HEREf performFrontend\n"; logStream.flush();}
+
+
   // Hopefully we won't trigger any LLVM-level fatal errors, but if we do try
   // to route them through our usual textual diagnostics before crashing.
   //
@@ -2241,7 +2264,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     PDC.setSuppressOutput(true);
   }
 
-  if (Invocation.getFrontendOptions().FrontendParseableOutput) {
+  if (false && Invocation.getFrontendOptions().FrontendParseableOutput) { //dmuxxx
    const auto &IO = Invocation.getFrontendOptions().InputsAndOutputs;
     const auto OSPid = getpid();
     const auto ProcInfo = sys::TaskProcessInformation(OSPid);
@@ -2280,7 +2303,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   if (auto *StatsReporter = Instance->getStatsReporter())
     StatsReporter->noteCurrentProcessExitStatus(r);
 
-  if (Invocation.getFrontendOptions().FrontendParseableOutput) {
+  if (false && Invocation.getFrontendOptions().FrontendParseableOutput) { //dmuxxx
     const auto &IO = Invocation.getFrontendOptions().InputsAndOutputs;
     const auto OSPid = getpid();
     const auto ProcInfo = sys::TaskProcessInformation(OSPid);

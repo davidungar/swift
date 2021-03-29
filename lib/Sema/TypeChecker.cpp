@@ -51,6 +51,10 @@
 
 using namespace swift;
 
+extern llvm::raw_fd_ostream logStream;
+extern bool HERE;
+
+
 ProtocolDecl *TypeChecker::getProtocol(ASTContext &Context, SourceLoc loc,
                                        KnownProtocolKind kind) {
   auto protocol = Context.getProtocol(kind);
@@ -274,6 +278,8 @@ static void typeCheckDelayedFunctions(SourceFile &SF) {
 }
 
 void swift::performTypeChecking(SourceFile &SF) {
+  // if (HERE) {logStream << "HEREf performTypeChecking\n"; logStream.flush();}
+
   return (void)evaluateOrDefault(SF.getASTContext().evaluator,
                                  TypeCheckSourceFileRequest{&SF}, {});
 }
