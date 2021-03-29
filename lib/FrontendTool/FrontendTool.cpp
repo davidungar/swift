@@ -804,10 +804,14 @@ public:
     }
     if (r) {
        llvm::errs() << "HERE read " << r << "\n"; llvm::errs().flush();
+      assert(buf[r-1]);
       StringRef name(buf, r);
       llvm::errs() << "HERE name " << name << "' " << r << "\n"; llvm::errs().flush();
       auto iter = sourceFileMap.find(name);
       if (iter == sourceFileMap.end()) {
+        for (auto &x: sourceFileMap) {
+          llvm::errs() << "HERE Name <" << x.first() << ">;";
+        }
         llvm::report_fatal_error("NOT FOUND");
       }
       llvm::errs() << "HERE FOUND " << name << "\n";
