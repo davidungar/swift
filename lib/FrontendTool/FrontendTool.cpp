@@ -785,7 +785,7 @@ public:
   const llvm::sys::fs::file_t  inpipe = 3;
 
   NullablePtr<SourceFile> nextToCompile() {
-    bool HERE = true;
+    bool HERE = false;
     //assert(false && "sdafasdfsadfasdfasfd");
     char buf[10000];
     if (HERE) { llvm::outs() << "HEREf about to read\n"; llvm::outs().flush(); }
