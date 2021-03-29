@@ -785,36 +785,37 @@ public:
   const llvm::sys::fs::file_t  inpipe = 3;
 
   NullablePtr<SourceFile> nextToCompile() {
+    bool HERE = false;
     char buf[10000];
-     llvm::errs() << "HERE about to read\n"; llvm::errs().flush();
+    if (HERE) { llvm::outs() << "HERE about to read\n"; llvm::outs().flush(); }
     int r = 0;
     for (;;) {
       r = read(inpipe, buf, 10000);
 
       if (r) {
-        llvm::errs() << "HERE READ " << r << "\n"; llvm::errs().flush();
+        if (HERE) { llvm::outs() << "HERE READ " << r << "\n"; llvm::outs().flush();}
       }
       else if (r == 0)
         return nullptr;
       else {
-         llvm::errs() << "HERE ERROR " << errno << "\n"; llvm::errs().flush();
+        if (HERE) { llvm::outs() << "HERE ERROR " << errno << "\n"; llvm::outs().flush();}
         exit(1);
       }
       break;
     }
     if (r) {
-       llvm::errs() << "HERE read " << r << "\n"; llvm::errs().flush();
+      if (HERE) { llvm::outs() << "HERE read " << r << "\n"; llvm::outs().flush();}
       assert(buf[r-1]);
       StringRef name(buf, r);
-      llvm::errs() << "HERE name " << name << "' " << r << "\n"; llvm::errs().flush();
+      if (HERE) { llvm::outs() << "HERE name " << name << "' " << r << "\n"; llvm::outs().flush();}
       auto iter = sourceFileMap.find(name);
       if (iter == sourceFileMap.end()) {
         for (auto &x: sourceFileMap) {
-          llvm::errs() << "HERE Name <" << x.first() << ">;";
+          if (HERE) {  llvm::outs() << "HERE Name <" << x.first() << ">;";}
         }
         llvm::report_fatal_error("NOT FOUND");
       }
-      llvm::errs() << "HERE FOUND " << name << "\n";
+      if (HERE) { llvm::outs() << "HERE FOUND " << name << "\n";}
       return iter->second;
     }
     else {
@@ -864,7 +865,7 @@ static bool performCompileStepsPostSema(CompilerInstance &Instance,
         const llvm::sys::fs::file_t outpipe = 4;
         auto wr = write(outpipe, "", 1);
    //    fflush(wr);
-       llvm::errs() << "HERE wrote " << wr << "\n"; llvm::errs().flush();
+       llvm::outs() << "HERE wrote " << wr << "\n"; llvm::outs().flush();
       }
       else
         break;

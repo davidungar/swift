@@ -1113,7 +1113,6 @@ LookupConformanceInModuleRequest::evaluate(
 
 Fingerprint SourceFile::getInterfaceHash() const {
   assert(hasInterfaceHash() && "Interface hash not enabled");
-  llvm::errs() << "HERE getInterfaceHash\n";
   auto &eval = getASTContext().evaluator;
   auto *mutableThis = const_cast<SourceFile *>(this);
   Optional<StableHasher> interfaceHasher =
