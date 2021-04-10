@@ -90,6 +90,15 @@ public:
   /// If indexing system modules, don't index the stdlib.
   bool IndexIgnoreStdlib = false;
 
+  /// Instead of creating a frontend job for each static batch,
+  /// create a compile servier for each "core", and dynamically
+  /// assign primaries to compile.
+  /// Each such frontend job thinks it has every primary.
+  bool DynamicBatching = false;
+
+  /// Do maybe expensive stuff for debugging
+  bool DebugDynamicBatching = false;
+
   /// The module for which we should verify all of the generic signatures.
   std::string VerifyGenericSignaturesInModule;
 

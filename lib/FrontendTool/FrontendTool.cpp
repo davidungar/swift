@@ -93,6 +93,7 @@
 using namespace swift;
 using namespace swift::parseable_output;
 
+
 static std::string displayName(StringRef MainExecutablePath) {
   std::string Name = llvm::sys::path::stem(MainExecutablePath).str();
   Name += " -frontend";
@@ -617,6 +618,18 @@ constructDetailedTaskDescription(const CompilerInvocation &Invocation,
                                  Outputs};
 }
 
+static void emitSwiftdepsForOnePrimaryInputIfNeeded(CompilerInstance &Instance,
+                                                    SourceFile *SF) {
+  const auto &Invocation = Instance.getInvocation();
+  const std::string &referenceDependenciesFilePath =
+      Invocation.getReferenceDependenciesFilePathForPrimary(
+          SF->getFilename());
+  if (referenceDependenciesFilePath.empty()) {
+    return;
+  }
+  emitReferenceDependencies(Instance, SF, referenceDependenciesFilePath);
+}
+
 static void emitSwiftdepsForAllPrimaryInputsIfNeeded(
     CompilerInstance &Instance) {
   const auto &Invocation = Instance.getInvocation();
@@ -647,14 +660,7 @@ static void emitSwiftdepsForAllPrimaryInputsIfNeeded(
     return;
 
   for (auto *SF : Instance.getPrimarySourceFiles()) {
-    const std::string &referenceDependenciesFilePath =
-        Invocation.getReferenceDependenciesFilePathForPrimary(
-            SF->getFilename());
-    if (referenceDependenciesFilePath.empty()) {
-      continue;
-    }
-
-    emitReferenceDependencies(Instance, SF, referenceDependenciesFilePath);
+    emitSwiftdepsForOnePrimaryInputIfNeeded(Instance, SF);
   }
 }
 
@@ -746,6 +752,102 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           int &ReturnValue,
                                           FrontendObserver *observer);
 
+
+
+class PrimaryScheduler {
+  ArrayRef<SourceFile*> sourceFiles;
+  //dmuxxx make const
+  llvm::StringMap<SourceFile*> sourceFileMap;
+  CompilerInstance& Instance;
+
+
+public:
+  PrimaryScheduler(CompilerInstance &Instance) : sourceFiles(Instance.getPrimarySourceFiles()),
+Instance(Instance)  {
+    for (auto *SF: sourceFiles)
+      sourceFileMap.insert({SF->getFilename(), SF});
+  }
+  const llvm::sys::fs::file_t  inpipe = 3;
+
+  NullablePtr<SourceFile> nextToCompile() {
+    char buf[10000];
+    Instance.logDynamicBatching("about to read");
+    int r = 0;
+    r = read(inpipe, buf, 10000);
+
+    if (r == 0) {
+      Instance.logDynamicBatching("EOF, quitting");
+      return nullptr;
+    }
+    else if (r < 0) {
+      Instance.logDynamicBatching("read ERROR", errno);
+      exit(1);
+    }
+
+    assert( r > 0);
+    Instance.logDynamicBatching("read", r);
+    assert(buf[r-1]);
+    StringRef name(buf, r);
+    Instance.logDynamicBatching("name received", name);
+    auto iter = sourceFileMap.find(name);
+    if (iter == sourceFileMap.end()) {
+      for (auto &x: sourceFileMap) {
+        Instance.logDynamicBatching("not found, but have", x.first());
+      }
+      Instance.logDynamicBatching("not found", name);
+      llvm::report_fatal_error("NOT FOUND");
+    }
+
+    Instance.logDynamicBatching("found", name);
+    return iter->second;
+  }
+};
+
+static bool writeServedOneFile(bool hadError) {
+  const llvm::sys::fs::file_t outpipe = 4;
+  char buf = hadError ? '\1' : '\0';
+  auto wr = write(outpipe, &buf, 1);
+  //dmu TODO diagnose
+  return wr == 1;
+}
+
+static bool performCompileStepsPostSemaDynamicallyBatching(CompilerInstance &Instance,
+                                                           int &ReturnValue,
+                                                           FrontendObserver *observer) {
+  const auto &Invocation = Instance.getInvocation();
+  const SILOptions &SILOpts = Invocation.getSILOptions();
+
+  auto primaryScheduler = PrimaryScheduler(Instance);
+  bool result = false;
+  while (SourceFile *PrimaryFile = primaryScheduler.nextToCompile().getPtrOrNull()) {
+    Instance.logDynamicBatching("starting type checking", PrimaryFile->getFilename());
+    swift::performTypeChecking(*PrimaryFile);
+    swift::performWholeModuleTypeChecking(*PrimaryFile);
+    Instance.logDynamicBatching("finished type checking", PrimaryFile->getFilename());
+
+    const InputFile *Input = Instance.getInvocation().getFrontendOptions().InputsAndOutputs.primaryInputNamed(PrimaryFile->getFilename());
+
+    auto SM = performASTLowering(*PrimaryFile, Instance.getSILTypes(),
+                                 SILOpts);
+    const PrimarySpecificPaths PSPs =
+    Instance.getPrimarySpecificPathsForSourceFile(*PrimaryFile);
+    result |= performCompileStepsPostSILGen(Instance, std::move(SM),
+                                            PrimaryFile, PSPs, ReturnValue,
+                                            observer);
+
+
+    emitSwiftdepsForOnePrimaryInputIfNeeded(Instance, PrimaryFile);
+
+    (void)swift::emitMakeDependenciesIfNeeded(Instance.getDiags(), Instance.getDependencyTracker(), Instance.getInvocation().getFrontendOptions(), *Input);
+
+    Instance.logDynamicBatching("finished checking", PrimaryFile->getFilename());
+    result |= writeServedOneFile(result);
+    Instance.logDynamicBatching("wrote completion", result);
+  }
+
+  return result;
+}
+
 static bool performCompileStepsPostSema(CompilerInstance &Instance,
                                         int &ReturnValue,
                                         FrontendObserver *observer) {
@@ -767,6 +869,9 @@ static bool performCompileStepsPostSema(CompilerInstance &Instance,
   // each source file, and run the remaining SILOpt-Serialize-IRGen-LLVM
   // once for each such input.
   if (!Instance.getPrimarySourceFiles().empty()) {
+    if (opts.DynamicBatching) {
+      return performCompileStepsPostSemaDynamicallyBatching(Instance, ReturnValue, observer);
+    }
     bool result = false;
     for (auto *PrimaryFile : Instance.getPrimarySourceFiles()) {
       auto SM = performASTLowering(*PrimaryFile, Instance.getSILTypes(),
@@ -777,7 +882,6 @@ static bool performCompileStepsPostSema(CompilerInstance &Instance,
                                               PrimaryFile, PSPs, ReturnValue,
                                               observer);
     }
-
     return result;
   }
 
@@ -1019,6 +1123,9 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
     emitIndexData(Instance);
   }
 
+  if (opts.DynamicBatching)
+    return;
+
   // Emit Swiftdeps for every file in the batch.
   emitSwiftdepsForAllPrimaryInputsIfNeeded(Instance);
 
@@ -1084,6 +1191,8 @@ static bool printSwiftFeature(CompilerInstance &instance) {
 static bool
 withSemanticAnalysis(CompilerInstance &Instance, FrontendObserver *observer,
                      llvm::function_ref<bool(CompilerInstance &)> cont) {
+  Instance.logDynamicBatching(__FUNCTION__);
+
   const auto &Invocation = Instance.getInvocation();
   const auto &opts = Invocation.getFrontendOptions();
   assert(!FrontendOptions::shouldActionOnlyParse(opts.RequestedAction) &&
@@ -1092,6 +1201,8 @@ withSemanticAnalysis(CompilerInstance &Instance, FrontendObserver *observer,
   Instance.performSema();
   if (observer)
     observer->performedSemanticAnalysis(Instance);
+  Instance.logDynamicBatching("didSema");
+
 
   switch (opts.CrashMode) {
   case FrontendOptions::DebugCrashMode::AssertAfterParse:
@@ -1107,8 +1218,13 @@ withSemanticAnalysis(CompilerInstance &Instance, FrontendObserver *observer,
   (void)migrator::updateCodeAndEmitRemapIfNeeded(&Instance);
 
   if (Instance.getASTContext().hadError() &&
-      !opts.AllowModuleWithCompilerErrors)
+      !opts.AllowModuleWithCompilerErrors) {
+    Instance.logDynamicBatching("HEREf sema failed");
+    Instance.getDiags().finishProcessing();
+    Instance.logDynamicBatching("finished diags");
+    writeServedOneFile(true);
     return true;
+  }
 
   return cont(Instance);
 }
@@ -1143,6 +1259,8 @@ static bool performParseOnly(ModuleDecl &MainModule) {
 static bool performAction(CompilerInstance &Instance,
                           int &ReturnValue,
                           FrontendObserver *observer) {
+  Instance.logDynamicBatching(__FUNCTION__);
+
   const auto &opts = Instance.getInvocation().getFrontendOptions();
   auto &Context = Instance.getASTContext();
   switch (Instance.getInvocation().getFrontendOptions().RequestedAction) {
@@ -1256,6 +1374,9 @@ static bool performAction(CompilerInstance &Instance,
 static bool performCompile(CompilerInstance &Instance,
                            int &ReturnValue,
                            FrontendObserver *observer) {
+
+  Instance.logDynamicBatching(__FUNCTION__);
+
   const auto &Invocation = Instance.getInvocation();
   const auto &opts = Invocation.getFrontendOptions();
   const FrontendOptions::ActionType Action = opts.RequestedAction;
@@ -1462,7 +1583,7 @@ static void freeASTContextIfPossible(CompilerInstance &Instance) {
   // primary input, then freeing it after processing the last primary is
   // unlikely to reduce the peak heap size. So, only optimize the
   // single-primary-case (or WMO).
-  if (opts.InputsAndOutputs.hasMultiplePrimaryInputs()) {
+  if (opts.DynamicBatching || opts.InputsAndOutputs.hasMultiplePrimaryInputs()) {
     return;
   }
 
@@ -1953,6 +2074,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   PrintingDiagnosticConsumer PDC;
 
+
   // Hopefully we won't trigger any LLVM-level fatal errors, but if we do try
   // to route them through our usual textual diagnostics before crashing.
   //
@@ -1990,6 +2112,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   std::unique_ptr<CompilerInstance> Instance =
     std::make_unique<CompilerInstance>();
+
 
   // In parseable output, avoid printing diagnostics
   Instance->addDiagnosticConsumer(&PDC);
@@ -2063,6 +2186,10 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   // The compiler invocation is now fully configured; notify our observer.
   if (observer) {
     observer->parsedArgs(Invocation);
+  }
+
+  if (Invocation.getFrontendOptions().DynamicBatching) {
+    Instance->startDynamicBatchingLogging();
   }
 
   if (Invocation.getFrontendOptions().PrintHelp ||
@@ -2154,7 +2281,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     PDC.setSuppressOutput(true);
   }
 
-  if (Invocation.getFrontendOptions().FrontendParseableOutput) {
+  if (!Invocation.getFrontendOptions().DynamicBatching && Invocation.getFrontendOptions().FrontendParseableOutput) {
    const auto &IO = Invocation.getFrontendOptions().InputsAndOutputs;
     const auto OSPid = getpid();
     const auto ProcInfo = sys::TaskProcessInformation(OSPid);
@@ -2193,7 +2320,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   if (auto *StatsReporter = Instance->getStatsReporter())
     StatsReporter->noteCurrentProcessExitStatus(r);
 
-  if (Invocation.getFrontendOptions().FrontendParseableOutput) {
+  if (!Invocation.getFrontendOptions().DynamicBatching && Invocation.getFrontendOptions().FrontendParseableOutput) {
     const auto &IO = Invocation.getFrontendOptions().InputsAndOutputs;
     const auto OSPid = getpid();
     const auto ProcInfo = sys::TaskProcessInformation(OSPid);

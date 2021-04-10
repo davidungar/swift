@@ -39,7 +39,8 @@ static constexpr const char *const localeCodes[] = {
 #include "swift/AST/LocalizationLanguages.def"
 };
 
-swift::CompilerInvocation::CompilerInvocation() {
+swift::CompilerInvocation::CompilerInvocation()
+{
   setTargetTriple(llvm::sys::getDefaultTargetTriple());
 }
 

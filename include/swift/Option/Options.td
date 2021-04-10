@@ -580,6 +580,24 @@ def experimental_cxx_stdlib :
   HelpText<"C++ standard library to use; forwarded to Clang's -stdlib flag">;
 
 
+def enable_dynamic_batching :
+  Flag<["-"], "enable-dynamic-batching">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Enable dynamically assign primary files to batch compiles">;
+
+def debug_dynamic_batching :
+  Flag<["-"], "debug-dynamic-batching">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Debug dynamically assign primary files to batch compiles">;
+
+
+def disable_dynamic_batching :
+  Flag<["-"], "disable-dynamic-batching">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Disable dynamically assign primary files to batch compiles">;
+
+
+
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
   Flags<[FrontendOption]>,

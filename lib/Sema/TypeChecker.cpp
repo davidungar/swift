@@ -51,6 +51,8 @@
 
 using namespace swift;
 
+
+
 ProtocolDecl *TypeChecker::getProtocol(ASTContext &Context, SourceLoc loc,
                                        KnownProtocolKind kind) {
   auto protocol = Context.getProtocol(kind);
