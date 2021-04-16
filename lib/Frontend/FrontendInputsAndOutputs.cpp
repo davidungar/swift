@@ -51,6 +51,9 @@ operator=(const FrontendInputsAndOutputs &other) {
   return *this;
 }
 
+FrontendInputsAndOutputs::FrontendInputsAndOutputs(const InputFile& input) {
+  addInput(input);
+}
 // All inputs:
 
 std::vector<std::string> FrontendInputsAndOutputs::getInputFilenames() const {
