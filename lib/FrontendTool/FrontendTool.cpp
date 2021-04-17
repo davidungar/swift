@@ -815,6 +815,7 @@ typedef std::unique_ptr<DiagnosticConsumer> UniqueDiagnosticConsumer;
 
 static llvm::SmallVector<UniqueDiagnosticConsumer, 4>
 initializeDiagnosticConsumers(CompilerInstance *,
+                              const CompilerInvocation&,
                               const FrontendInputsAndOutputs&,
                               NullablePtr<PrintingDiagnosticConsumer>,
                               llvm::StringMap<std::vector<std::string>>&);
@@ -846,7 +847,8 @@ static bool performCompileStepsPostSemaDynamicallyBatching(CompilerInstance &Ins
     llvm::StringMap<std::vector<std::string>> FileSpecificDiagnostics;
     auto initialConsumerCount = Instance.getDiags().getConsumers().size();
     auto owningConsumers = initializeDiagnosticConsumers(
-      &Instance, specificInputsAndOutputs, nullptr, FileSpecificDiagnostics);
+      &Instance, Instance.getInvocation(),
+      specificInputsAndOutputs, nullptr, FileSpecificDiagnostics);
     emitBeganMessagesIfNeeded(Invocation, Args, specificInputsAndOutputs);
 
     Instance.logDynamicBatching("starting type checking", PrimaryFile->getFilename());
@@ -2114,10 +2116,10 @@ static void printTargetInfo(const CompilerInvocation &invocation,
 
 static llvm::SmallVector<UniqueDiagnosticConsumer, 4>
 initializeDiagnosticConsumers(CompilerInstance *Instance,
+                              const CompilerInvocation &invocation,
                               const FrontendInputsAndOutputs &inputsAndOutputs,
                               NullablePtr<PrintingDiagnosticConsumer> PDC,
                               llvm::StringMap<std::vector<std::string>> &FileSpecificDiagnostics) {
-  const CompilerInvocation &invocation = Instance->getInvocation();
   const FrontendOptions &frontendOptions = invocation.getFrontendOptions();
   if (frontendOptions.DynamicBatching)
     return {};
@@ -2346,10 +2348,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     observer->parsedArgs(Invocation);
   }
 
-  if (Invocation.getFrontendOptions().DynamicBatching) {
-    Instance->startDynamicBatchingLogging();
-  }
-
   if (Invocation.getFrontendOptions().PrintHelp ||
       Invocation.getFrontendOptions().PrintHelpHidden) {
     unsigned IncludedFlagsBitmask = options::FrontendOption;
@@ -2378,6 +2376,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   llvm::StringMap<std::vector<std::string>> FileSpecificDiagnostics;
   auto owningDiagnosticConsumers = initializeDiagnosticConsumers(
     Instance.get(),
+    Invocation,
     Invocation.getFrontendOptions().InputsAndOutputs,
     &PDC,
     FileSpecificDiagnostics);
@@ -2401,6 +2400,10 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   if (Instance->setup(Invocation)) {
     return finishDiagProcessing(1, /*verifierEnabled*/ false);
   }
+
+  if (Invocation.getFrontendOptions().DynamicBatching &&
+      Invocation.getFrontendOptions().DebugDynamicBatching)
+    Instance->startDynamicBatchingLogging();
 
   // The compiler instance has been configured; notify our observer.
   if (observer) {

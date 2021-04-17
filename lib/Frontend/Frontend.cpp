@@ -1268,8 +1268,6 @@ CompilerInstance::getPrimarySpecificPathsForSourceFile(
 
 
 void CompilerInstance::startDynamicBatchingLogging() {
-  if (getInvocation().getFrontendOptions().DynamicBatching &&
-      getInvocation().getFrontendOptions().DebugDynamicBatching)
   dynamicBatchingLog = os_log_create("com.apple.swift.batchMode", "dynamicBatching");
 }
 
