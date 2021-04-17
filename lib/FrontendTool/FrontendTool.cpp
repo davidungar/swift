@@ -835,11 +835,13 @@ static bool performCompileStepsPostSemaDynamicallyBatching(CompilerInstance &Ins
                                                            int &ReturnValue,
                                                            FrontendObserver *observer,
                                                            ArrayRef<const char *> Args) {
+
   const auto &Invocation = Instance.getInvocation();
   const SILOptions &SILOpts = Invocation.getSILOptions();
 
   auto primaryScheduler = PrimaryScheduler(Instance);
-  bool result = false;
+  bool result = Instance.getASTContext().hadError();
+  assert(!result && "HAVE TO KEEP DIAGS?");
   while (SourceFile *PrimaryFile = primaryScheduler.nextToCompile().getPtrOrNull()) {
     const InputFile *Input = Instance.getInvocation().getFrontendOptions().InputsAndOutputs.primaryInputNamed(PrimaryFile->getFilename());
 
@@ -1266,11 +1268,10 @@ withSemanticAnalysis(CompilerInstance &Instance, FrontendObserver *observer,
 
   if (Instance.getASTContext().hadError() &&
       !opts.AllowModuleWithCompilerErrors) {
-    Instance.logDynamicBatching("HEREf sema failed");
-    Instance.getDiags().finishProcessing();
-    Instance.logDynamicBatching("finished diags");
-    writeServedOneFile(true);
-    return true;
+    // For dynamic batching, deal with the error later, for each primary
+    if (!Instance.getInvocation().getFrontendOptions().DynamicBatching)
+      return true;
+      Instance.logDynamicBatching("HEREf sema failed");
   }
 
   return cont(Instance);
