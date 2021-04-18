@@ -754,22 +754,9 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
 
 
-class PrimaryScheduler {
-  ArrayRef<SourceFile*> sourceFiles;
-  //dmuxxx make const
-  llvm::StringMap<SourceFile*> sourceFileMap;
-  CompilerInstance& Instance;
-
-
-public:
-  PrimaryScheduler(CompilerInstance &Instance) : sourceFiles(Instance.getPrimarySourceFiles()),
-Instance(Instance)  {
-    for (auto *SF: sourceFiles)
-      sourceFileMap.insert({SF->getFilename(), SF});
-  }
-  const llvm::sys::fs::file_t  inpipe = 3;
-
-  NullablePtr<SourceFile> nextToCompile() {
+  /// For now, an empty string is EOF, none is for an error
+  static Optional<std::string> nextToCompile(const CompilerInstance &Instance) {
+    const llvm::sys::fs::file_t  inpipe = 3;
     char buf[10000];
     Instance.logDynamicBatching("about to read");
     int r = 0;
@@ -777,31 +764,44 @@ Instance(Instance)  {
 
     if (r == 0) {
       Instance.logDynamicBatching("EOF, quitting");
-      return nullptr;
+      return std::string();
     }
     else if (r < 0) {
       Instance.logDynamicBatching("read ERROR", errno);
-      exit(1);
+      return None;
     }
-
-    assert( r > 0);
     Instance.logDynamicBatching("read", r);
     assert(buf[r-1]);
-    StringRef name(buf, r);
-    Instance.logDynamicBatching("name received", name);
-    auto iter = sourceFileMap.find(name);
-    if (iter == sourceFileMap.end()) {
-      for (auto &x: sourceFileMap) {
-        Instance.logDynamicBatching("not found, but have", x.first());
-      }
-      Instance.logDynamicBatching("not found", name);
-      llvm::report_fatal_error("NOT FOUND");
-    }
-
-    Instance.logDynamicBatching("found", name);
-    return iter->second;
+    return std::string(buf, r-1);
   }
-};
+
+/// Return hadError, and leaves InputsAndOutputs with the primary to compile, or no primaries if EOF.
+static bool nextToCompile(const CompilerInstance &Instance,
+                                                      CompilerInvocation &Invocation) {
+  auto &IO = Invocation.getFrontendOptions().InputsAndOutputs;
+  const auto optName = nextToCompile(Instance);
+  if (!optName) {
+    IO.constrainToNoPrimaries();
+    return true;
+  }
+  const std::string &name = optName.getValue();
+  if (name.empty()) {
+    IO.constrainToNoPrimaries();
+    return false;
+  }
+  Instance.logDynamicBatching("name received", name);
+  auto notFound = Invocation.getFrontendOptions().InputsAndOutputs.constrainPrimariesTo(name);
+  if (notFound) {
+    for (auto &x: sourceFileMap) {
+      Instance.logDynamicBatching("not found, but have", x.first());
+      Instance.logDynamicBatching("not found", name);
+    }
+    IO.constrainToNoPrimaries();
+    return true;
+  }
+  Instance.logDynamicBatching("found", name);
+  return false;
+}
 
 static bool writeServedOneFile(bool hadError) {
   const llvm::sys::fs::file_t outpipe = 4;
