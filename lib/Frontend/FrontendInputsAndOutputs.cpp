@@ -539,16 +539,24 @@ FrontendInputsAndOutputs::getPrimarySpecificPathsForPrimary(
   return f->getPrimarySpecificPaths();
 }
 
-const InputFile *
-FrontendInputsAndOutputs::primaryInputNamed(StringRef name) const {
+unsigned
+FrontendInputsAndOutputs::indexForPrimaryInputNamed(StringRef name) const {
   assert(!name.empty() && "input files have names");
   StringRef correctedFile =
       InputFile::convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(
           name);
   auto iterator = PrimaryInputsByName.find(correctedFile);
   if (iterator == PrimaryInputsByName.end())
+    return AllInputs.size();
+  return iterator->second;
+}
+
+const InputFile *
+FrontendInputsAndOutputs::primaryInputNamed(StringRef name) const {
+  const unsigned index = indexForPrimaryInputNamed(name);
+  if (index >= AllInputs.size())
     return nullptr;
-  const InputFile *f = &AllInputs[iterator->second];
-  assert(f->isPrimary() && "PrimaryInputsByName should only include primries");
+  const InputFile *f = &AllInputs[index];
+  assert(f->isPrimary() && "PrimaryInputsByName should only include primaries");
   return f;
 }
