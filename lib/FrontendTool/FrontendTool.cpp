@@ -751,11 +751,17 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           const PrimarySpecificPaths &PSPs,
                                           int &ReturnValue,
                                           FrontendObserver *observer);
-
-
+struct NextToCompile {
+  enum class Outcome {
+    Error,
+    Finished,
+    SourceFileName
+  };
+  Outcome outcome;
+  std::string sourceFileName;
 
   /// For now, an empty string is EOF, none is for an error
-  static Optional<std::string> nextToCompile(const CompilerInstance &Instance) {
+  NextToCompile(const CompilerInstance &Instance) {
     const llvm::sys::fs::file_t  inpipe = 3;
     char buf[10000];
     Instance.logDynamicBatching("about to read");
@@ -764,52 +770,28 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
 
     if (r == 0) {
       Instance.logDynamicBatching("EOF, quitting");
-      return std::string();
+      outcome = Outcome::Finished;
+      return;
     }
     else if (r < 0) {
       Instance.logDynamicBatching("read ERROR", errno);
-      return None;
+      outcome = Outcome::Error;
+      return;
     }
     Instance.logDynamicBatching("read", r);
     assert(buf[r-1]);
-    return std::string(buf, r-1);
+    outcome = Outcome::SourceFileName;
+    sourceFileName = std::string(buf, r-1);
   }
 
-/// Return hadError, and leaves InputsAndOutputs with the primary to compile, or no primaries if EOF.
-static bool nextToCompile(const CompilerInstance &Instance,
-                                                      CompilerInvocation &Invocation) {
-  auto &IO = Invocation.getFrontendOptions().InputsAndOutputs;
-  const auto optName = nextToCompile(Instance);
-  if (!optName) {
-    IO.constrainToNoPrimaries();
-    return true;
+  static bool writeServedOneFile(bool hadError) {
+    const llvm::sys::fs::file_t outpipe = 4;
+    char buf = hadError ? '\1' : '\0';
+    auto wr = write(outpipe, &buf, 1);
+    //dmu TODO diagnose
+    return wr == 1;
   }
-  const std::string &name = optName.getValue();
-  if (name.empty()) {
-    IO.constrainToNoPrimaries();
-    return false;
-  }
-  Instance.logDynamicBatching("name received", name);
-  auto notFound = Invocation.getFrontendOptions().InputsAndOutputs.constrainPrimariesTo(name);
-  if (notFound) {
-    for (auto &x: sourceFileMap) {
-      Instance.logDynamicBatching("not found, but have", x.first());
-      Instance.logDynamicBatching("not found", name);
-    }
-    IO.constrainToNoPrimaries();
-    return true;
-  }
-  Instance.logDynamicBatching("found", name);
-  return false;
-}
-
-static bool writeServedOneFile(bool hadError) {
-  const llvm::sys::fs::file_t outpipe = 4;
-  char buf = hadError ? '\1' : '\0';
-  auto wr = write(outpipe, &buf, 1);
-  //dmu TODO diagnose
-  return wr == 1;
-}
+};
 
 typedef std::unique_ptr<DiagnosticConsumer> UniqueDiagnosticConsumer;
 
@@ -2400,14 +2382,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     return finishDiagProcessing(1, /*verifierEnabled*/ false);
   }
 
-  llvm::StringMap<std::vector<std::string>> FileSpecificDiagnostics;
-  auto owningDiagnosticConsumers = initializeDiagnosticConsumers(
-    Instance.get(),
-    Invocation,
-    Invocation.getFrontendOptions().InputsAndOutputs,
-    &PDC,
-    FileSpecificDiagnostics);
-
   if (Invocation.getDiagnosticOptions().UseColor)
     PDC.forceColors();
 
@@ -2423,6 +2397,15 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   const DiagnosticOptions &diagOpts = Invocation.getDiagnosticOptions();
   bool verifierEnabled = diagOpts.VerifyMode != DiagnosticOptions::NoVerify;
+
+  llvm::StringMap<std::vector<std::string>> FileSpecificDiagnostics;
+  auto owningDiagnosticConsumers = initializeDiagnosticConsumers(
+    Instance.get(),
+    Invocation,
+    Invocation.getFrontendOptions().InputsAndOutputs,
+    &PDC,
+    FileSpecificDiagnostics);
+
 
   if (Instance->setup(Invocation)) {
     return finishDiagProcessing(1, /*verifierEnabled*/ false);
