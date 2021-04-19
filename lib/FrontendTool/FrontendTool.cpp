@@ -2019,6 +2019,67 @@ initializeDiagnosticConsumers(CompilerInstance *Instance,
   return consumers;
 }
 
+static void emitBeganMessagesIfNeeded(
+                                      const CompilerInvocation &Invocation,
+                                      ArrayRef<const char *> Args,
+                                      const FrontendInputsAndOutputs &IO) {
+  if (Invocation.getFrontendOptions().FrontendParseableOutput)
+    return;
+  const auto OSPid = getpid();
+  const auto ProcInfo = sys::TaskProcessInformation(OSPid);
+
+  // Parseable output clients may not understand the idea of a batch
+  // compilation. We assign each primary in a batch job a quasi process id,
+  // making sure it cannot collide with a real PID (always positive). Non-batch
+  // compilation gets a real OS PID.
+  int64_t Pid = IO.hasUniquePrimaryInput() ? OSPid : QUASI_PID_START;
+  IO.forEachPrimaryInputWithIndex([&](const InputFile &Input,
+                                      unsigned idx) -> bool {
+    emitBeganMessage(
+                     llvm::errs(),
+                     mapFrontendInvocationToAction(Invocation),
+                     constructDetailedTaskDescription(Invocation, Input, Args), Pid - idx,
+                     ProcInfo);
+    return false;
+  });
+}
+
+static void emitFinishedMessagesIfNeeded(
+    const CompilerInvocation &Invocation,
+    const FrontendInputsAndOutputs &IO,
+    llvm::StringMap<std::vector<std::string>> &FileSpecificDiagnostics,
+    int r
+    ) {
+  if (!Invocation.getFrontendOptions().FrontendParseableOutput)
+    return;
+
+  const auto OSPid = getpid();
+  const auto ProcInfo = sys::TaskProcessInformation(OSPid);
+
+  // Parseable output clients may not understand the idea of a batch
+  // compilation. We assign each primary in a batch job a quasi process id,
+  // making sure it cannot collide with a real PID (always positive). Non-batch
+  // compilation gets a real OS PID.
+  int64_t Pid = IO.hasUniquePrimaryInput() ? OSPid : QUASI_PID_START;
+  IO.forEachPrimaryInputWithIndex([&](const InputFile &Input,
+                                      unsigned idx) -> bool {
+    assert(FileSpecificDiagnostics.count(Input.getFileName()) != 0 &&
+           "Expected diagnostic collection for input.");
+
+    // Join all diagnostics produced for this file into a single output.
+    auto PrimaryDiags = FileSpecificDiagnostics.lookup(Input.getFileName());
+    const char *const Delim = "";
+    std::ostringstream JoinedDiags;
+    std::copy(PrimaryDiags.begin(), PrimaryDiags.end(),
+              std::ostream_iterator<std::string>(JoinedDiags, Delim));
+
+    emitFinishedMessage(llvm::errs(),
+                        mapFrontendInvocationToAction(Invocation),
+                        JoinedDiags.str(), r, Pid - idx, ProcInfo);
+    return false;
+  });
+}
+
 int swift::performFrontend(ArrayRef<const char *> Args,
                            const char *Argv0, void *MainAddr,
                            FrontendObserver *observer) {
@@ -2204,26 +2265,8 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     PDC.setSuppressOutput(true);
   }
 
-  if (Invocation.getFrontendOptions().FrontendParseableOutput) {
-   const auto &IO = Invocation.getFrontendOptions().InputsAndOutputs;
-    const auto OSPid = getpid();
-    const auto ProcInfo = sys::TaskProcessInformation(OSPid);
-
-    // Parseable output clients may not understand the idea of a batch
-    // compilation. We assign each primary in a batch job a quasi process id,
-    // making sure it cannot collide with a real PID (always positive). Non-batch
-    // compilation gets a real OS PID.
-    int64_t Pid = IO.hasUniquePrimaryInput() ? OSPid : QUASI_PID_START;
-    IO.forEachPrimaryInputWithIndex([&](const InputFile &Input,
-                                        unsigned idx) -> bool {
-      emitBeganMessage(
-          llvm::errs(),
-          mapFrontendInvocationToAction(Invocation),
-          constructDetailedTaskDescription(Invocation, Input, Args), Pid - idx,
-          ProcInfo);
-      return false;
-    });
-  }
+  emitBeganMessagesIfNeeded(Invocation, Args,
+                            Invocation.getFrontendOptions().InputsAndOutputs);
 
   int ReturnValue = 0;
   bool HadError = performCompile(*Instance, ReturnValue, observer);
@@ -2243,34 +2286,10 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   if (auto *StatsReporter = Instance->getStatsReporter())
     StatsReporter->noteCurrentProcessExitStatus(r);
 
-  if (Invocation.getFrontendOptions().FrontendParseableOutput) {
-    const auto &IO = Invocation.getFrontendOptions().InputsAndOutputs;
-    const auto OSPid = getpid();
-    const auto ProcInfo = sys::TaskProcessInformation(OSPid);
-
-    // Parseable output clients may not understand the idea of a batch
-    // compilation. We assign each primary in a batch job a quasi process id,
-    // making sure it cannot collide with a real PID (always positive). Non-batch
-    // compilation gets a real OS PID.
-    int64_t Pid = IO.hasUniquePrimaryInput() ? OSPid : QUASI_PID_START;
-    IO.forEachPrimaryInputWithIndex([&](const InputFile &Input,
-                                        unsigned idx) -> bool {
-      assert(FileSpecificDiagnostics.count(Input.getFileName()) != 0 &&
-             "Expected diagnostic collection for input.");
-
-      // Join all diagnostics produced for this file into a single output.
-      auto PrimaryDiags = FileSpecificDiagnostics.lookup(Input.getFileName());
-      const char *const Delim = "";
-      std::ostringstream JoinedDiags;
-      std::copy(PrimaryDiags.begin(), PrimaryDiags.end(),
-                std::ostream_iterator<std::string>(JoinedDiags, Delim));
-
-      emitFinishedMessage(llvm::errs(),
-                          mapFrontendInvocationToAction(Invocation),
-                          JoinedDiags.str(), r, Pid - idx, ProcInfo);
-      return false;
-    });
-  }
+  emitFinishedMessagesIfNeeded(Invocation,
+                               Invocation.getFrontendOptions().InputsAndOutputs,
+                               FileSpecificDiagnostics,
+                               r);
 
   return r;
 }
