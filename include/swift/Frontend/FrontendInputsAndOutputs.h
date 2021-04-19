@@ -82,6 +82,12 @@ public:
 
   std::vector<std::string> getInputFilenames() const;
 
+private:
+  /// Return an out-of-bounds index for `AllInputs` if the name is not found.
+  /// Otherwise, return the index into `AllInputs` for the primary with the given name.
+  unsigned indexForPrimaryInputNamed(StringRef) const;
+
+public:
   /// \return nullptr if not a primary input file.
   const InputFile *primaryInputNamed(StringRef name) const;
 
