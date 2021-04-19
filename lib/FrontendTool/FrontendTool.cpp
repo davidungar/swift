@@ -2254,6 +2254,10 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     return finishDiagProcessing(1, /*verifierEnabled*/ false);
   }
 
+  if (Invocation.getFrontendOptions().DynamicBatching &&
+      Invocation.getFrontendOptions().DebugDynamicBatching)
+    Instance->startDynamicBatchingLogging();
+
   // The compiler instance has been configured; notify our observer.
   if (observer) {
     observer->configuredCompiler(*Instance);

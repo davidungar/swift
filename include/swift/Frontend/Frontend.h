@@ -49,6 +49,7 @@
 #include "clang/Basic/FileManager.h"
 
 #include <memory>
+#include <os/log.h>
 
 namespace swift {
 
@@ -660,6 +661,14 @@ public:
   getPrimarySpecificPathsForAtMostOnePrimary() const;
   const PrimarySpecificPaths &
   getPrimarySpecificPathsForSourceFile(const SourceFile &SF) const;
+
+private:
+  os_log_t dynamicBatchingLog = nullptr;
+public:
+  void startDynamicBatchingLogging();
+  void logDynamicBatching(const char* msg) const;
+  void logDynamicBatching(const char* msg, int n) const;
+  void logDynamicBatching(const char* msg, StringRef s) const;
 };
 
 } // namespace swift
