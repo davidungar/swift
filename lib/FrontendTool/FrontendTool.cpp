@@ -739,6 +739,49 @@ static bool writeLdAddCFileIfNeeded(CompilerInstance &Instance) {
   return false;
 }
 
+struct NextToCompile {
+  enum class Outcome {
+    Error,
+    Finished,
+    SourceFileName
+  };
+  Outcome outcome;
+  std::string sourceFileName;
+
+  /// For now, an empty string is EOF, none is for an error
+  NextToCompile(const CompilerInstance &Instance) {
+    const llvm::sys::fs::file_t  inpipe = 3;
+    char buf[10000];
+    Instance.logDynamicBatching("about to read");
+    int r = 0;
+    r = read(inpipe, buf, 10000);
+
+    if (r == 0) {
+      Instance.logDynamicBatching("EOF, quitting");
+      outcome = Outcome::Finished;
+      return;
+    }
+    else if (r < 0) {
+      Instance.logDynamicBatching("read ERROR", errno);
+      outcome = Outcome::Error;
+      return;
+    }
+    Instance.logDynamicBatching("read", r);
+    assert(buf[r-1]);
+    outcome = Outcome::SourceFileName;
+    sourceFileName = std::string(buf, r-1);
+  }
+
+  static bool writeServedOneFile(bool hadError) {
+    const llvm::sys::fs::file_t outpipe = 4;
+    char buf = hadError ? '\1' : '\0';
+    auto wr = write(outpipe, &buf, 1);
+    //dmu TODO diagnose
+    return wr == 1;
+  }
+};
+
+
 static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           std::unique_ptr<SILModule> SM,
                                           ModuleOrSourceFile MSF,
@@ -746,44 +789,49 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           int &ReturnValue,
                                           FrontendObserver *observer);
 
-static bool performCompileStepsPostSema(CompilerInstance &Instance,
-                                        int &ReturnValue,
-                                        FrontendObserver *observer) {
+
+// There are no primary inputs, the compiler is in WMO mode, and builds one
+// SILModule for the entire module.
+static bool performCompileStepsPostSemaWMO(CompilerInstance &Instance,
+                                           int &ReturnValue,
+                                           FrontendObserver *observer) {
+  auto *mod = Instance.getMainModule();
+  const auto &Invocation = Instance.getInvocation();
+  const SILOptions &SILOpts = Invocation.getSILOptions();
+  auto SM = performASTLowering(mod, Instance.getSILTypes(), SILOpts);
+  const PrimarySpecificPaths PSPs =
+      Instance.getPrimarySpecificPathsForWholeModuleOptimizationMode();
+  return performCompileStepsPostSILGen(Instance, std::move(SM), mod, PSPs,
+                                       ReturnValue, observer);
+}
+
+static bool performCompileStepsPostSemaBatchMode(CompilerInstance &Instance,
+                                                 int &ReturnValue,
+                                                 FrontendObserver *observer) {
+  const auto &Invocation = Instance.getInvocation();
+  const SILOptions &SILOpts = Invocation.getSILOptions();
+  bool result = false;
+  for (auto *PrimaryFile : Instance.getPrimarySourceFiles()) {
+    auto SM = performASTLowering(*PrimaryFile, Instance.getSILTypes(),
+                                 SILOpts);
+    const PrimarySpecificPaths PSPs =
+        Instance.getPrimarySpecificPathsForSourceFile(*PrimaryFile);
+    result |= performCompileStepsPostSILGen(Instance, std::move(SM),
+                                            PrimaryFile, PSPs, ReturnValue,
+                                            observer);
+  }
+  return result;
+}
+
+static bool performCompileStepsPostSemaForPrimarySerializedInput(CompilerInstance &Instance,
+                                                                 int &ReturnValue,
+                                                                 FrontendObserver *observer) {
   const auto &Invocation = Instance.getInvocation();
   const SILOptions &SILOpts = Invocation.getSILOptions();
   const FrontendOptions &opts = Invocation.getFrontendOptions();
 
-  auto *mod = Instance.getMainModule();
-  if (!opts.InputsAndOutputs.hasPrimaryInputs()) {
-    // If there are no primary inputs the compiler is in WMO mode and builds one
-    // SILModule for the entire module.
-    auto SM = performASTLowering(mod, Instance.getSILTypes(), SILOpts);
-    const PrimarySpecificPaths PSPs =
-        Instance.getPrimarySpecificPathsForWholeModuleOptimizationMode();
-    return performCompileStepsPostSILGen(Instance, std::move(SM), mod, PSPs,
-                                         ReturnValue, observer);
-  }
-  // If there are primary source files, build a separate SILModule for
-  // each source file, and run the remaining SILOpt-Serialize-IRGen-LLVM
-  // once for each such input.
-  if (!Instance.getPrimarySourceFiles().empty()) {
-    bool result = false;
-    for (auto *PrimaryFile : Instance.getPrimarySourceFiles()) {
-      auto SM = performASTLowering(*PrimaryFile, Instance.getSILTypes(),
-                                   SILOpts);
-      const PrimarySpecificPaths PSPs =
-          Instance.getPrimarySpecificPathsForSourceFile(*PrimaryFile);
-      result |= performCompileStepsPostSILGen(Instance, std::move(SM),
-                                              PrimaryFile, PSPs, ReturnValue,
-                                              observer);
-    }
-
-    return result;
-  }
-
-  // If there are primary inputs but no primary _source files_, there might be
-  // a primary serialized input.
   bool result = false;
+  auto *mod = Instance.getMainModule();
   for (FileUnit *fileUnit : mod->getFiles()) {
     if (auto SASTF = dyn_cast<SerializedASTFile>(fileUnit))
       if (opts.InputsAndOutputs.isInputPrimary(SASTF->getFilename())) {
@@ -794,8 +842,34 @@ static bool performCompileStepsPostSema(CompilerInstance &Instance,
                                                 PSPs, ReturnValue, observer);
       }
   }
-
   return result;
+}
+
+static bool performCompileStepsPostSema(CompilerInstance &Instance,
+                                        int &ReturnValue,
+                                        FrontendObserver *observer,
+                                        ArrayRef<const char *> Args) {
+  const FrontendOptions &opts = Instance.getInvocation().getFrontendOptions();
+
+  // If there are no primary inputs the compiler is in WMO mode and builds one
+  // SILModule for the entire module.
+  if (!opts.InputsAndOutputs.hasPrimaryInputs()) {
+    return performCompileStepsPostSemaWMO(Instance, ReturnValue, observer);
+  }
+  // If there are primary inputs but no primary _source files_, there might be
+  // a primary serialized input.
+  if (Instance.getPrimarySourceFiles().empty()) {
+    return performCompileStepsPostSemaForPrimarySerializedInput(Instance,
+                                                                ReturnValue,
+                                                                observer);
+  }
+  // If there are primary source files, build a separate SILModule for
+  // each source file, and run the remaining SILOpt-Serialize-IRGen-LLVM
+  // once for each such input.
+  return performCompileStepsPostSemaBatchMode(Instance, ReturnValue, observer);
+#error if dynamicall batching switch and repeat?
+  // opts.DynamicBatching
+  // performCompileStepsPostSemaDynamicallyBatching(Instance, ReturnValue, observer, Args)
 }
 
 static void emitIndexDataForSourceFile(SourceFile *PrimarySourceFile,
@@ -1084,6 +1158,8 @@ static bool printSwiftFeature(CompilerInstance &instance) {
 static bool
 withSemanticAnalysis(CompilerInstance &Instance, FrontendObserver *observer,
                      llvm::function_ref<bool(CompilerInstance &)> cont) {
+  Instance.logDynamicBatching(__FUNCTION__);
+
   const auto &Invocation = Instance.getInvocation();
   const auto &opts = Invocation.getFrontendOptions();
   assert(!FrontendOptions::shouldActionOnlyParse(opts.RequestedAction) &&
@@ -1092,6 +1168,8 @@ withSemanticAnalysis(CompilerInstance &Instance, FrontendObserver *observer,
   Instance.performSema();
   if (observer)
     observer->performedSemanticAnalysis(Instance);
+  Instance.logDynamicBatching("didSema");
+
 
   switch (opts.CrashMode) {
   case FrontendOptions::DebugCrashMode::AssertAfterParse:
@@ -1107,8 +1185,12 @@ withSemanticAnalysis(CompilerInstance &Instance, FrontendObserver *observer,
   (void)migrator::updateCodeAndEmitRemapIfNeeded(&Instance);
 
   if (Instance.getASTContext().hadError() &&
-      !opts.AllowModuleWithCompilerErrors)
-    return true;
+      !opts.AllowModuleWithCompilerErrors) {
+    // For dynamic batching, deal with the error later, for each primary
+    if (!Instance.getInvocation().getFrontendOptions().DynamicBatching)
+      return true;
+      Instance.logDynamicBatching("HEREf sema failed");
+  }
 
   return cont(Instance);
 }
@@ -1142,7 +1224,10 @@ static bool performParseOnly(ModuleDecl &MainModule) {
 
 static bool performAction(CompilerInstance &Instance,
                           int &ReturnValue,
-                          FrontendObserver *observer) {
+                          FrontendObserver *observer,
+                          ArrayRef<const char *> Args) {
+  Instance.logDynamicBatching(__FUNCTION__);
+
   const auto &opts = Instance.getInvocation().getFrontendOptions();
   auto &Context = Instance.getASTContext();
   switch (Instance.getInvocation().getFrontendOptions().RequestedAction) {
@@ -1241,7 +1326,7 @@ static bool performAction(CompilerInstance &Instance,
         Instance, observer, [&](CompilerInstance &Instance) {
           assert(FrontendOptions::doesActionGenerateSIL(opts.RequestedAction) &&
                  "All actions not requiring SILGen must have been handled!");
-          return performCompileStepsPostSema(Instance, ReturnValue, observer);
+          return performCompileStepsPostSema(Instance, ReturnValue, observer, Args);
         });
   }
 
@@ -1255,7 +1340,11 @@ static bool performAction(CompilerInstance &Instance,
 /// \returns true on error
 static bool performCompile(CompilerInstance &Instance,
                            int &ReturnValue,
-                           FrontendObserver *observer) {
+                           FrontendObserver *observer,
+                           ArrayRef <const char *> Args) {
+
+  Instance.logDynamicBatching(__FUNCTION__);
+
   const auto &Invocation = Instance.getInvocation();
   const auto &opts = Invocation.getFrontendOptions();
   const FrontendOptions::ActionType Action = opts.RequestedAction;
@@ -1289,7 +1378,7 @@ static bool performCompile(CompilerInstance &Instance,
     return true;
   }() && "Only supports parsing .swift files");
 
-  bool hadError = performAction(Instance, ReturnValue, observer);
+  bool hadError = performAction(Instance, ReturnValue, observer, Args);
 
   // We might have freed the ASTContext already, but in that case we would
   // have already performed these actions.
@@ -1462,7 +1551,7 @@ static void freeASTContextIfPossible(CompilerInstance &Instance) {
   // primary input, then freeing it after processing the last primary is
   // unlikely to reduce the peak heap size. So, only optimize the
   // single-primary-case (or WMO).
-  if (opts.InputsAndOutputs.hasMultiplePrimaryInputs()) {
+  if (opts.DynamicBatching || opts.InputsAndOutputs.hasMultiplePrimaryInputs()) {
     return;
   }
 
@@ -1775,10 +1864,10 @@ createSerializedDiagnosticConsumerIfNeeded(
 /// proceeds. The accumulated diagnostics are then emitted in the frontend's parseable-output.
 static std::unique_ptr<DiagnosticConsumer>
 createAccumulatingDiagnosticConsumer(
-    const FrontendInputsAndOutputs &InputsAndOutputs,
+    const FrontendInputsAndOutputs &inputsAndOutputs,
     llvm::StringMap<std::vector<std::string>> &FileSpecificDiagnostics) {
   return createDispatchingDiagnosticConsumerIfNeeded(
-      InputsAndOutputs,
+      inputsAndOutputs,
       [&](const InputFile &Input) -> std::unique_ptr<DiagnosticConsumer> {
     FileSpecificDiagnostics.try_emplace(Input.getFileName(),
                                         std::vector<std::string>());
@@ -1797,15 +1886,16 @@ createAccumulatingDiagnosticConsumer(
 /// If no serialized diagnostics are being produced, returns null.
 static std::unique_ptr<DiagnosticConsumer>
 createJSONFixItDiagnosticConsumerIfNeeded(
-    const CompilerInvocation &invocation) {
+    const FrontendInputsAndOutputs &inputsAndOutputs,
+    const DiagnosticOptions &diagnosticOptions) {
   return createDispatchingDiagnosticConsumerIfNeeded(
-      invocation.getFrontendOptions().InputsAndOutputs,
+      inputsAndOutputs,
       [&](const InputFile &input) -> std::unique_ptr<DiagnosticConsumer> {
         auto fixItsOutputPath = input.getFixItsOutputPath();
         if (fixItsOutputPath.empty())
           return nullptr;
         return std::make_unique<JSONFixitWriter>(
-            fixItsOutputPath.str(), invocation.getDiagnosticOptions());
+            fixItsOutputPath.str(), diagnosticOptions);
       });
 }
 
@@ -1942,6 +2032,117 @@ static void printTargetInfo(const CompilerInvocation &invocation,
   out << "  }\n";
 
   out << "}\n";
+}
+
+static llvm::SmallVector<std::unique_ptr<DiagnosticConsumer>, 4>
+initializeDiagnosticConsumers(CompilerInstance *Instance,
+                              const CompilerInvocation &invocation,
+                              const FrontendInputsAndOutputs &inputsAndOutputs,
+                              NullablePtr<PrintingDiagnosticConsumer> PDC,
+                              llvm::StringMap<std::vector<std::string>> &FileSpecificDiagnostics) {
+  const FrontendOptions &frontendOptions = invocation.getFrontendOptions();
+  if (frontendOptions.DynamicBatching)
+    return {};
+  llvm::SmallVector<std::unique_ptr<DiagnosticConsumer>, 4> consumers;
+  if (frontendOptions.FrontendParseableOutput) {
+    // We need a diagnostic consumer that will, per-file, collect all
+    // diagnostics to be reported in parseable-output
+    std::unique_ptr<DiagnosticConsumer> FileSpecificAccumulatingConsumer =
+      createAccumulatingDiagnosticConsumer(
+        inputsAndOutputs,
+        FileSpecificDiagnostics);
+    Instance->addDiagnosticConsumer(FileSpecificAccumulatingConsumer.get());
+    consumers.emplace_back(std::move(FileSpecificAccumulatingConsumer));
+
+    // If we got this far, we need to suppress the output of the
+    // PrintingDiagnosticConsumer to ensure that only the parseable-output
+    // is emitted
+    if (auto pdc = PDC.getPtrOrNull())
+      pdc->setSuppressOutput(true);
+  }
+  // Because the serialized diagnostics consumer is initialized here,
+  // diagnostics emitted above, within CompilerInvocation::parseArgs, are never
+  // serialized. This is a non-issue because, in nearly all cases, frontend
+  // arguments are generated by the driver, not directly by a user. The driver
+  // is responsible for emitting diagnostics for its own errors. See SR-2683
+  // for details.
+  std::unique_ptr<DiagnosticConsumer> SerializedConsumerDispatcher =
+      createSerializedDiagnosticConsumerIfNeeded(inputsAndOutputs);
+  if (SerializedConsumerDispatcher) {
+    Instance->addDiagnosticConsumer(SerializedConsumerDispatcher.get());
+    consumers.emplace_back(std::move(SerializedConsumerDispatcher));
+  }
+
+  std::unique_ptr<DiagnosticConsumer> FixItsConsumer =
+      createJSONFixItDiagnosticConsumerIfNeeded(inputsAndOutputs,
+                                                invocation.getDiagnosticOptions());
+  if (FixItsConsumer) {
+    Instance->addDiagnosticConsumer(FixItsConsumer.get());
+    consumers.emplace_back(std::move(FixItsConsumer));
+  }
+
+  return consumers;
+}
+
+static void emitBeganMessagesIfNeeded(
+                                      const CompilerInvocation &Invocation,
+                                      ArrayRef<const char *> Args,
+                                      const FrontendInputsAndOutputs &IO) {
+  if (Invocation.getFrontendOptions().FrontendParseableOutput)
+    return;
+  const auto OSPid = getpid();
+  const auto ProcInfo = sys::TaskProcessInformation(OSPid);
+
+  // Parseable output clients may not understand the idea of a batch
+  // compilation. We assign each primary in a batch job a quasi process id,
+  // making sure it cannot collide with a real PID (always positive). Non-batch
+  // compilation gets a real OS PID.
+  int64_t Pid = IO.hasUniquePrimaryInput() ? OSPid : QUASI_PID_START;
+  IO.forEachPrimaryInputWithIndex([&](const InputFile &Input,
+                                      unsigned idx) -> bool {
+    emitBeganMessage(
+                     llvm::errs(),
+                     mapFrontendInvocationToAction(Invocation),
+                     constructDetailedTaskDescription(Invocation, Input, Args), Pid - idx,
+                     ProcInfo);
+    return false;
+  });
+}
+
+static void emitFinishedMessagesIfNeeded(
+    const CompilerInvocation &Invocation,
+    const FrontendInputsAndOutputs &IO,
+    llvm::StringMap<std::vector<std::string>> &FileSpecificDiagnostics,
+    int r
+    ) {
+  if (!Invocation.getFrontendOptions().FrontendParseableOutput)
+    return;
+
+  const auto OSPid = getpid();
+  const auto ProcInfo = sys::TaskProcessInformation(OSPid);
+
+  // Parseable output clients may not understand the idea of a batch
+  // compilation. We assign each primary in a batch job a quasi process id,
+  // making sure it cannot collide with a real PID (always positive). Non-batch
+  // compilation gets a real OS PID.
+  int64_t Pid = IO.hasUniquePrimaryInput() ? OSPid : QUASI_PID_START;
+  IO.forEachPrimaryInputWithIndex([&](const InputFile &Input,
+                                      unsigned idx) -> bool {
+    assert(FileSpecificDiagnostics.count(Input.getFileName()) != 0 &&
+           "Expected diagnostic collection for input.");
+
+    // Join all diagnostics produced for this file into a single output.
+    auto PrimaryDiags = FileSpecificDiagnostics.lookup(Input.getFileName());
+    const char *const Delim = "";
+    std::ostringstream JoinedDiags;
+    std::copy(PrimaryDiags.begin(), PrimaryDiags.end(),
+              std::ostream_iterator<std::string>(JoinedDiags, Delim));
+
+    emitFinishedMessage(llvm::errs(),
+                        mapFrontendInvocationToAction(Invocation),
+                        JoinedDiags.str(), r, Pid - idx, ProcInfo);
+    return false;
+  });
 }
 
 int swift::performFrontend(ArrayRef<const char *> Args,
@@ -2090,39 +2291,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     return finishDiagProcessing(1, /*verifierEnabled*/ false);
   }
 
-  llvm::StringMap<std::vector<std::string>> FileSpecificDiagnostics;
-  std::unique_ptr<DiagnosticConsumer> FileSpecificAccumulatingConsumer;
-  if (Invocation.getFrontendOptions().FrontendParseableOutput) {
-    // We need a diagnostic consumer that will, per-file, collect all
-    // diagnostics to be reported in parseable-output
-    FileSpecificAccumulatingConsumer = createAccumulatingDiagnosticConsumer(
-        Invocation.getFrontendOptions().InputsAndOutputs,
-        FileSpecificDiagnostics);
-    Instance->addDiagnosticConsumer(FileSpecificAccumulatingConsumer.get());
-
-    // If we got this far, we need to suppress the output of the
-    // PrintingDiagnosticConsumer to ensure that only the parseable-output
-    // is emitted
-    PDC.setSuppressOutput(true);
-  }
-
-  // Because the serialized diagnostics consumer is initialized here,
-  // diagnostics emitted above, within CompilerInvocation::parseArgs, are never
-  // serialized. This is a non-issue because, in nearly all cases, frontend
-  // arguments are generated by the driver, not directly by a user. The driver
-  // is responsible for emitting diagnostics for its own errors. See SR-2683
-  // for details.
-  std::unique_ptr<DiagnosticConsumer> SerializedConsumerDispatcher =
-      createSerializedDiagnosticConsumerIfNeeded(
-        Invocation.getFrontendOptions().InputsAndOutputs);
-  if (SerializedConsumerDispatcher)
-    Instance->addDiagnosticConsumer(SerializedConsumerDispatcher.get());
-
-  std::unique_ptr<DiagnosticConsumer> FixItsConsumer =
-      createJSONFixItDiagnosticConsumerIfNeeded(Invocation);
-  if (FixItsConsumer)
-    Instance->addDiagnosticConsumer(FixItsConsumer.get());
-
   if (Invocation.getDiagnosticOptions().UseColor)
     PDC.forceColors();
 
@@ -2139,9 +2307,22 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   const DiagnosticOptions &diagOpts = Invocation.getDiagnosticOptions();
   bool verifierEnabled = diagOpts.VerifyMode != DiagnosticOptions::NoVerify;
 
+  llvm::StringMap<std::vector<std::string>> FileSpecificDiagnostics;
+  auto owningDiagnosticConsumers = initializeDiagnosticConsumers(
+    Instance.get(),
+    Invocation,
+    Invocation.getFrontendOptions().InputsAndOutputs,
+    &PDC,
+    FileSpecificDiagnostics);
+
+
   if (Instance->setup(Invocation)) {
     return finishDiagProcessing(1, /*verifierEnabled*/ false);
   }
+
+  if (Invocation.getFrontendOptions().DynamicBatching &&
+      Invocation.getFrontendOptions().DebugDynamicBatching)
+    Instance->startDynamicBatchingLogging();
 
   // The compiler instance has been configured; notify our observer.
   if (observer) {
@@ -2154,29 +2335,12 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     PDC.setSuppressOutput(true);
   }
 
-  if (Invocation.getFrontendOptions().FrontendParseableOutput) {
-   const auto &IO = Invocation.getFrontendOptions().InputsAndOutputs;
-    const auto OSPid = getpid();
-    const auto ProcInfo = sys::TaskProcessInformation(OSPid);
-
-    // Parseable output clients may not understand the idea of a batch
-    // compilation. We assign each primary in a batch job a quasi process id,
-    // making sure it cannot collide with a real PID (always positive). Non-batch
-    // compilation gets a real OS PID.
-    int64_t Pid = IO.hasUniquePrimaryInput() ? OSPid : QUASI_PID_START;
-    IO.forEachPrimaryInputWithIndex([&](const InputFile &Input,
-                                        unsigned idx) -> bool {
-      emitBeganMessage(
-          llvm::errs(),
-          mapFrontendInvocationToAction(Invocation),
-          constructDetailedTaskDescription(Invocation, Input, Args), Pid - idx,
-          ProcInfo);
-      return false;
-    });
-  }
+  if (!Invocation.getFrontendOptions().DynamicBatching)
+    emitBeganMessagesIfNeeded(Invocation, Args,
+                              Invocation.getFrontendOptions().InputsAndOutputs);
 
   int ReturnValue = 0;
-  bool HadError = performCompile(*Instance, ReturnValue, observer);
+  bool HadError = performCompile(*Instance, ReturnValue, observer, Args);
 
   if (verifierEnabled) {
     DiagnosticEngine &diags = Instance->getDiags();
@@ -2193,34 +2357,11 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   if (auto *StatsReporter = Instance->getStatsReporter())
     StatsReporter->noteCurrentProcessExitStatus(r);
 
-  if (Invocation.getFrontendOptions().FrontendParseableOutput) {
-    const auto &IO = Invocation.getFrontendOptions().InputsAndOutputs;
-    const auto OSPid = getpid();
-    const auto ProcInfo = sys::TaskProcessInformation(OSPid);
-
-    // Parseable output clients may not understand the idea of a batch
-    // compilation. We assign each primary in a batch job a quasi process id,
-    // making sure it cannot collide with a real PID (always positive). Non-batch
-    // compilation gets a real OS PID.
-    int64_t Pid = IO.hasUniquePrimaryInput() ? OSPid : QUASI_PID_START;
-    IO.forEachPrimaryInputWithIndex([&](const InputFile &Input,
-                                        unsigned idx) -> bool {
-      assert(FileSpecificDiagnostics.count(Input.getFileName()) != 0 &&
-             "Expected diagnostic collection for input.");
-
-      // Join all diagnostics produced for this file into a single output.
-      auto PrimaryDiags = FileSpecificDiagnostics.lookup(Input.getFileName());
-      const char *const Delim = "";
-      std::ostringstream JoinedDiags;
-      std::copy(PrimaryDiags.begin(), PrimaryDiags.end(),
-                std::ostream_iterator<std::string>(JoinedDiags, Delim));
-
-      emitFinishedMessage(llvm::errs(),
-                          mapFrontendInvocationToAction(Invocation),
-                          JoinedDiags.str(), r, Pid - idx, ProcInfo);
-      return false;
-    });
-  }
+  if (!Invocation.getFrontendOptions().DynamicBatching)
+    emitFinishedMessagesIfNeeded(Invocation,
+                                 Invocation.getFrontendOptions().InputsAndOutputs,
+                                 FileSpecificDiagnostics,
+                                 r);
 
   return r;
 }

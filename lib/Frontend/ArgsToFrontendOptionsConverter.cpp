@@ -69,6 +69,12 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.IndexSystemModules |= Args.hasArg(OPT_index_system_modules);
   Opts.IndexIgnoreStdlib |= Args.hasArg(OPT_index_ignore_stdlib);
 
+  Opts.DynamicBatching = Args.hasFlag(
+                                      options::OPT_enable_dynamic_batching,
+                                      options::OPT_disable_dynamic_batching,
+                                      false);
+  Opts.DebugDynamicBatching |= Args.hasArg(OPT_debug_dynamic_batching);
+
   Opts.EmitVerboseSIL |= Args.hasArg(OPT_emit_verbose_sil);
   Opts.EmitSortedSIL |= Args.hasArg(OPT_emit_sorted_sil);
   Opts.PrintFullConvention |=

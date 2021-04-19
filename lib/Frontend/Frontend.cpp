@@ -1005,7 +1005,13 @@ bool CompilerInstance::performParseAndResolveImportsOnly() {
 }
 
 void CompilerInstance::performSema() {
+  logDynamicBatching(__FUNCTION__);
+
   performParseAndResolveImportsOnly();
+
+  /// Don't check all the primaries if only some will be compiled.
+  if (getInvocation().getFrontendOptions().DynamicBatching)
+    return;
 
   FrontendStatsTracer tracer(getStatsReporter(), "perform-sema");
 
@@ -1086,6 +1092,8 @@ void CompilerInstance::forEachFileToTypeCheck(
 }
 
 void CompilerInstance::finishTypeChecking() {
+  logDynamicBatching(__FUNCTION__);
+
   forEachFileToTypeCheck([](SourceFile &SF) {
     performWholeModuleTypeChecking(SF);
   });
@@ -1256,4 +1264,25 @@ const PrimarySpecificPaths &
 CompilerInstance::getPrimarySpecificPathsForSourceFile(
     const SourceFile &SF) const {
   return Invocation.getPrimarySpecificPathsForSourceFile(SF);
+}
+
+
+void CompilerInstance::startDynamicBatchingLogging() {
+  dynamicBatchingLog = os_log_create("com.apple.swift.batchMode", "dynamicBatching");
+}
+
+void CompilerInstance::logDynamicBatching(const char* msg) const {
+  if (!dynamicBatchingLog)
+    return;
+  os_log(dynamicBatchingLog, "%d %s\n", getpid(), msg);
+}
+void CompilerInstance::logDynamicBatching(const char* msg, int n) const {
+  if (!dynamicBatchingLog)
+    return;
+  os_log(dynamicBatchingLog, "%d %s %d\n", getpid(), msg, n);
+}
+void CompilerInstance::logDynamicBatching(const char* msg, StringRef s) const {
+  if (!dynamicBatchingLog)
+    return;
+  os_log(dynamicBatchingLog, "%d %s %s\n", getpid(), msg, s);
 }

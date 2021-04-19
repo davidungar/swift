@@ -58,6 +58,7 @@ public:
   FrontendInputsAndOutputs() = default;
   FrontendInputsAndOutputs(const FrontendInputsAndOutputs &other);
   FrontendInputsAndOutputs &operator=(const FrontendInputsAndOutputs &other);
+  FrontendInputsAndOutputs(const InputFile&);
 
   // Whole-module-optimization (WMO) routines:
 
