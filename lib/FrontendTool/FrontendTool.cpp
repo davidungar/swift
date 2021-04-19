@@ -746,44 +746,31 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           int &ReturnValue,
                                           FrontendObserver *observer);
 
-static bool performCompileStepsPostSema(CompilerInstance &Instance,
-                                        int &ReturnValue,
-                                        FrontendObserver *observer) {
+
+// There are no primary inputs, the compiler is in WMO mode, and builds one
+// SILModule for the entire module.
+static bool performCompileStepsPostSemaWMO(CompilerInstance &Instance,
+                                           int &ReturnValue,
+                                           FrontendObserver *observer) {
+  auto *mod = Instance.getMainModule();
+  const auto &Invocation = Instance.getInvocation();
+  const SILOptions &SILOpts = Invocation.getSILOptions();
+  auto SM = performASTLowering(mod, Instance.getSILTypes(), SILOpts);
+  const PrimarySpecificPaths PSPs =
+      Instance.getPrimarySpecificPathsForWholeModuleOptimizationMode();
+  return performCompileStepsPostSILGen(Instance, std::move(SM), mod, PSPs,
+                                       ReturnValue, observer);
+}
+
+static bool performCompileStepsPostSemaForPrimarySerializedInput(CompilerInstance &Instance,
+                                                                 int &ReturnValue,
+                                                                 FrontendObserver *observer) {
   const auto &Invocation = Instance.getInvocation();
   const SILOptions &SILOpts = Invocation.getSILOptions();
   const FrontendOptions &opts = Invocation.getFrontendOptions();
 
-  auto *mod = Instance.getMainModule();
-  if (!opts.InputsAndOutputs.hasPrimaryInputs()) {
-    // If there are no primary inputs the compiler is in WMO mode and builds one
-    // SILModule for the entire module.
-    auto SM = performASTLowering(mod, Instance.getSILTypes(), SILOpts);
-    const PrimarySpecificPaths PSPs =
-        Instance.getPrimarySpecificPathsForWholeModuleOptimizationMode();
-    return performCompileStepsPostSILGen(Instance, std::move(SM), mod, PSPs,
-                                         ReturnValue, observer);
-  }
-  // If there are primary source files, build a separate SILModule for
-  // each source file, and run the remaining SILOpt-Serialize-IRGen-LLVM
-  // once for each such input.
-  if (!Instance.getPrimarySourceFiles().empty()) {
-    bool result = false;
-    for (auto *PrimaryFile : Instance.getPrimarySourceFiles()) {
-      auto SM = performASTLowering(*PrimaryFile, Instance.getSILTypes(),
-                                   SILOpts);
-      const PrimarySpecificPaths PSPs =
-          Instance.getPrimarySpecificPathsForSourceFile(*PrimaryFile);
-      result |= performCompileStepsPostSILGen(Instance, std::move(SM),
-                                              PrimaryFile, PSPs, ReturnValue,
-                                              observer);
-    }
-
-    return result;
-  }
-
-  // If there are primary inputs but no primary _source files_, there might be
-  // a primary serialized input.
   bool result = false;
+  auto *mod = Instance.getMainModule();
   for (FileUnit *fileUnit : mod->getFiles()) {
     if (auto SASTF = dyn_cast<SerializedASTFile>(fileUnit))
       if (opts.InputsAndOutputs.isInputPrimary(SASTF->getFilename())) {
@@ -794,8 +781,49 @@ static bool performCompileStepsPostSema(CompilerInstance &Instance,
                                                 PSPs, ReturnValue, observer);
       }
   }
-
   return result;
+}
+
+static bool performCompileStepsPostSemaBatchMode(CompilerInstance &Instance,
+                                                 int &ReturnValue,
+                                                 FrontendObserver *observer) {
+  // Build a separate SILModule for
+  // each source file, and run the remaining SILOpt-Serialize-IRGen-LLVM
+  // once for each such input.
+
+  const auto &Invocation = Instance.getInvocation();
+  const SILOptions &SILOpts = Invocation.getSILOptions();
+  bool result = false;
+  for (auto *PrimaryFile : Instance.getPrimarySourceFiles()) {
+    auto SM = performASTLowering(*PrimaryFile, Instance.getSILTypes(),
+                                 SILOpts);
+    const PrimarySpecificPaths PSPs =
+        Instance.getPrimarySpecificPathsForSourceFile(*PrimaryFile);
+    result |= performCompileStepsPostSILGen(Instance, std::move(SM),
+                                            PrimaryFile, PSPs, ReturnValue,
+                                            observer);
+  }
+  return result;
+}
+
+static bool performCompileStepsPostSema(CompilerInstance &Instance,
+                                        int &ReturnValue,
+                                        FrontendObserver *observer) {
+  const FrontendOptions &opts = Instance.getInvocation().getFrontendOptions();
+
+  // If there are no primary inputs the compiler is in WMO mode and builds one
+  // SILModule for the entire module.
+  if (!opts.InputsAndOutputs.hasPrimaryInputs()) {
+    return performCompileStepsPostSemaWMO(Instance, ReturnValue, observer);
+  }
+  // If there are primary inputs but no primary _source files_, there might be
+  // a primary serialized input.
+  if (Instance.getPrimarySourceFiles().empty()) {
+    return performCompileStepsPostSemaForPrimarySerializedInput(Instance,
+                                                                ReturnValue,
+                                                                observer);
+  }
+ return performCompileStepsPostSemaBatchMode(Instance, ReturnValue, observer);
 }
 
 static void emitIndexDataForSourceFile(SourceFile *PrimarySourceFile,
