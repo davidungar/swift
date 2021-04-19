@@ -850,7 +850,8 @@ static bool performCompileStepsPostSemaBatchMode(CompilerInstance &Instance,
 
 static bool performCompileStepsPostSema(CompilerInstance &Instance,
                                         int &ReturnValue,
-                                        FrontendObserver *observer) {
+                                        FrontendObserver *observer,
+                                        ArrayRef<const char *> Args) {
   const FrontendOptions &opts = Instance.getInvocation().getFrontendOptions();
 
   // If there are no primary inputs the compiler is in WMO mode and builds one
@@ -1218,9 +1219,10 @@ static bool performParseOnly(ModuleDecl &MainModule) {
 
 static bool performAction(CompilerInstance &Instance,
                           int &ReturnValue,
-                          FrontendObserver *observer) {
+                          FrontendObserver *observer,
+                          ArrayRef<const char *> Args) {
   Instance.logDynamicBatching(__FUNCTION__);
-  
+
   const auto &opts = Instance.getInvocation().getFrontendOptions();
   auto &Context = Instance.getASTContext();
   switch (Instance.getInvocation().getFrontendOptions().RequestedAction) {
@@ -1319,7 +1321,7 @@ static bool performAction(CompilerInstance &Instance,
         Instance, observer, [&](CompilerInstance &Instance) {
           assert(FrontendOptions::doesActionGenerateSIL(opts.RequestedAction) &&
                  "All actions not requiring SILGen must have been handled!");
-          return performCompileStepsPostSema(Instance, ReturnValue, observer);
+          return performCompileStepsPostSema(Instance, ReturnValue, observer, Args);
         });
   }
 
@@ -1333,7 +1335,8 @@ static bool performAction(CompilerInstance &Instance,
 /// \returns true on error
 static bool performCompile(CompilerInstance &Instance,
                            int &ReturnValue,
-                           FrontendObserver *observer) {
+                           FrontendObserver *observer,
+                           ArrayRef<const char *> Args) {
   Instance.logDynamicBatching(__FUNCTION__);
 
   const auto &Invocation = Instance.getInvocation();
@@ -1369,7 +1372,7 @@ static bool performCompile(CompilerInstance &Instance,
     return true;
   }() && "Only supports parsing .swift files");
 
-  bool hadError = performAction(Instance, ReturnValue, observer);
+  bool hadError = performAction(Instance, ReturnValue, observer, Args);
 
   // We might have freed the ASTContext already, but in that case we would
   // have already performed these actions.
@@ -2325,7 +2328,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
                             Invocation.getFrontendOptions().InputsAndOutputs);
 
   int ReturnValue = 0;
-  bool HadError = performCompile(*Instance, ReturnValue, observer);
+  bool HadError = performCompile(*Instance, ReturnValue, observer, Args);
 
   if (verifierEnabled) {
     DiagnosticEngine &diags = Instance->getDiags();
