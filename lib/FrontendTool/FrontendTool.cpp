@@ -739,6 +739,48 @@ static bool writeLdAddCFileIfNeeded(CompilerInstance &Instance) {
   return false;
 }
 
+struct NextToCompile {
+  enum class Outcome {
+    Error,
+    Finished,
+    SourceFileName
+  };
+  Outcome outcome;
+  std::string sourceFileName;
+
+  /// For now, an empty string is EOF, none is for an error
+  NextToCompile(const CompilerInstance &Instance) {
+    const llvm::sys::fs::file_t  inpipe = 3;
+    char buf[10000];
+    Instance.logDynamicBatching("about to read");
+    int r = 0;
+    r = read(inpipe, buf, 10000);
+
+    if (r == 0) {
+      Instance.logDynamicBatching("EOF, quitting");
+      outcome = Outcome::Finished;
+      return;
+    }
+    else if (r < 0) {
+      Instance.logDynamicBatching("read ERROR", errno);
+      outcome = Outcome::Error;
+      return;
+    }
+    Instance.logDynamicBatching("read", r);
+    assert(buf[r-1]);
+    outcome = Outcome::SourceFileName;
+    sourceFileName = std::string(buf, r-1);
+  }
+
+  static bool writeServedOneFile(bool hadError) {
+    const llvm::sys::fs::file_t outpipe = 4;
+    char buf = hadError ? '\1' : '\0';
+    auto wr = write(outpipe, &buf, 1);
+    //dmu TODO diagnose
+    return wr == 1;
+  }
+};
+
 static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           std::unique_ptr<SILModule> SM,
                                           ModuleOrSourceFile MSF,
@@ -1112,6 +1154,8 @@ static bool printSwiftFeature(CompilerInstance &instance) {
 static bool
 withSemanticAnalysis(CompilerInstance &Instance, FrontendObserver *observer,
                      llvm::function_ref<bool(CompilerInstance &)> cont) {
+  Instance.logDynamicBatching(__FUNCTION__);
+
   const auto &Invocation = Instance.getInvocation();
   const auto &opts = Invocation.getFrontendOptions();
   assert(!FrontendOptions::shouldActionOnlyParse(opts.RequestedAction) &&
@@ -1120,6 +1164,8 @@ withSemanticAnalysis(CompilerInstance &Instance, FrontendObserver *observer,
   Instance.performSema();
   if (observer)
     observer->performedSemanticAnalysis(Instance);
+  Instance.logDynamicBatching("didSema");
+
 
   switch (opts.CrashMode) {
   case FrontendOptions::DebugCrashMode::AssertAfterParse:
@@ -1135,8 +1181,10 @@ withSemanticAnalysis(CompilerInstance &Instance, FrontendObserver *observer,
   (void)migrator::updateCodeAndEmitRemapIfNeeded(&Instance);
 
   if (Instance.getASTContext().hadError() &&
-      !opts.AllowModuleWithCompilerErrors)
+      !opts.AllowModuleWithCompilerErrors) {
+    Instance.logDynamicBatching("sema failed");
     return true;
+  }
 
   return cont(Instance);
 }
@@ -1171,6 +1219,8 @@ static bool performParseOnly(ModuleDecl &MainModule) {
 static bool performAction(CompilerInstance &Instance,
                           int &ReturnValue,
                           FrontendObserver *observer) {
+  Instance.logDynamicBatching(__FUNCTION__);
+  
   const auto &opts = Instance.getInvocation().getFrontendOptions();
   auto &Context = Instance.getASTContext();
   switch (Instance.getInvocation().getFrontendOptions().RequestedAction) {
@@ -1284,6 +1334,8 @@ static bool performAction(CompilerInstance &Instance,
 static bool performCompile(CompilerInstance &Instance,
                            int &ReturnValue,
                            FrontendObserver *observer) {
+  Instance.logDynamicBatching(__FUNCTION__);
+
   const auto &Invocation = Instance.getInvocation();
   const auto &opts = Invocation.getFrontendOptions();
   const FrontendOptions::ActionType Action = opts.RequestedAction;

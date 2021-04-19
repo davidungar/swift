@@ -1005,6 +1005,8 @@ bool CompilerInstance::performParseAndResolveImportsOnly() {
 }
 
 void CompilerInstance::performSema() {
+  logDynamicBatching(__FUNCTION__);
+
   performParseAndResolveImportsOnly();
 
   FrontendStatsTracer tracer(getStatsReporter(), "perform-sema");
@@ -1086,6 +1088,8 @@ void CompilerInstance::forEachFileToTypeCheck(
 }
 
 void CompilerInstance::finishTypeChecking() {
+  logDynamicBatching(__FUNCTION__);
+
   forEachFileToTypeCheck([](SourceFile &SF) {
     performWholeModuleTypeChecking(SF);
   });
