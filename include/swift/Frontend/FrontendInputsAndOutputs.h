@@ -37,6 +37,8 @@ class FrontendInputsAndOutputs {
 
   std::vector<InputFile> AllInputs;
   llvm::StringMap<unsigned> PrimaryInputsByName;
+
+  /// Indices into `AllInputs`
   std::vector<unsigned> PrimaryInputsInOrder;
 
   /// In Single-threaded WMO mode, all inputs are used
