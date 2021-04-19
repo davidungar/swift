@@ -781,7 +781,6 @@ struct NextToCompile {
   }
 };
 
-
 static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
                                           std::unique_ptr<SILModule> SM,
                                           ModuleOrSourceFile MSF,
@@ -805,24 +804,6 @@ static bool performCompileStepsPostSemaWMO(CompilerInstance &Instance,
                                        ReturnValue, observer);
 }
 
-static bool performCompileStepsPostSemaBatchMode(CompilerInstance &Instance,
-                                                 int &ReturnValue,
-                                                 FrontendObserver *observer) {
-  const auto &Invocation = Instance.getInvocation();
-  const SILOptions &SILOpts = Invocation.getSILOptions();
-  bool result = false;
-  for (auto *PrimaryFile : Instance.getPrimarySourceFiles()) {
-    auto SM = performASTLowering(*PrimaryFile, Instance.getSILTypes(),
-                                 SILOpts);
-    const PrimarySpecificPaths PSPs =
-        Instance.getPrimarySpecificPathsForSourceFile(*PrimaryFile);
-    result |= performCompileStepsPostSILGen(Instance, std::move(SM),
-                                            PrimaryFile, PSPs, ReturnValue,
-                                            observer);
-  }
-  return result;
-}
-
 static bool performCompileStepsPostSemaForPrimarySerializedInput(CompilerInstance &Instance,
                                                                  int &ReturnValue,
                                                                  FrontendObserver *observer) {
@@ -841,6 +822,28 @@ static bool performCompileStepsPostSemaForPrimarySerializedInput(CompilerInstanc
         result |= performCompileStepsPostSILGen(Instance, std::move(SM), mod,
                                                 PSPs, ReturnValue, observer);
       }
+  }
+  return result;
+}
+
+static bool performCompileStepsPostSemaBatchMode(CompilerInstance &Instance,
+                                                 int &ReturnValue,
+                                                 FrontendObserver *observer) {
+  // Build a separate SILModule for
+  // each source file, and run the remaining SILOpt-Serialize-IRGen-LLVM
+  // once for each such input.
+
+  const auto &Invocation = Instance.getInvocation();
+  const SILOptions &SILOpts = Invocation.getSILOptions();
+  bool result = false;
+  for (auto *PrimaryFile : Instance.getPrimarySourceFiles()) {
+    auto SM = performASTLowering(*PrimaryFile, Instance.getSILTypes(),
+                                 SILOpts);
+    const PrimarySpecificPaths PSPs =
+        Instance.getPrimarySpecificPathsForSourceFile(*PrimaryFile);
+    result |= performCompileStepsPostSILGen(Instance, std::move(SM),
+                                            PrimaryFile, PSPs, ReturnValue,
+                                            observer);
   }
   return result;
 }
@@ -1186,10 +1189,10 @@ withSemanticAnalysis(CompilerInstance &Instance, FrontendObserver *observer,
 
   if (Instance.getASTContext().hadError() &&
       !opts.AllowModuleWithCompilerErrors) {
+    Instance.logDynamicBatching("sema failed");
     // For dynamic batching, deal with the error later, for each primary
     if (!Instance.getInvocation().getFrontendOptions().DynamicBatching)
       return true;
-      Instance.logDynamicBatching("HEREf sema failed");
   }
 
   return cont(Instance);
@@ -1227,7 +1230,7 @@ static bool performAction(CompilerInstance &Instance,
                           FrontendObserver *observer,
                           ArrayRef<const char *> Args) {
   Instance.logDynamicBatching(__FUNCTION__);
-
+  
   const auto &opts = Instance.getInvocation().getFrontendOptions();
   auto &Context = Instance.getASTContext();
   switch (Instance.getInvocation().getFrontendOptions().RequestedAction) {
@@ -1864,10 +1867,10 @@ createSerializedDiagnosticConsumerIfNeeded(
 /// proceeds. The accumulated diagnostics are then emitted in the frontend's parseable-output.
 static std::unique_ptr<DiagnosticConsumer>
 createAccumulatingDiagnosticConsumer(
-    const FrontendInputsAndOutputs &inputsAndOutputs,
+    const FrontendInputsAndOutputs &InputsAndOutputs,
     llvm::StringMap<std::vector<std::string>> &FileSpecificDiagnostics) {
   return createDispatchingDiagnosticConsumerIfNeeded(
-      inputsAndOutputs,
+      InputsAndOutputs,
       [&](const InputFile &Input) -> std::unique_ptr<DiagnosticConsumer> {
     FileSpecificDiagnostics.try_emplace(Input.getFileName(),
                                         std::vector<std::string>());
@@ -1886,16 +1889,15 @@ createAccumulatingDiagnosticConsumer(
 /// If no serialized diagnostics are being produced, returns null.
 static std::unique_ptr<DiagnosticConsumer>
 createJSONFixItDiagnosticConsumerIfNeeded(
-    const FrontendInputsAndOutputs &inputsAndOutputs,
-    const DiagnosticOptions &diagnosticOptions) {
+    const CompilerInvocation &invocation) {
   return createDispatchingDiagnosticConsumerIfNeeded(
-      inputsAndOutputs,
+      invocation.getFrontendOptions().InputsAndOutputs,
       [&](const InputFile &input) -> std::unique_ptr<DiagnosticConsumer> {
         auto fixItsOutputPath = input.getFixItsOutputPath();
         if (fixItsOutputPath.empty())
           return nullptr;
         return std::make_unique<JSONFixitWriter>(
-            fixItsOutputPath.str(), diagnosticOptions);
+            fixItsOutputPath.str(), invocation.getDiagnosticOptions());
       });
 }
 
@@ -2074,8 +2076,7 @@ initializeDiagnosticConsumers(CompilerInstance *Instance,
   }
 
   std::unique_ptr<DiagnosticConsumer> FixItsConsumer =
-      createJSONFixItDiagnosticConsumerIfNeeded(inputsAndOutputs,
-                                                invocation.getDiagnosticOptions());
+      createJSONFixItDiagnosticConsumerIfNeeded(invocation);
   if (FixItsConsumer) {
     Instance->addDiagnosticConsumer(FixItsConsumer.get());
     consumers.emplace_back(std::move(FixItsConsumer));
@@ -2291,6 +2292,14 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     return finishDiagProcessing(1, /*verifierEnabled*/ false);
   }
 
+  llvm::StringMap<std::vector<std::string>> FileSpecificDiagnostics;
+  auto owningDiagnosticConsumers = initializeDiagnosticConsumers(
+    Instance.get(),
+    Invocation,
+    Invocation.getFrontendOptions().InputsAndOutputs,
+    &PDC,
+    FileSpecificDiagnostics);
+
   if (Invocation.getDiagnosticOptions().UseColor)
     PDC.forceColors();
 
@@ -2306,15 +2315,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   const DiagnosticOptions &diagOpts = Invocation.getDiagnosticOptions();
   bool verifierEnabled = diagOpts.VerifyMode != DiagnosticOptions::NoVerify;
-
-  llvm::StringMap<std::vector<std::string>> FileSpecificDiagnostics;
-  auto owningDiagnosticConsumers = initializeDiagnosticConsumers(
-    Instance.get(),
-    Invocation,
-    Invocation.getFrontendOptions().InputsAndOutputs,
-    &PDC,
-    FileSpecificDiagnostics);
-
 
   if (Instance->setup(Invocation)) {
     return finishDiagProcessing(1, /*verifierEnabled*/ false);

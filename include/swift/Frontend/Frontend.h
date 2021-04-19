@@ -50,7 +50,6 @@
 
 #include <memory>
 #include <os/log.h>
-///xxxx #include <OSLog/OSLog.h>
 
 namespace swift {
 
