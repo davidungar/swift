@@ -223,7 +223,7 @@ static bool makeParserAST(CompilerInstance &CI, StringRef Text,
   std::unique_ptr<llvm::MemoryBuffer> Buf;
   Buf = llvm::MemoryBuffer::getMemBuffer(Text, "<module-interface>");
   Invocation.getFrontendOptions().InputsAndOutputs.addInput(
-      InputFile(Buf.get()->getBufferIdentifier(), /*isPrimary*/false, Buf.get(),
+      InputFile(Buf.get()->getBufferIdentifier(), /*isCurrentPrimaryInput*/ false, /*isPrimary*/false, Buf.get(),
                 file_types::TY_Swift));
   return CI.setup(Invocation);
 }

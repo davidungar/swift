@@ -274,7 +274,7 @@ void CompilerInstance::setupStatsReporter() {
   const auto &LangOpts = Invok.getLangOptions();
   const auto &SILOpts = Invok.getSILOptions();
   const std::string &OutFile =
-      FEOpts.InputsAndOutputs.lastInputProducingOutput().outputFilename();
+      FEOpts.InputsAndOutputs.lastInputPotentiallyProducingOutput().outputFilename();
   auto Reporter = std::make_unique<UnifiedStatsReporter>(
       "swift-frontend",
       FEOpts.ModuleName,
@@ -625,7 +625,7 @@ bool CompilerInstance::setUpInputs() {
         getRecordedBufferID(input, shouldRecover, failed);
     hasFailed |= failed;
 
-    if (!bufferID.hasValue() || !input.isPrimary())
+    if (!bufferID.hasValue() || !input.isPotentialPrimaryInput())
       continue;
 
     recordPrimaryInputBuffer(*bufferID);
@@ -1081,7 +1081,7 @@ void CompilerInstance::forEachFileToTypeCheck(
       fn(*SF);
     }
   } else {
-    for (auto *SF : getPrimarySourceFiles()) {
+    for (auto *SF : getPotentialPrimarySourceFiles()) {
       fn(*SF);
     }
   }
@@ -1143,7 +1143,7 @@ SourceFile *CompilerInstance::createSourceFileForMainModule(
   auto opts = getSourceFileParsingOptions(isPrimary);
 
   auto *inputFile = new (*Context)
-      SourceFile(*mod, fileKind, bufferID, opts, isPrimary);
+      SourceFile(*mod, fileKind, bufferID, opts, false, isPrimary);
 
   if (isMainBuffer)
     inputFile->SyntaxParsingCache = Invocation.getMainFileSyntaxParsingCache();

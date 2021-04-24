@@ -235,7 +235,7 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
   auto *newModule = ModuleDecl::create(
       Ctx.getIdentifier("REPL_Code_Completion"), Ctx, implicitImports);
   auto &newSF =
-      *new (Ctx) SourceFile(*newModule, SourceFileKind::Main, *BufferID);
+  *new (Ctx) SourceFile(*newModule, SourceFileKind::Main, *BufferID, {}, false, false);
   newModule->addFile(newSF);
 
   performImportResolution(newSF);

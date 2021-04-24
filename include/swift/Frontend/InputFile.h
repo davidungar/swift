@@ -44,7 +44,7 @@ namespace swift {
 class InputFile final {
   std::string Filename;
   file_types::ID FileID;
-  llvm::PointerIntPair<llvm::MemoryBuffer *, 1, bool> BufferAndIsPrimary;
+  llvm::PointerIntPair<llvm::MemoryBuffer *, 2, unsigned> BufferAndPrimaryBits;
   PrimarySpecificPaths PSPs;
 
 public:
@@ -54,18 +54,19 @@ public:
   /// and is therefore not suitable for most clients that use files synthesized
   /// from memory buffers. Use the overload of this constructor accepting a
   /// memory buffer and an explicit \c file_types::ID instead.
-  InputFile(StringRef name, bool isPrimary,
-            llvm::MemoryBuffer *buffer = nullptr)
-      : InputFile(name, isPrimary, buffer,
+  InputFile(StringRef name, bool isCurrentPrimaryInput, bool isPotentialPrimaryInput,
+            llvm::MemoryBuffer *buffer)
+      : InputFile(name, isCurrentPrimaryInput, isPotentialPrimaryInput, buffer,
                   file_types::lookupTypeForExtension(
                       llvm::sys::path::extension(name))) {}
 
   /// Constructs an input file from the provided data.
-  InputFile(StringRef name, bool isPrimary, llvm::MemoryBuffer *buffer,
+  InputFile(StringRef name, bool isCurrentPrimaryInput, bool isPotentialPrimaryInput, llvm::MemoryBuffer *buffer,
             file_types::ID FileID)
       : Filename(
             convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(name)),
-        FileID(FileID), BufferAndIsPrimary(buffer, isPrimary),
+        FileID(FileID),
+  BufferAndPrimaryBits(buffer, isCurrentPrimaryInput * 2 + isPotentialPrimaryInput),
         PSPs(PrimarySpecificPaths()) {
     assert(!name.empty());
   }
@@ -75,11 +76,12 @@ public:
   file_types::ID getType() const { return FileID; };
 
   /// Retrieves whether this input file was passed as a primary to the frontend.
-  bool isPrimary() const { return BufferAndIsPrimary.getInt(); }
+  bool isCurrentPrimaryInput() const { return BufferAndPrimaryBits.getInt() & 2; }
+  bool isPotentialPrimaryInput() const { return BufferAndPrimaryBits.getInt() & 1; }
 
   /// Retrieves the backing buffer for this input file, if any.
   llvm::MemoryBuffer *getBuffer() const {
-    return BufferAndIsPrimary.getPointer();
+    return BufferAndPrimaryBits.getPointer();
   }
 
   /// The name of this \c InputFile, or `-` if this input corresponds to the

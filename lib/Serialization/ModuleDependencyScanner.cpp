@@ -140,7 +140,7 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
     unsigned bufferID = Ctx.SourceMgr.addNewSourceBuffer(std::move(interfaceBuf.get()));
     auto moduleDecl = ModuleDecl::create(moduleName, Ctx);
     auto sourceFile = new (Ctx) SourceFile(
-        *moduleDecl, SourceFileKind::Interface, bufferID);
+                                           *moduleDecl, SourceFileKind::Interface, bufferID,{}, false, false);
 
     // Walk the source file to find the import declarations.
     llvm::StringSet<> alreadyAddedModules;

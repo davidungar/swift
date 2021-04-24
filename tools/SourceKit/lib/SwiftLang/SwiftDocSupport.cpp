@@ -859,7 +859,7 @@ static bool makeParserAST(CompilerInstance &CI, StringRef Text,
   std::unique_ptr<llvm::MemoryBuffer> Buf;
   Buf = llvm::MemoryBuffer::getMemBuffer(Text, "<module-interface>");
   Invocation.getFrontendOptions().InputsAndOutputs.addInput(
-      InputFile(Buf.get()->getBufferIdentifier(), /*isPrimary*/false, Buf.get(),
+      InputFile(Buf.get()->getBufferIdentifier(), /*isCurrentPrimaryInput*/, false, /*isPotentialPrimaryInput*/false, Buf.get(),
                 file_types::TY_Swift));
   return CI.setup(Invocation);
 }
@@ -1178,7 +1178,7 @@ static bool reportSourceDocInfo(CompilerInvocation Invocation,
   EditorDiagConsumer DiagConsumer;
   CI.addDiagnosticConsumer(&DiagConsumer);
   Invocation.getFrontendOptions().InputsAndOutputs.addInput(
-      InputFile(InputBuf->getBufferIdentifier(), false, InputBuf));
+      InputFile(InputBuf->getBufferIdentifier(), false, false, InputBuf));
   if (CI.setup(Invocation))
     return true;
   DiagConsumer.setInputBufferIDs(CI.getInputBufferIDs());
@@ -1444,7 +1444,7 @@ SourceFile *SwiftLangSupport::getSyntacticSourceFile(
     return nullptr;
   }
   Invocation.getFrontendOptions().InputsAndOutputs.addInput(
-      InputFile(InputBuf->getBufferIdentifier(), /*isPrimary*/false, InputBuf,
+      InputFile(InputBuf->getBufferIdentifier(), /*isCurrentPrimaryInput*/false, /*isPrimary*/false, InputBuf,
                 file_types::TY_Swift));
 
   if (ParseCI.setup(Invocation)) {

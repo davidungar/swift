@@ -509,24 +509,45 @@ void ModuleDecl::addFile(FileUnit &newFile) {
 }
 
 ArrayRef<SourceFile *>
-PrimarySourceFilesRequest::evaluate(Evaluator &evaluator,
+CurrentPrimarySourceFilesRequest::evaluate(Evaluator &evaluator,
                                     ModuleDecl *mod) const {
   assert(mod->isMainModule() && "Only the main module can have primaries");
 
   SmallVector<SourceFile *, 8> primaries;
   for (auto *file : mod->getFiles()) {
     if (auto *SF = dyn_cast<SourceFile>(file)) {
-      if (SF->isPrimary())
+      if (SF->isCurrentPrimarySource())
         primaries.push_back(SF);
     }
   }
   return mod->getASTContext().AllocateCopy(primaries);
 }
 
-ArrayRef<SourceFile *> ModuleDecl::getPrimarySourceFiles() const {
+ArrayRef<SourceFile *>
+PotentialPrimarySourceFilesRequest::evaluate(Evaluator &evaluator,
+                                    ModuleDecl *mod) const {
+  assert(mod->isMainModule() && "Only the main module can have primaries");
+
+  SmallVector<SourceFile *, 8> primaries;
+  for (auto *file : mod->getFiles()) {
+    if (auto *SF = dyn_cast<SourceFile>(file)) {
+      if (SF->isPotentialPrimarySource())
+        primaries.push_back(SF);
+    }
+  }
+  return mod->getASTContext().AllocateCopy(primaries);
+}
+
+ArrayRef<SourceFile *> ModuleDecl::getCurrentPrimarySourceFiles() const {
   auto &eval = getASTContext().evaluator;
   auto *mutableThis = const_cast<ModuleDecl *>(this);
-  return evaluateOrDefault(eval, PrimarySourceFilesRequest{mutableThis}, {});
+  return evaluateOrDefault(eval, CurrentPrimarySourceFilesRequest{mutableThis}, {});
+}
+
+ArrayRef<SourceFile *> ModuleDecl::getPotentialPrimarySourceFiles() const {
+  auto &eval = getASTContext().evaluator;
+  auto *mutableThis = const_cast<ModuleDecl *>(this);
+  return evaluateOrDefault(eval, PotentialPrimarySourceFilesRequest{mutableThis}, {});
 }
 
 SourceFile *CodeCompletionFileRequest::evaluate(Evaluator &evaluator,
@@ -2462,12 +2483,15 @@ ModuleDecl::computeFileIDMap(bool shouldDiagnose) const {
 
 SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
                        Optional<unsigned> bufferID,
-                       ParsingOptions parsingOpts, bool isPrimary)
+                       ParsingOptions parsingOpts,
+                       bool isCurrentPrimarySource, bool isPotentialPrimarySource)
     : FileUnit(FileUnitKind::Source, M), BufferID(bufferID ? *bufferID : -1),
-      ParsingOpts(parsingOpts), IsPrimary(isPrimary), Kind(K) {
+      ParsingOpts(parsingOpts),
+      IsCurrentPrimarySource(isCurrentPrimarySource), IsPotentialPrimarySource(isPotentialPrimarySource),
+      Kind(K) {
   M.getASTContext().addDestructorCleanup(*this);
 
-  assert(!IsPrimary || M.isMainModule() &&
+  assert(!IsPotentialPrimarySource|| M.isMainModule() &&
          "A primary cannot appear outside the main module");
 
   if (isScriptMode()) {

@@ -339,7 +339,7 @@ bool CompletionInstance::performCachedOperationIfPossible(
   registerSILGenRequestFunctions(tmpCtx->evaluator);
   ModuleDecl *tmpM = ModuleDecl::create(Identifier(), *tmpCtx);
   SourceFile *tmpSF = new (*tmpCtx)
-      SourceFile(*tmpM, oldSF->Kind, tmpBufferID, oldSF->getParsingOptions());
+      SourceFile(*tmpM, oldSF->Kind, tmpBufferID, oldSF->getParsingOptions(), false, false);
 
   // FIXME: Since we don't setup module loaders on the temporary AST context,
   // 'canImport()' conditional compilation directive always fails. That causes
@@ -466,7 +466,7 @@ bool CompletionInstance::performCachedOperationIfPossible(
                                               oldM->getImplicitImportInfo());
     newM->setABIName(oldM->getABIName());
     auto *newSF = new (Ctx) SourceFile(*newM, SourceFileKind::Main, newBufferID,
-                                       oldSF->getParsingOptions());
+                                       oldSF->getParsingOptions(), false, false);
     newM->addFile(*newSF);
 
     // Tell the compiler instance we've replaced the main module.

@@ -526,8 +526,11 @@ public:
 
   /// Gets the set of SourceFiles which are the primary inputs for this
   /// CompilerInstance.
-  ArrayRef<SourceFile *> getPrimarySourceFiles() const {
-    return getMainModule()->getPrimarySourceFiles();
+  ArrayRef<SourceFile *> getCurrentPrimarySourceFiles() const {
+    return getMainModule()->getCurrentPrimarySourceFiles();
+  }
+  ArrayRef<SourceFile *> getPotentialPrimarySourceFiles() const {
+    return getMainModule()->getPotentialPrimarySourceFiles();
   }
 
   /// Gets the SourceFile which is the primary input for this CompilerInstance.
@@ -537,7 +540,7 @@ public:
   /// FIXME: This should be removed eventually, once there are no longer any
   /// codepaths that rely on a single primary file.
   SourceFile *getPrimarySourceFile() const {
-    auto primaries = getPrimarySourceFiles();
+    auto primaries = getCurrentPrimarySourceFiles();
     if (primaries.empty()) {
       return nullptr;
     } else {

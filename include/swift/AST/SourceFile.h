@@ -118,8 +118,11 @@ private:
   /// The parsing options for the file.
   ParsingOptions ParsingOpts;
 
-  /// Whether this is a primary source file which we'll be generating code for.
-  bool IsPrimary;
+  /// Whether this is a primary source file we are generating code for.
+  bool IsCurrentPrimarySource;
+
+  /// Whether this is a primary source file we might generate code for.
+  bool IsPotentialPrimarySource;
 
   /// The scope map that describes this source file.
   NullablePtr<ASTScope> Scope = nullptr;
@@ -208,7 +211,8 @@ public:
 
   /// Whether this source file is a primary file, meaning that we're generating
   /// code for it. Note this method returns \c false in WMO.
-  bool isPrimary() const { return IsPrimary; }
+  bool isCurrentPrimarySource() const { return IsCurrentPrimarySource; }
+  bool isPotentialPrimarySource() const { return IsPotentialPrimarySource; }
 
   /// A cache of syntax nodes that can be reused when creating the syntax tree
   /// for this file.
@@ -284,7 +288,9 @@ public:
   llvm::StringMap<SourceFilePathInfo> getInfoForUsedFilePaths() const;
 
   SourceFile(ModuleDecl &M, SourceFileKind K, Optional<unsigned> bufferID,
-             ParsingOptions parsingOpts = {}, bool isPrimary = false);
+             ParsingOptions parsingOpts, //  = {},
+             bool isCurrentPrimarySource,
+             bool isPotentialPrimarySource);
 
   ~SourceFile();
 

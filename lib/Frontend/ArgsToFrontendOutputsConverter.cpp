@@ -246,7 +246,7 @@ Optional<std::string> OutputFilesComputer::deriveOutputFileForDirectory(
 std::string
 OutputFilesComputer::determineBaseNameOfOutput(const InputFile &input) const {
   std::string nameToStem =
-      input.isPrimary()
+      input.isPotentialPrimaryInput()
           ? input.getFileName()
           : ModuleNameArg ? ModuleNameArg->getValue() : FirstInput;
   return llvm::sys::path::stem(nameToStem).str();
@@ -280,7 +280,7 @@ SupplementaryOutputPathsComputer::computeOutputPaths() const {
   if (!pathsFromUser)
     return None;
 
-  if (InputsAndOutputs.hasPrimaryInputs())
+  if (InputsAndOutputs.hasPotentialPrimaryInputs())
     assert(OutputFiles.size() == pathsFromUser->size());
   else if (InputsAndOutputs.isSingleThreadedWMO())
     assert(OutputFiles.size() == pathsFromUser->size() &&
@@ -512,7 +512,7 @@ StringRef SupplementaryOutputPathsComputer::
   if (!outputFilename.empty() && outputFilename != "-")
     return outputFilename;
 
-  if (input.isPrimary() && input.getFileName() != "-")
+  if (input.isPotentialPrimaryInput() && input.getFileName() != "-")
     return llvm::sys::path::filename(input.getFileName());
 
   return ModuleName;

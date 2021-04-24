@@ -180,7 +180,7 @@ ArgsToFrontendInputsConverter::createInputFilesConsumingPrimaries(
   FrontendInputsAndOutputs result;
   for (auto &file : Files) {
     bool isPrimary = primaryFiles.count(file) > 0;
-    result.addInput(InputFile(file, isPrimary));
+    result.addInput(InputFile(file, false, isPrimary, {}));
     if (isPrimary)
       primaryFiles.erase(file);
   }

@@ -209,15 +209,17 @@ static FrontendInputsAndOutputs resolveSymbolicLinksInInputs(
     if (auto err = FileSystem->getRealPath(input.getFileName(), newFilename))
       newFilename = input.getFileName();
     llvm::sys::path::native(newFilename);
-    bool newIsPrimary = input.isPrimary() ||
+    bool newIsPotentialPrimary = input.isPotentialPrimaryInput() ||
                         (!PrimaryFile.empty() && PrimaryFile == newFilename);
-    if (newIsPrimary) {
+    bool newIsCurrentPrimary = input.isCurrentPrimaryInput() ||
+                        (!PrimaryFile.empty() && PrimaryFile == newFilename);
+    if (newIsPotentialPrimary) {
       ++primaryCount;
     }
     assert(primaryCount < 2 && "cannot handle multiple primaries");
 
     replacementInputsAndOutputs.addInput(
-        InputFile(newFilename.str(), newIsPrimary, input.getBuffer()));
+        InputFile(newFilename.str(), newIsCurrentPrimary, newIsPotentialPrimary, input.getBuffer()));
   }
 
   if (PrimaryFile.empty() || primaryCount == 1) {

@@ -324,7 +324,7 @@ static void countASTStats(UnifiedStatsReporter &Stats,
     C.NumIncrementalDependencies = D->getIncrementalDependencies().size();
   }
 
-  for (auto SF : Instance.getPrimarySourceFiles()) {
+  for (auto SF : Instance.getPotentialPrimarySourceFiles()) {
     auto &Ctx = SF->getASTContext();
     Ctx.evaluator.enumerateReferencesInFile(SF, [&C](const auto &ref) {
     using NodeKind = evaluator::DependencyCollector::Reference::Kind;
@@ -346,8 +346,8 @@ static void countASTStats(UnifiedStatsReporter &Stats,
     });
   }
 
-  if (!Instance.getPrimarySourceFiles().empty()) {
-    for (auto SF : Instance.getPrimarySourceFiles())
+  if (!Instance.getPotentialPrimarySourceFiles().empty()) {
+    for (auto SF : Instance.getPotentialPrimarySourceFiles())
       countStatsOfSourceFile(Stats, Instance, SF);
   } else if (auto *M = Instance.getMainModule()) {
     // No primary source file, but a main module; this is WMO-mode
@@ -499,7 +499,7 @@ getPrimaryOrMainSourceFile(const CompilerInstance &Instance) {
 /// Dumps the AST of all available primary source files. If corresponding output
 /// files were specified, use them; otherwise, dump the AST to stdout.
 static bool dumpAST(CompilerInstance &Instance) {
-  auto primaryFiles = Instance.getPrimarySourceFiles();
+  auto primaryFiles = Instance.getPotentialPrimarySourceFiles();
   if (!primaryFiles.empty()) {
     for (SourceFile *sourceFile: primaryFiles) {
       auto PSPs = Instance.getPrimarySpecificPathsForSourceFile(*sourceFile);
@@ -622,7 +622,7 @@ static void emitSwiftdepsForAllPrimaryInputsIfNeeded(
   const auto &Invocation = Instance.getInvocation();
   if (Invocation.getFrontendOptions()
           .InputsAndOutputs.hasReferenceDependenciesPath() &&
-      Instance.getPrimarySourceFiles().empty()) {
+      Instance.getCurrentPrimarySourceFiles().empty()) {
     Instance.getDiags().diagnose(
         SourceLoc(), diag::emit_reference_dependencies_without_primary_file);
     return;
@@ -646,7 +646,7 @@ static void emitSwiftdepsForAllPrimaryInputsIfNeeded(
       !Invocation.getFrontendOptions().AllowModuleWithCompilerErrors)
     return;
 
-  for (auto *SF : Instance.getPrimarySourceFiles()) {
+  for (auto *SF : Instance.getCurrentPrimarySourceFiles()) {
     const std::string &referenceDependenciesFilePath =
         Invocation.getReferenceDependenciesFilePathForPrimary(
             SF->getFilename());
@@ -836,7 +836,7 @@ static bool performCompileStepsPostSemaBatchMode(CompilerInstance &Instance,
   const auto &Invocation = Instance.getInvocation();
   const SILOptions &SILOpts = Invocation.getSILOptions();
   bool result = false;
-  for (auto *PrimaryFile : Instance.getPrimarySourceFiles()) {
+  for (auto *PrimaryFile : Instance.getCurrentPrimarySourceFiles()) {
     auto SM = performASTLowering(*PrimaryFile, Instance.getSILTypes(),
                                  SILOpts);
     const PrimarySpecificPaths PSPs =
@@ -848,24 +848,85 @@ static bool performCompileStepsPostSemaBatchMode(CompilerInstance &Instance,
   return result;
 }
 
-static bool performCompileStepsPostSema(CompilerInstance &Instance,
-                                        int &ReturnValue,
-                                        FrontendObserver *observer,
-                                        ArrayRef<const char *> Args) {
+
+//bool switchToPrimary(CompilerInstance &Instance,
+//                     StringRef sourceFileName,
+//                     llvm::StringMap<std::vector<std::string>> &FileSpecificDiagnostics) {
+//  unsigned fsdSize = FileSpecificDiagnostics.size();
+//
+//  assert(fsdSize == FileSpecificDiagnostics.size());
+//
+////  saveDiags();
+////  finishDiagProcessing
+////  emitFinishedMessagesIfNeeded();
+////  switchDiagnostics();
+////  emitBeginMessage();
+//  abort();
+//#error HERE
+//  return hadError;
+//}
+//
+//bool outputDiagnostics(llvm::StringMap<std::vector<std::string>> &FileSpecificDiagnostics,
+//                       StringRef(primarySourceFile)) {
+//  idc just for the primary file
+//    handle all diags in FSD
+//    finish diags
+//    remove the hoohas
+//  FSD at file handleDiag
+//}
+
+static bool performCompileStepsPostSemaDynamicBatchMode(
+              CompilerInstance &Instance,
+              int &ReturnValue,
+              FrontendObserver *observer,
+              ArrayRef<const char *> Args,
+              llvm::StringMap<std::vector<std::string>> &FileSpecificDiagnostics) {
+  abort();
+//  bool hadError = false;
+//  for (;;) {
+//    auto nextToCompile = NextToCompile(Instance);
+//    switch (nextToCompile.outcome) {
+//      case NextToCompile::Outcome::Finished:
+//        return hadError;
+//      case NextToCompile::Outcome::Error:
+//        return true;
+//      case NextToCompile::Outcome::SourceFileName:
+//        hadError |= switchToPrimary(Instance,
+//                                    nextToCompile.sourceFileName,
+//                                    FileSpecificDiagnostics);
+//        break;
+//    }
+//    hadError |= performCompileStepsPostSemaBatchMode(Instance, ReturnValue, observer);
+//   // bool hadError = outputDiagnostics(FileSpecificDiagnostics, thePrimarySourceFileName);
+//
+//
+//  }
+}
+
+static bool performCompileStepsPostSema(
+              CompilerInstance &Instance,
+              int &ReturnValue,
+              FrontendObserver *observer,
+              ArrayRef<const char *> Args,
+              llvm::StringMap<std::vector<std::string>> &FileSpecificDiagnostics) {
   const FrontendOptions &opts = Instance.getInvocation().getFrontendOptions();
 
   // If there are no primary inputs the compiler is in WMO mode and builds one
   // SILModule for the entire module.
-  if (!opts.InputsAndOutputs.hasPrimaryInputs()) {
+  if (!opts.InputsAndOutputs.hasPotentialPrimaryInputs()) {
     return performCompileStepsPostSemaWMO(Instance, ReturnValue, observer);
   }
   // If there are primary inputs but no primary _source files_, there might be
   // a primary serialized input.
-  if (Instance.getPrimarySourceFiles().empty()) {
+  if (Instance.getPotentialPrimarySourceFiles().empty()) {
     return performCompileStepsPostSemaForPrimarySerializedInput(Instance,
                                                                 ReturnValue,
                                                                 observer);
   }
+ if (opts.DynamicBatching)
+   return performCompileStepsPostSemaDynamicBatchMode(
+            Instance, ReturnValue, observer, Args, FileSpecificDiagnostics);
+
  return performCompileStepsPostSemaBatchMode(Instance, ReturnValue, observer);
 }
 
@@ -874,10 +935,10 @@ static void emitIndexDataForSourceFile(SourceFile *PrimarySourceFile,
 
 /// Emits index data for all primary inputs, or the main module.
 static void emitIndexData(const CompilerInstance &Instance) {
-  if (Instance.getPrimarySourceFiles().empty()) {
+  if (Instance.getPotentialPrimarySourceFiles().empty()) {
     emitIndexDataForSourceFile(nullptr, Instance);
   } else {
-    for (SourceFile *SF : Instance.getPrimarySourceFiles())
+    for (SourceFile *SF : Instance.getPotentialPrimarySourceFiles())
       emitIndexDataForSourceFile(SF, Instance);
   }
 }
@@ -1074,9 +1135,9 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
   // must be run *before* verifying diagnostics so that the former can be tested
   // via the latter.
   if (opts.EnableIncrementalDependencyVerifier) {
-    if (!Instance.getPrimarySourceFiles().empty()) {
+    if (!Instance.getPotentialPrimarySourceFiles().empty()) {
       swift::verifyDependencies(Instance.getSourceMgr(),
-                                Instance.getPrimarySourceFiles());
+                                Instance.getPotentialPrimarySourceFiles());
     } else {
       swift::verifyDependencies(Instance.getSourceMgr(),
                                 Instance.getMainModule()->getFiles());
@@ -1220,7 +1281,8 @@ static bool performParseOnly(ModuleDecl &MainModule) {
 static bool performAction(CompilerInstance &Instance,
                           int &ReturnValue,
                           FrontendObserver *observer,
-                          ArrayRef<const char *> Args) {
+                          ArrayRef<const char *> Args,
+                          llvm::StringMap<std::vector<std::string>> &FileSpecificDiagnostics) {
   Instance.logDynamicBatching(__FUNCTION__);
 
   const auto &opts = Instance.getInvocation().getFrontendOptions();
@@ -1321,7 +1383,8 @@ static bool performAction(CompilerInstance &Instance,
         Instance, observer, [&](CompilerInstance &Instance) {
           assert(FrontendOptions::doesActionGenerateSIL(opts.RequestedAction) &&
                  "All actions not requiring SILGen must have been handled!");
-          return performCompileStepsPostSema(Instance, ReturnValue, observer, Args);
+          return performCompileStepsPostSema(
+                   Instance, ReturnValue, observer, Args, FileSpecificDiagnostics);
         });
   }
 
@@ -1336,7 +1399,8 @@ static bool performAction(CompilerInstance &Instance,
 static bool performCompile(CompilerInstance &Instance,
                            int &ReturnValue,
                            FrontendObserver *observer,
-                           ArrayRef<const char *> Args) {
+                           ArrayRef<const char *> Args,
+                           llvm::StringMap<std::vector<std::string>> &FileSpecificDiagnostics) {
   Instance.logDynamicBatching(__FUNCTION__);
 
   const auto &Invocation = Instance.getInvocation();
@@ -1372,7 +1436,8 @@ static bool performCompile(CompilerInstance &Instance,
     return true;
   }() && "Only supports parsing .swift files");
 
-  bool hadError = performAction(Instance, ReturnValue, observer, Args);
+  bool hadError = performAction(
+                    Instance, ReturnValue, observer, Args, FileSpecificDiagnostics);
 
   // We might have freed the ASTContext already, but in that case we would
   // have already performed these actions.
@@ -1545,7 +1610,7 @@ static void freeASTContextIfPossible(CompilerInstance &Instance) {
   // primary input, then freeing it after processing the last primary is
   // unlikely to reduce the peak heap size. So, only optimize the
   // single-primary-case (or WMO).
-  if (opts.InputsAndOutputs.hasMultiplePrimaryInputs()) {
+  if (opts.InputsAndOutputs.hasMultiplePotentialPrimaryInputs()) {
     return;
   }
 
@@ -1821,8 +1886,8 @@ createDispatchingDiagnosticConsumerIfNeeded(
   //
   // To avoid introducing bugs into WMO or single-file modes, test for multiple
   // primaries.
-  if (!subconsumers.empty() && inputsAndOutputs.hasMultiplePrimaryInputs()) {
-    inputsAndOutputs.forEachNonPrimaryInput(
+  if (!subconsumers.empty() && inputsAndOutputs.hasMultiplePotentialPrimaryInputs()) {
+    inputsAndOutputs.forEachNonPotentialPrimaryInput(
         [&](const InputFile &input) -> bool {
           subconsumers.emplace_back(input.getFileName(), nullptr);
           return false;
@@ -2087,8 +2152,8 @@ static void emitBeganMessagesIfNeeded(
   // compilation. We assign each primary in a batch job a quasi process id,
   // making sure it cannot collide with a real PID (always positive). Non-batch
   // compilation gets a real OS PID.
-  int64_t Pid = IO.hasUniquePrimaryInput() ? OSPid : QUASI_PID_START;
-  IO.forEachPrimaryInputWithIndex([&](const InputFile &Input,
+  int64_t Pid = IO.hasUniqueCurrentPrimaryInput() ? OSPid : QUASI_PID_START;
+  IO.forEachCurrentPrimaryInputWithIndex([&](const InputFile &Input,
                                       unsigned idx) -> bool {
     emitBeganMessage(
                      llvm::errs(),
@@ -2115,8 +2180,8 @@ static void emitFinishedMessagesIfNeeded(
   // compilation. We assign each primary in a batch job a quasi process id,
   // making sure it cannot collide with a real PID (always positive). Non-batch
   // compilation gets a real OS PID.
-  int64_t Pid = IO.hasUniquePrimaryInput() ? OSPid : QUASI_PID_START;
-  IO.forEachPrimaryInputWithIndex([&](const InputFile &Input,
+  int64_t Pid = IO.hasUniqueCurrentPrimaryInput() ? OSPid : QUASI_PID_START;
+  IO.forEachCurrentPrimaryInputWithIndex([&](const InputFile &Input,
                                       unsigned idx) -> bool {
     assert(FileSpecificDiagnostics.count(Input.getFileName()) != 0 &&
            "Expected diagnostic collection for input.");
@@ -2328,7 +2393,8 @@ int swift::performFrontend(ArrayRef<const char *> Args,
                             Invocation.getFrontendOptions().InputsAndOutputs);
 
   int ReturnValue = 0;
-  bool HadError = performCompile(*Instance, ReturnValue, observer, Args);
+  bool HadError = performCompile(*Instance, ReturnValue, observer, Args,
+                                 FileSpecificDiagnostics);
 
   if (verifierEnabled) {
     DiagnosticEngine &diags = Instance->getDiags();

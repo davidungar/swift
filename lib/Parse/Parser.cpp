@@ -1235,7 +1235,7 @@ struct ParserUnit::Implementation {
     parsingOpts |= ParsingFlags::DisablePoundIfEvaluation;
 
     auto *M = ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx);
-    SF = new (Ctx) SourceFile(*M, SFKind, BufferID, parsingOpts);
+    SF = new (Ctx) SourceFile(*M, SFKind, BufferID, parsingOpts, false, false);
   }
 
   ~Implementation() {

@@ -62,7 +62,7 @@ struct InvocationOptions {
     // for all files.
     assert(!this->PrimaryFile.empty());
     assert(this->Invok.getFrontendOptions()
-               .InputsAndOutputs.hasUniquePrimaryInput() &&
+               .InputsAndOutputs.hasUniquePotentialPrimaryInput() &&
            "Must have exactly one primary input for code completion, etc.");
   }
 
@@ -912,7 +912,7 @@ void ASTProducer::findSnapshotAndOpenFiles(
   for (const auto &input :
        Opts.Invok.getFrontendOptions().InputsAndOutputs.getAllInputs()) {
     const std::string &File = input.getFileName();
-    bool IsPrimary = input.isPrimary();
+    bool IsPrimary = input.isPotentialPrimaryInput();
     bool FoundSnapshot = false;
     for (auto &Snap : Snapshots) {
       if (Snap->getFilename() == File) {

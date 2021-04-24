@@ -8423,7 +8423,7 @@ SourceFile &ClangImporter::Implementation::getClangSwiftAttrSourceFile(
     return *known->second;
 
   auto sourceFile = new (SwiftContext) SourceFile(
-      module, SourceFileKind::Library, None);
+    module, SourceFileKind::Library, None, {}, false, false);
   ClangSwiftAttrSourceFiles.insert({&module, sourceFile});
   return *sourceFile;
 }

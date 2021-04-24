@@ -222,12 +222,12 @@ FileSpecificDiagnosticConsumer::findSubconsumerForNonNote(
   // Try to put it in the responsible primary input
   if (Info.BufferIndirectlyCausingDiagnostic.isInvalid())
     return None;
-  const auto currentPrimarySubconsumer =
+  const auto currentPrimarySourceSubconsumer =
       subconsumerForLocation(SM, Info.BufferIndirectlyCausingDiagnostic);
-  assert(!currentPrimarySubconsumer ||
-         (*currentPrimarySubconsumer)->getConsumer() &&
+  assert(!currentPrimarySourceSubconsumer ||
+         (*currentPrimarySourceSubconsumer)->getConsumer() &&
              "current primary must have a .dia file");
-  return currentPrimarySubconsumer;
+  return currentPrimarySourceSubconsumer;
 }
 
 bool FileSpecificDiagnosticConsumer::finishProcessing() {

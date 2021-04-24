@@ -447,7 +447,7 @@ private:
             typename std::enable_if<Request::isDependencySource>::type * = nullptr>
   void handleDependencySourceRequest(const Request &r) {
     auto source = r.readDependencySource(recorder);
-    if (!source.isNull() && source.get()->isPrimary()) {
+    if (!source.isNull() && source.get()->isPotentialPrimarySource()) {
       recorder.handleDependencySourceRequest(r, source.get());
     }
   }

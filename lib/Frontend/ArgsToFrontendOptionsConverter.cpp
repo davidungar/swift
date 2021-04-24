@@ -196,7 +196,7 @@ bool ArgsToFrontendOptionsConverter::convert(
   }
 
   if (Opts.RequestedAction == FrontendOptions::ActionType::Immediate &&
-      Opts.InputsAndOutputs.hasPrimaryInputs()) {
+      Opts.InputsAndOutputs.hasPotentialPrimaryInputs()) {
     Diags.diagnose(SourceLoc(), diag::error_immediate_mode_primary_file);
     return true;
   }
@@ -619,7 +619,7 @@ void ArgsToFrontendOptionsConverter::computeImportObjCHeaderOptions() {
   using namespace options;
   if (const Arg *A = Args.getLastArgNoClaim(OPT_import_objc_header)) {
     Opts.ImplicitObjCHeaderPath = A->getValue();
-    Opts.SerializeBridgingHeader |= !Opts.InputsAndOutputs.hasPrimaryInputs();
+    Opts.SerializeBridgingHeader |= !Opts.InputsAndOutputs.hasPotentialPrimaryInputs();
   }
 }
 void ArgsToFrontendOptionsConverter::

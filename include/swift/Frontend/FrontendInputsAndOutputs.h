@@ -36,10 +36,13 @@ class FrontendInputsAndOutputs {
   friend class ArgsToFrontendInputsConverter;
 
   std::vector<InputFile> AllInputs;
-  llvm::StringMap<unsigned> PrimaryInputsByName;
+  llvm::StringMap<unsigned> PotentialPrimaryInputsByName;
 
   /// Indices into `AllInputs`
-  std::vector<unsigned> PrimaryInputsInOrder;
+  std::vector<unsigned> CurrentPrimaryInputsInOrder;
+  std::vector<unsigned> PotentialPrimaryInputsInOrder;
+
+
 
   /// In Single-threaded WMO mode, all inputs are used
   /// both for importing and compiling.
@@ -69,7 +72,7 @@ public:
   bool isSingleThreadedWMO() const { return IsSingleThreadedWMO; }
   void setIsSingleThreadedWMO(bool istw) { IsSingleThreadedWMO = istw; }
 
-  bool isWholeModule() const { return !hasPrimaryInputs(); }
+  bool isWholeModule() const { return !hasPotentialPrimaryInputs(); }
 
   bool shouldRecoverMissingInputs() { return ShouldRecoverMissingInputs; }
   void setShouldRecoverMissingInputs() { ShouldRecoverMissingInputs = true; }
@@ -111,31 +114,38 @@ public:
 
   // Primaries:
 
-  const InputFile &firstPrimaryInput() const;
-  const InputFile &lastPrimaryInput() const;
+  const InputFile &firstCurrentPrimaryInput() const;
+  const InputFile &lastCurrentPrimaryInput() const;
+  const InputFile &firstPotentialPrimaryInput() const;
+  const InputFile &lastPotentialPrimaryInput() const;
+
 
   /// If \p fn returns true, exit early and return true.
   bool
-  forEachPrimaryInput(llvm::function_ref<bool(const InputFile &)> fn) const;
+  forEachCurrentPrimaryInput(llvm::function_ref<bool(const InputFile &)> fn) const;
+  bool
+  forEachPotentialPrimaryInput(llvm::function_ref<bool(const InputFile &)> fn) const;
 
   /// Iterates over primary inputs, exposing their unique ordered index
   /// If \p fn returns true, exit early and return true.
-  bool forEachPrimaryInputWithIndex(
+  bool forEachCurrentPrimaryInputWithIndex(
       llvm::function_ref<bool(const InputFile &, unsigned index)> fn) const;
 
   /// If \p fn returns true, exit early and return true.
   bool
-  forEachNonPrimaryInput(llvm::function_ref<bool(const InputFile &)> fn) const;
+  forEachNonPotentialPrimaryInput(llvm::function_ref<bool(const InputFile &)> fn) const;
 
-  unsigned primaryInputCount() const { return PrimaryInputsInOrder.size(); }
+  unsigned currentPrimaryInputCount() const { return CurrentPrimaryInputsInOrder.size(); }
+  unsigned potentialPrimaryInputCount() const { return PotentialPrimaryInputsInOrder.size(); }
 
   // Primary count readers:
 
-  bool hasUniquePrimaryInput() const { return primaryInputCount() == 1; }
+  bool hasUniqueCurrentPrimaryInput() const { return currentPrimaryInputCount() == 1; }
+  bool hasUniquePotentialPrimaryInput() const { return potentialPrimaryInputCount() == 1; }
 
-  bool hasPrimaryInputs() const { return primaryInputCount() > 0; }
+  bool hasPotentialPrimaryInputs() const { return potentialPrimaryInputCount() > 0; }
 
-  bool hasMultiplePrimaryInputs() const { return primaryInputCount() > 1; }
+  bool hasMultiplePotentialPrimaryInputs() const { return potentialPrimaryInputCount() > 1; }
 
   /// Fails an assertion if there is more than one primary input.
   /// Used in situations where only one primary input can be handled
@@ -153,7 +163,7 @@ public:
   // Count-dependend readers:
 
   /// \return the unique primary input, if one exists.
-  const InputFile *getUniquePrimaryInput() const;
+  const InputFile *getUniquePotentialPrimaryInput() const;
 
   const InputFile &getRequiredUniquePrimaryInput() const;
 
@@ -206,8 +216,8 @@ public:
     return countOfInputsProducingMainOutputs() != 0;
   }
 
-  const InputFile &firstInputProducingOutput() const;
-  const InputFile &lastInputProducingOutput() const;
+  const InputFile &firstInputPotentiallyProducingOutput() const;
+  const InputFile &lastInputPotentiallyProducingOutput() const;
 
   /// Under single-threaded WMO, we pretend that the first input
   /// generates the main output, even though it will include code

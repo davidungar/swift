@@ -1178,7 +1178,7 @@ getNotableRegions(StringRef SourceText, unsigned NameOffset, StringRef Name,
   CompilerInvocation Invocation{};
 
   Invocation.getFrontendOptions().InputsAndOutputs.addInput(
-      InputFile("<extract>", true, InputBuffer.get(), file_types::TY_Swift));
+      InputFile("<extract>", false, true, InputBuffer.get(), file_types::TY_Swift));
   Invocation.getFrontendOptions().ModuleName = "extract";
   Invocation.getLangOptions().DisablePoundIfEvaluation = true;
 

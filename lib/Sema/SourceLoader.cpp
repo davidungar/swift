@@ -122,7 +122,8 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
 
   auto *importFile =
       new (Ctx) SourceFile(*importMod, SourceFileKind::Library, bufferID,
-                           SourceFile::getDefaultParsingOptions(Ctx.LangOpts));
+                           SourceFile::getDefaultParsingOptions(Ctx.LangOpts),
+                           false, false);
   importMod->addFile(*importFile);
   performImportResolution(*importFile);
   importMod->setHasResolvedImports();

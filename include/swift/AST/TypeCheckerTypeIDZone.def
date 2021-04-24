@@ -190,7 +190,9 @@ SWIFT_REQUEST(TypeChecker, OverriddenDeclsRequest,
 SWIFT_REQUEST(TypeChecker, PatternBindingEntryRequest,
               const PatternBindingEntry *(PatternBindingDecl *, unsigned),
               SeparatelyCached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, PrimarySourceFilesRequest,
+SWIFT_REQUEST(TypeChecker, CurrentPrimarySourceFilesRequest,
+              ArrayRef<SourceFile *>(ModuleDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, PotentialPrimarySourceFilesRequest,
               ArrayRef<SourceFile *>(ModuleDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, PropertyWrapperAuxiliaryVariablesRequest,
               PropertyWrapperAuxiliaryVariables(VarDecl *), Cached,
